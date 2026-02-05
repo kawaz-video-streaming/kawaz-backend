@@ -1,2 +1,2 @@
 # kawaz-backend
-this service represents the backend service of the video streaming app 
+this service represents the backend of the video streaming app 
