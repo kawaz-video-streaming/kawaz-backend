@@ -6,7 +6,7 @@ const main = async () => {
     await startSystem(config);
 };
 
-main().catch((error) => {
+main().then(()=> {console.log("System started successfully")}).catch((error) => {
     console.error(`Error starting the system: \n${error.message}`);
     process.exit(1);
 });
