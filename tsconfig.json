@@ -31,6 +31,8 @@
     "noImplicitThis": true,
     "alwaysStrict": true,
     "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     // "noFallthroughCasesInSwitch": true,
 
     /* Module resolution, interop and JSON */

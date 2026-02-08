@@ -4,19 +4,28 @@
   "private": true,
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "clean": "rimraf dist"
+    "build": "npm run clean && tsc",
+    "build:watch": "tsc --watch",
+    "build:advanced": "npm run clean:advanced && npm i && tsc",
+    "start": "node --env-file .env dist/index.js",
+    "start:dev": "npm run build && npm run start",
+    "dev": "ts-node-dev --respawn --env-file .env src/index.ts",
+    "clean": "rimraf dist",
+    "clean:advanced": "rimraf dist && rimraf node_modules && rimraf package-lock.json"
   },
   "dependencies": {
-    "express": "^5.2.1"
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "http-status-codes": "^2.3.0",
+    "joi": "^17.13.3",
+    "ramda": "^0.32.0"
   },
   "devDependencies": {
-    "typescript": "^5.2.2",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/ramda": "^0.31.1",
+    "rimraf": "^5.0.0",
     "ts-node-dev": "^2.0.0",
-    "@types/node": "^25.0.0",
-    "@types/express": "^5.0.0",
-    "rimraf": "^5.0.0"
+    "typescript": "^5.2.2"
   }
 }

@@ -1,12 +1,12 @@
-import express from 'express';
+import { getConfig } from "./config";
+import { startSystem } from "./services/system";
 
-const app = express();
-const port = process.env.PORT ?? 3000;
+const main = async () => {
+    const config = getConfig(process.env);
+    await startSystem(config);
+};
 
-app.get('/', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
-app.listen(port, () => {
-  console.log(`Server listening on ${port}`);
+main().catch((error) => {
+    console.error(`Error starting the system: \n${error.message}`);
+    process.exit(1);
 });
