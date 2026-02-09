@@ -19,5 +19,5 @@ const mediaSchema = new Schema<Media>(
 
 export type MediaModel = Model<Media>;
 
-export const createMediaModel = (): MediaModel =>
-  mongoose.model<Media>("media", mediaSchema);
+export const createMediaModel = (connection: mongoose.Connection): MediaModel =>
+  connection.model<Media>("media", mediaSchema);

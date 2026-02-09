@@ -1,8 +1,10 @@
 import { SystemConfig } from "../config";
-import { startServer } from "./server";
-import { createStorageClient, StorageClient } from "./storageClient";
+import { initializeDB } from "./db/db";
+import { startServer } from "./server/server";
+import { StorageClient } from "./storageClient/storageClient";
 
 export const startSystem = async (config: SystemConfig) => {
-    const storageClient: StorageClient = createStorageClient(config.storage);
-    await startServer(config.server, storageClient);
+    const storageClient = new StorageClient(config.storage);
+    const dals = await initializeDB(config.db);
+    await startServer(config.server, storageClient, dals);
 }
