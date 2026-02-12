@@ -1,5 +1,6 @@
 import express from "express";
 import http from "http";
+import https from "https";
 import { StorageClient } from "../storageClient/storageClient";
 import { ServerConfig } from "./types";
 import { registerMiddlewares, registerRoutes } from "./utils";
@@ -13,8 +14,8 @@ export const startServer = async (
   const app = express();
   const appWithMiddlewares = registerMiddlewares(app);
   const appWithRoutes = registerRoutes(appWithMiddlewares, storageClient, dals);
-  const server = http.createServer(appWithRoutes);
-  const { port } = config;
+  const { port, secured } = config;
+  const server = secured ? https.createServer(appWithRoutes) : http.createServer(appWithRoutes);
   return new Promise<void>((resolve, reject) => {
     server.listen(port, () => {
       console.log(`Server is running on port ${port}`);

@@ -1,8 +1,8 @@
 import Joi from "joi";
 import { isNotNil } from "ramda";
-import { S3ClientConfig } from "@aws-sdk/client-s3";
 import { DatabaseConfig } from "./services/db/types";
 import { ServerConfig } from "./services/server/types";
+import { StorageClientConfig } from "./services/storageClient/types";
 
 class InvalidConfigError extends Error {
   constructor(error: Joi.ValidationError) {
@@ -13,24 +13,30 @@ class InvalidConfigError extends Error {
 
 interface EnvironmentVariables {
   PORT: number;
+  SECURED: boolean;
   MONGO_CONNECTION_STRING: string;
   AWS_ENDPOINT: string;
   AWS_REGION: string;
   AWS_ACCESS_KEY_ID: string;
   AWS_SECRET_ACCESS_KEY: string;
+  AWS_PART_SIZE: number;
+  AWS_MAX_CONCURRENCY: number;
 }
 
 const environmentVariablesSchema = Joi.object<EnvironmentVariables>({
   PORT: Joi.number().required(),
+  SECURED: Joi.boolean().default(false),
   MONGO_CONNECTION_STRING: Joi.string().uri().required(),
   AWS_ENDPOINT: Joi.string().uri().required(),
   AWS_REGION: Joi.string().default("us-east-1"),
   AWS_ACCESS_KEY_ID: Joi.string().required(),
-  AWS_SECRET_ACCESS_KEY: Joi.string().required()
+  AWS_SECRET_ACCESS_KEY: Joi.string().required(),
+  AWS_PART_SIZE: Joi.number().default(5 * 1024 * 1024),
+  AWS_MAX_CONCURRENCY: Joi.number().default(4)
 }).unknown();
 
 export interface SystemConfig {
-  storage: S3ClientConfig;
+  storage: StorageClientConfig;
   server: ServerConfig;
   db: DatabaseConfig;
 }
@@ -47,10 +53,13 @@ export const getConfig = (env: NodeJS.ProcessEnv): SystemConfig => {
       credentials: {
         accessKeyId: value.AWS_ACCESS_KEY_ID,
         secretAccessKey: value.AWS_SECRET_ACCESS_KEY
-      }
+      },
+      partSize: value.AWS_PART_SIZE,
+      maxConcurrency: value.AWS_MAX_CONCURRENCY
     },
     server: {
-      port: value.PORT
+      port: value.PORT,
+      secured: value.SECURED
     },
     db: {
       dbConnectionString: value.MONGO_CONNECTION_STRING

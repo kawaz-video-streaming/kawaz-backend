@@ -5,6 +5,7 @@ import { StatusCodes } from "http-status-codes";
 import { createMediaRouter } from "../../routes/media/media.routes";
 import { StorageClient } from "../storageClient/storageClient";
 import { Dals } from "../db/types";
+import { RequestErrorHandler } from "../../utils/decorators";
 
 export const registerMiddlewares = (app: Express) => {
     app.use(cors());
@@ -18,5 +19,7 @@ export const registerRoutes = (app: Express, storageClient: StorageClient, { med
     app.get("/health", (_req, res) => {
         res.sendStatus(StatusCodes.OK);
     });
+    app.use(RequestErrorHandler);
+
     return app;
 };

@@ -1,10 +1,11 @@
-import { CreateBucketCommand, DeleteBucketCommand, HeadBucketCommand, PutObjectCommand, S3Client, S3ClientConfig, S3ServiceException } from "@aws-sdk/client-s3";
-import { StorageError, UploadObjectOptions } from "./types";
-
+import { CreateBucketCommand, DeleteBucketCommand, HeadBucketCommand, S3Client, S3ServiceException } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
+import { Readable } from "stream";
+import { StorageClientConfig, StorageError, UploadObjectOptions } from "./types";
 
 export class StorageClient {
     private client: S3Client;
-    constructor(config: S3ClientConfig) {
+    constructor(private readonly config: StorageClientConfig) {
         this.client = new S3Client(config);
     }
     ensureBucket = async (bucketName: string) => {
@@ -24,12 +25,26 @@ export class StorageClient {
         });
     };
 
-    uploadObject = async (bucketName: string, objectKey: string, objectData: Buffer, options?: UploadObjectOptions) => {
+    uploadObject = async (bucketName: string, objectKey: string, objectData: Readable, options?: UploadObjectOptions) => {
         if (options?.ensureBucket) {
             await this.ensureBucket(bucketName);
         }
-        await this.client.send(new PutObjectCommand({ Bucket: bucketName, Key: objectKey, Body: objectData })).catch((error: S3ServiceException) => {
-            throw new StorageError("uploadObject", error, { bucketName, objectKey });
-        });
+        try {
+            const upload = new Upload({
+                client: this.client,
+                params: { Bucket: bucketName, Key: objectKey, Body: objectData },
+                queueSize: this.config.maxConcurrency,
+                partSize: this.config.partSize
+            })
+            upload.on("httpUploadProgress", (progress) => {
+                console.log(`Upload progress for ${objectKey}: ${progress.loaded! / progress.total! * 100}%`);
+            });
+            await upload.done();
+        } catch (error) {
+            if (error instanceof S3ServiceException) {
+                throw new StorageError("uploadObject", error, { bucketName, objectKey });
+            }
+            throw error;
+        }
     }
 }

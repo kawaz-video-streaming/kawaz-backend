@@ -1,4 +1,9 @@
-import { S3ServiceException } from "@aws-sdk/client-s3";
+import { S3ClientConfig, S3ServiceException } from "@aws-sdk/client-s3";
+
+export interface StorageClientConfig extends S3ClientConfig {
+    partSize: number; // Optional configuration for multipart upload part size
+    maxConcurrency: number; // Optional configuration for maximum concurrency in multipart uploads
+}
 
 export class StorageError extends Error {
     constructor(operation: string, error: S3ServiceException, details: {}) {
