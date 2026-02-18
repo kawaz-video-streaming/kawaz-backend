@@ -1,7 +1,7 @@
 import express from "express";
 import http from "http";
 import https from "https";
-import { StorageClient } from "../storageClient/storageClient";
+import { StorageClient } from "@ido_kawaz/storage-client";
 import { ServerConfig } from "./types";
 import { registerMiddlewares, registerRoutes } from "./utils";
 import { Dals } from "../db/types";

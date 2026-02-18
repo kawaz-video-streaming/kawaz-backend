@@ -1,7 +1,7 @@
 import { SystemConfig } from "../config";
 import { initializeDB } from "./db/db";
 import { startServer } from "./server/server";
-import { StorageClient } from "./storageClient/storageClient";
+import { StorageClient } from "@ido_kawaz/storage-client";
 
 export const startSystem = async (config: SystemConfig) => {
     const storageClient = new StorageClient(config.storage);

@@ -2,7 +2,7 @@ import Joi from "joi";
 import { isNotNil } from "ramda";
 import { DatabaseConfig } from "./services/db/types";
 import { ServerConfig } from "./services/server/types";
-import { StorageClientConfig } from "./services/storageClient/types";
+import { StorageClientConfig } from "@ido_kawaz/storage-client";
 
 class InvalidConfigError extends Error {
   constructor(error: Joi.ValidationError) {
@@ -31,7 +31,7 @@ const environmentVariablesSchema = Joi.object<EnvironmentVariables>({
   AWS_REGION: Joi.string().default("us-east-1"),
   AWS_ACCESS_KEY_ID: Joi.string().required(),
   AWS_SECRET_ACCESS_KEY: Joi.string().required(),
-  AWS_PART_SIZE: Joi.number().default(5 * 1024 * 1024),
+  AWS_PART_SIZE: Joi.number().default(128 * 1024 * 1024),
   AWS_MAX_CONCURRENCY: Joi.number().default(4)
 }).unknown();
 

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { StatusCodes } from "http-status-codes";
 import { isNil } from 'ramda';
 import { MediaDal } from '../../models/media/media.dal';
-import { StorageClient } from '../../services/storageClient/storageClient';
+import { StorageClient } from "@ido_kawaz/storage-client";
 import { RequestHandlerDecorator } from '../../utils/decorators';
 import { BadRequestError } from '../../utils/errors';
 import { createMediaLogic } from './media.logic';
