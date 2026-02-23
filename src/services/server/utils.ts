@@ -8,6 +8,7 @@ import { StorageClient } from "@ido_kawaz/storage-client";
 import { Dals } from "../db/types";
 import { RequestErrorHandler } from "../../utils/decorators";
 import { swaggerSpec } from "../../config/swagger";
+import { AmqpClient } from "@ido_kawaz/amqp-client";
 
 export const registerMiddlewares = (app: Express) => {
     app.use(cors());
@@ -16,7 +17,7 @@ export const registerMiddlewares = (app: Express) => {
     return app;
 };
 
-export const registerRoutes = (app: Express, storageClient: StorageClient, { mediaDal }: Dals) => {
+export const registerRoutes = (app: Express, storageClient: StorageClient, amqpClient: AmqpClient, { mediaDal }: Dals) => {
     /**
      * @openapi
      * /health:
@@ -37,7 +38,7 @@ export const registerRoutes = (app: Express, storageClient: StorageClient, { med
     app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
     // API routes
-    app.use("/media", createMediaRouter(mediaDal, storageClient));
+    app.use("/media", createMediaRouter(mediaDal, storageClient, amqpClient));
 
     app.use(RequestErrorHandler);
 

@@ -3,9 +3,10 @@ import { StorageClient } from "@ido_kawaz/storage-client";
 import { createMediaHandlers } from "./media.handlers";
 import { MediaDal } from "../../models/media/media.dal";
 import multer from "multer";
+import { AmqpClient } from "@ido_kawaz/amqp-client";
 
-export const createMediaRouter = (mediaDal: MediaDal, storageClient: StorageClient) => {
-  const mediaHandlers = createMediaHandlers(mediaDal, storageClient);
+export const createMediaRouter = (mediaDal: MediaDal, storageClient: StorageClient, amqpClient: AmqpClient) => {
+  const mediaHandlers = createMediaHandlers(mediaDal, storageClient, amqpClient);
   const router = Router();
   const upload = multer({ storage: multer.diskStorage({ destination: './tmp' }) });
 
@@ -42,13 +43,13 @@ export const createMediaRouter = (mediaDal: MediaDal, storageClient: StorageClie
    *         content:
    *           application/json:
    *             schema:
-   *               $ref: '#/components/schemas/Error'
+   *               $ref: '#/components/schemas/BadRequestError'
    *       500:
    *         description: Internal server error
    *         content:
    *           application/json:
    *             schema:
-   *               $ref: '#/components/schemas/Error'
+   *               $ref: '#/components/schemas/InternalServerError'
    */
   router.post("/upload", upload.single("file"), mediaHandlers.uploadMedia);
   return router;

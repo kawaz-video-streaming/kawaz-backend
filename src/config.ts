@@ -3,6 +3,7 @@ import { isNotNil } from "ramda";
 import { DatabaseConfig } from "./services/db/types";
 import { ServerConfig } from "./services/server/types";
 import { StorageClientConfig } from "@ido_kawaz/storage-client";
+import { AmqpConfig } from "@ido_kawaz/amqp-client";
 
 class InvalidConfigError extends Error {
   constructor(error: Joi.ValidationError) {
@@ -15,6 +16,7 @@ interface EnvironmentVariables {
   PORT: number;
   SECURED: boolean;
   MONGO_CONNECTION_STRING: string;
+  AMQP_CONNECTION_STRING: string;
   AWS_ENDPOINT: string;
   AWS_REGION: string;
   AWS_ACCESS_KEY_ID: string;
@@ -27,6 +29,7 @@ const environmentVariablesSchema = Joi.object<EnvironmentVariables>({
   PORT: Joi.number().required(),
   SECURED: Joi.boolean().default(false),
   MONGO_CONNECTION_STRING: Joi.string().uri().required(),
+  AMQP_CONNECTION_STRING: Joi.string().uri().required(),
   AWS_ENDPOINT: Joi.string().uri().required(),
   AWS_REGION: Joi.string().default("us-east-1"),
   AWS_ACCESS_KEY_ID: Joi.string().required(),
@@ -36,6 +39,7 @@ const environmentVariablesSchema = Joi.object<EnvironmentVariables>({
 }).unknown();
 
 export interface SystemConfig {
+  amqp: AmqpConfig;
   storage: StorageClientConfig;
   server: ServerConfig;
   db: DatabaseConfig;
@@ -56,6 +60,9 @@ export const getConfig = (env: NodeJS.ProcessEnv): SystemConfig => {
       },
       partSize: value.AWS_PART_SIZE,
       maxConcurrency: value.AWS_MAX_CONCURRENCY
+    },
+    amqp: {
+      amqpConnectionString: value.AMQP_CONNECTION_STRING
     },
     server: {
       port: value.PORT,

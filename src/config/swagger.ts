@@ -16,12 +16,23 @@ const options: swaggerJsdoc.Options = {
         ],
         components: {
             schemas: {
-                Error: {
+                InternalServerError: {
                     type: "object",
                     properties: {
-                        message: {
+                        error: {
                             type: "string",
                             description: "Error message",
+                            example: "An unexpected error occurred while processing the request"
+                        },
+                    },
+                },
+                BadRequestError: {
+                    type: "object",
+                    properties: {
+                        error: {
+                            type: "string",
+                            description: "Error message",
+                            example: "file is required for uploading media"
                         },
                     },
                 },
