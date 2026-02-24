@@ -1,7 +1,20 @@
 import { SystemConfig } from "../config";
-import { startServer } from "./server";
+import { initializeDB } from "./db/db";
+import { startServer } from "./server/server";
+import { StorageClient } from "@ido_kawaz/storage-client";
+import { AmqpClient } from "@ido_kawaz/amqp-client";
 
-export const startSystem = async (config: SystemConfig) => {
-    await startServer(config.server);
-    console.log("System started successfully");
+const startAmqp = async (amqpClient: AmqpClient) => {
+    const startTime = Date.now();
+    await amqpClient.start();
+    const endTime = Date.now();
+    console.log(`connected to amqp successfully in ${endTime - startTime} ms`);
+}
+
+export const startSystem = async ({ storage, amqp, db, server }: SystemConfig) => {
+    const storageClient = new StorageClient(storage);
+    const amqpClient = new AmqpClient(amqp, []);
+    const dals = await initializeDB(db);
+    await startAmqp(amqpClient);
+    await startServer(server, storageClient, amqpClient, dals);
 }
