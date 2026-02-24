@@ -50,26 +50,27 @@ export const getConfig = (env: NodeJS.ProcessEnv): SystemConfig => {
   if (isNotNil(error)) {
     throw new InvalidConfigError(error);
   }
+  const envVars = value as EnvironmentVariables;
   return {
     storage: {
-      region: value.AWS_REGION,
-      endpoint: value.AWS_ENDPOINT,
+      region: envVars.AWS_REGION,
+      endpoint: envVars.AWS_ENDPOINT,
       credentials: {
-        accessKeyId: value.AWS_ACCESS_KEY_ID,
-        secretAccessKey: value.AWS_SECRET_ACCESS_KEY
+        accessKeyId: envVars.AWS_ACCESS_KEY_ID,
+        secretAccessKey: envVars.AWS_SECRET_ACCESS_KEY
       },
-      partSize: value.AWS_PART_SIZE,
-      maxConcurrency: value.AWS_MAX_CONCURRENCY
+      partSize: envVars.AWS_PART_SIZE,
+      maxConcurrency: envVars.AWS_MAX_CONCURRENCY
     },
     amqp: {
-      amqpConnectionString: value.AMQP_CONNECTION_STRING
+      amqpConnectionString: envVars.AMQP_CONNECTION_STRING
     },
     server: {
-      port: value.PORT,
-      secured: value.SECURED
+      port: envVars.PORT,
+      secured: envVars.SECURED
     },
     db: {
-      dbConnectionString: value.MONGO_CONNECTION_STRING
+      dbConnectionString: envVars.MONGO_CONNECTION_STRING
     }
   }
 }

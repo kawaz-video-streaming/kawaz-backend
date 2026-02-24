@@ -8,13 +8,13 @@ export const createMediaLogic = (
   storageClient: StorageClient,
   amqpClient: AmqpClient
 ) => ({
-  uploadMedia: async (file: Express.Multer.File) => {
-    const fileData = createReadStream(file.path);
+  uploadMedia: async ({ path: filePath, originalname: fileName, mimetype: fileType, size: fileSize }: Express.Multer.File) => {
+    const fileData = createReadStream(filePath);
     const bucket = "kawaz-plus";
-    const path = `raw/${file.originalname}`;
+    const path = `raw/${fileName}`;
     await storageClient.uploadObject(bucket, path, fileData, { ensureBucket: true });
-    await mediaDal.createMedia(file.originalname, file.mimetype, file.size);
-    if (file.mimetype == "video/mp4") {
+    await mediaDal.createMedia(fileName, fileType, fileSize);
+    if (fileType === "video/mp4") {
       amqpClient.publish("converter", "uploaded.media", { bucket, path });
     }
   }

@@ -1,3 +1,4 @@
+import { Model } from "mongoose";
 import { MediaModel } from "../../models/media/media";
 import { MediaDal } from "../../models/media/media.dal";
 
@@ -11,7 +12,7 @@ export interface DatabaseConfig {
     dbConnectionString: string;
 }
 
-export interface Models {
+export interface Models extends Record<string, Model<any>> {
     mediaModel: MediaModel;
 };
 
