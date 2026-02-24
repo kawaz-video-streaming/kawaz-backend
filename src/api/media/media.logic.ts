@@ -15,7 +15,7 @@ export const createMediaLogic = (
     await storageClient.uploadObject(bucket, path, fileData, { ensureBucket: true });
     await mediaDal.createMedia(file.originalname, file.mimetype, file.size);
     if (file.mimetype == "video/mp4") {
-      amqpClient.publish("converter", "media.uploaded", { bucket, path });
+      amqpClient.publish("converter", "uploaded.media", { bucket, path });
     }
   }
 });
