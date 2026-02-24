@@ -8,6 +8,7 @@ It provides:
 - OpenAPI/Swagger UI docs
 - MongoDB persistence for media metadata
 - object storage upload via `@ido_kawaz/storage-client`
+- AMQP-based event publishing integration
 
 ## Tech Stack
 
@@ -22,6 +23,7 @@ It provides:
 - Node.js 20+ (required for `node --env-file` used by `npm run start`)
 - MongoDB instance
 - S3-compatible object storage endpoint
+- AMQP broker (e.g. RabbitMQ)
 
 ## Installation
 
@@ -38,6 +40,7 @@ PORT=8080
 SECURED=false
 
 MONGO_CONNECTION_STRING=mongodb://localhost:27017/kawaz
+AMQP_CONNECTION_STRING=amqp://localhost:5672
 
 AWS_ENDPOINT=http://localhost:9000
 AWS_REGION=us-east-1
@@ -49,6 +52,7 @@ AWS_MAX_CONCURRENCY=4
 
 Notes:
 - `SECURED` toggles `https.createServer` (`true`) vs `http.createServer` (`false`).
+- `AMQP_CONNECTION_STRING` is required.
 - `AWS_PART_SIZE` defaults to `134217728` (128 MiB) if not provided.
 - `AWS_MAX_CONCURRENCY` defaults to `4` if not provided.
 
@@ -100,3 +104,7 @@ Swagger UI:
 2. File is uploaded to object storage bucket `kawaz-plus` under `raw/<originalname>`.
 3. Metadata (`filename`, `contentType`, `size`, `uploadedAt`) is saved to MongoDB.
 4. Temporary file is deleted from `./tmp`.
+5. If the uploaded file MIME type is `video/mp4`, an AMQP event is published:
+	- exchange: `converter`
+	- routing key: `media.uploaded`
+	- payload: `{ bucket, path }`

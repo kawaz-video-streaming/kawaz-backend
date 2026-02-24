@@ -3,7 +3,7 @@ import cors from "cors";
 import express, { Express } from "express";
 import { StatusCodes } from "http-status-codes";
 import swaggerUi from "swagger-ui-express";
-import { createMediaRouter } from "../../routes/media/media.routes";
+import { createMediaRouter } from "../../api/media/media.routes";
 import { StorageClient } from "@ido_kawaz/storage-client";
 import { Dals } from "../db/types";
 import { RequestErrorHandler } from "../../utils/decorators";
