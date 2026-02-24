@@ -7,7 +7,7 @@ import { createMediaRouter } from "../../api/media/media.routes";
 import { StorageClient } from "@ido_kawaz/storage-client";
 import { Dals } from "../db/types";
 import { RequestErrorHandler } from "../../utils/decorators";
-import { swaggerSpec } from "../../config/swagger";
+import { swaggerSpec } from "../swagger";
 import { AmqpClient } from "@ido_kawaz/amqp-client";
 
 export const registerMiddlewares = (app: Express) => {
