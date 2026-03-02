@@ -1,55 +1,46 @@
-import Joi from "joi";
-import { isNotNil } from "ramda";
-import { AmqpConfig, createAmqpConfig } from "@ido_kawaz/amqp-client";
+import { createServerConfig, ServerConfig } from "@ido_kawaz/server-framework";
 import { createMongoConfig, MongoConfig } from "@ido_kawaz/mongo-client";
-import { createStorageClientConfig, StorageClientConfig } from "@ido_kawaz/storage-client";
-import { ServerConfig } from "./services/server";
+import { AmqpConfig, createAmqpConfig } from "@ido_kawaz/amqp-client";
+import { createStorageConfig, StorageConfig } from "@ido_kawaz/storage-client";
+import { mergeDeepRight } from "ramda";
+import { z } from 'zod';
 
 class InvalidConfigError extends Error {
-  constructor(error: Joi.ValidationError) {
-    const message = `Invalid configuration: \n${error.details.map(detail => detail.message).join(',\n')}`;
+  constructor(error: z.ZodError) {
+    const message = `Invalid configuration: \n${error.issues.map(detail => detail.message).join(',\n')}`;
     super(message);
   }
 }
 
+export const SERVICE_NAME = "kawaz-backend";
+
 const environments = ["development", "local", "test"] as const;
 
-type Environment = typeof environments[number];
+export type Environment = typeof environments[number];
 
-interface EnvironmentVariables {
-  NODE_ENV: Environment;
-  PORT: number;
-  SECURED: boolean;
-}
-
-const environmentVariablesSchema = Joi.object<EnvironmentVariables>({
-  NODE_ENV: Joi.string().valid(...environments).default("development"),
-  PORT: Joi.number().required(),
-  SECURED: Joi.boolean().default(false)
-}).unknown();
+const environmentVariablesSchema = z.object({
+  NODE_ENV: z.enum(environments).default("development")
+}).strict();
 
 export interface SystemConfig {
   nodeEnv: Environment;
   amqpConfig: AmqpConfig;
-  storageConfig: StorageClientConfig;
+  storageConfig: StorageConfig;
   serverConfig: ServerConfig;
   dbConfig: MongoConfig;
 }
 
-export const getConfig = (env: NodeJS.ProcessEnv): SystemConfig => {
-  const { error, value } = environmentVariablesSchema.validate(env, { abortEarly: false, convert: true });
-  if (isNotNil(error)) {
-    throw new InvalidConfigError(error);
+export const getConfig = (env: {} = {}): SystemConfig => {
+  const parseResult = environmentVariablesSchema.safeParse(mergeDeepRight(process.env, env));
+  if (!parseResult.success) {
+    throw new InvalidConfigError(parseResult.error);
   }
-  const envVars = value as EnvironmentVariables;
+  const envVars = parseResult.data;
   return {
     nodeEnv: envVars.NODE_ENV,
-    storageConfig: createStorageClientConfig(),
-    amqpConfig: createAmqpConfig(),
+    serverConfig: createServerConfig(),
     dbConfig: createMongoConfig(),
-    serverConfig: {
-      port: envVars.PORT,
-      secured: envVars.SECURED
-    },
+    amqpConfig: createAmqpConfig(),
+    storageConfig: createStorageConfig()
   }
 }

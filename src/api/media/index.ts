@@ -1,9 +1,8 @@
-import { Router } from "express";
-import { StorageClient } from "@ido_kawaz/storage-client";
-import { createMediaHandlers } from "./handlers";
-import { MediaDal } from "../../dal/media/media.dal";
-import multer from "multer";
 import { AmqpClient } from "@ido_kawaz/amqp-client";
+import { multer, Router } from "@ido_kawaz/server-framework";
+import { StorageClient } from "@ido_kawaz/storage-client";
+import { MediaDal } from "../../dal/media";
+import { createMediaHandlers } from "./handlers";
 
 export const createMediaRouter = (mediaDal: MediaDal, storageClient: StorageClient, amqpClient: AmqpClient) => {
   const mediaHandlers = createMediaHandlers(mediaDal, storageClient, amqpClient);

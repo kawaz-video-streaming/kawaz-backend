@@ -1,5 +1,5 @@
 import { Dal } from "@ido_kawaz/mongo-client";
-import { MediaModel, Media } from "./media";
+import { Media, MediaModel } from "./model";
 
 export class MediaDal extends Dal<Media> {
   constructor(mediaModel: MediaModel) {

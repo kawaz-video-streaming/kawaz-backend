@@ -1,19 +1,18 @@
-import { Request, Response } from 'express';
+import { AmqpClient } from '@ido_kawaz/amqp-client';
+import { BadRequestError, Request, Response } from "@ido_kawaz/server-framework";
+import { StorageClient } from "@ido_kawaz/storage-client";
+import { promises } from 'fs';
 import { StatusCodes } from "http-status-codes";
 import { isNil } from 'ramda';
-import { MediaDal } from '../../dal/media/media.dal';
-import { StorageClient } from "@ido_kawaz/storage-client";
-import { RequestHandlerDecorator } from '../decorators';
-import { BadRequestError } from '../errors';
+import { MediaDal } from '../../dal/media';
+import { requestHandlerDecorator } from "../../utils/decorator";
 import { createMediaLogic } from './logic';
-import { AmqpClient } from '@ido_kawaz/amqp-client';
-import { promises } from 'fs';
 
 export const createMediaHandlers = (mediaDal: MediaDal, storageClient: StorageClient, amqpClient: AmqpClient) => {
     const logic = createMediaLogic(mediaDal, storageClient, amqpClient);
     return {
         uploadMedia:
-            RequestHandlerDecorator(
+            requestHandlerDecorator(
                 'upload media',
                 async (req: Request, res: Response) => {
                     if (isNil(req.file)) {

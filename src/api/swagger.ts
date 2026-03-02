@@ -1,12 +1,13 @@
 import swaggerJsdoc from "swagger-jsdoc";
+import { SERVICE_NAME } from "../config";
 
 const options: swaggerJsdoc.Options = {
     definition: {
         openapi: "3.0.0",
         info: {
-            title: "Kawaz Backend API",
+            title: `${SERVICE_NAME} API`,
             version: "0.1.0",
-            description: "API documentation for Kawaz Backend service",
+            description: `API documentation for ${SERVICE_NAME} service`,
         },
         servers: [
             {
@@ -48,7 +49,7 @@ const options: swaggerJsdoc.Options = {
             },
         },
     },
-    apis: ["./src/api/**/*.ts", "./src/services/server/utils.ts"],
+    apis: ["./src/api/**/*.ts"],
 };
 
 export const swaggerSpec = swaggerJsdoc(options);

@@ -1,14 +1,15 @@
 import { AmqpClient } from "@ido_kawaz/amqp-client";
+import { RequestFile } from "@ido_kawaz/server-framework";
 import { StorageClient } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
-import { MediaDal } from "../../dal/media/media.dal";
+import { MediaDal } from "../../dal/media";
 
 export const createMediaLogic = (
   mediaDal: MediaDal,
   storageClient: StorageClient,
   amqpClient: AmqpClient
 ) => ({
-  uploadMedia: async ({ path: filePath, originalname: fileName, mimetype: fileType, size: fileSize }: Express.Multer.File) => {
+  uploadMedia: async ({ path: filePath, originalname: fileName, mimetype: fileType, size: fileSize }: RequestFile) => {
     const fileData = createReadStream(filePath);
     const bucket = "kawaz-plus";
     const path = `raw/${fileName}`;

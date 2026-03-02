@@ -1,5 +1,5 @@
-import { MediaModel } from "./media/media";
-import { MediaDal } from "./media/media.dal";
+import { MediaDal } from "./media";
+import { MediaModel } from "./media/model";
 
 export interface Models {
     mediaModel: MediaModel;

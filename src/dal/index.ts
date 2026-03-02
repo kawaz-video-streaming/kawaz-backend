@@ -1,7 +1,7 @@
 import { MongoClient } from "@ido_kawaz/mongo-client";
-import { createMediaModel } from "./media/media";
-import { MediaDal } from "./media/media.dal";
-import { Models, Dals } from "./types";
+import { MediaDal } from "./media";
+import { createMediaModel } from "./media/model";
+import { Dals, Models } from "./types";
 
 export const createModels = (client: MongoClient): Models => {
     return {
