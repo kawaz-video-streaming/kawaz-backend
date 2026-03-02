@@ -3,7 +3,7 @@ import z from "zod";
 
 export const mediaUploadRequestSchema = z.object({
     body: z.object({
-        includeSubtitle: z.boolean().optional()
+        includeSubtitles: z.coerce.boolean().optional()
     }).optional(),
     file: z.object({
         path: z.string(),
@@ -16,8 +16,17 @@ export const mediaUploadRequestSchema = z.object({
 });
 
 interface ValidatedMediaUploadRequest {
-    includeSubtitle?: boolean;
+    body: {
+        includeSubtitles?: boolean;
+    };
     file: RequestFile;
+}
+
+export interface ConvertMediaMessage {
+    mediaName: string;
+    mediaStorageBucket: string;
+    mediaRoutingKey: string;
+    areSubtitlesIncluded: boolean;
 }
 
 export const validateMediaUploadRequest = (req: Request): ValidatedMediaUploadRequest => {
