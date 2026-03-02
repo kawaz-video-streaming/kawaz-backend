@@ -4,8 +4,8 @@ import { StorageClient } from "@ido_kawaz/storage-client";
 import { MediaDal } from "../../dal/media";
 import { createMediaHandlers } from "./handlers";
 
-export const createMediaRouter = (mediaDal: MediaDal, storageClient: StorageClient, amqpClient: AmqpClient) => {
-  const mediaHandlers = createMediaHandlers(mediaDal, storageClient, amqpClient);
+export const createMediaRouter = (mediaDal: MediaDal, storageClient: StorageClient, amqpClient: AmqpClient, storagePartSize: number) => {
+  const mediaHandlers = createMediaHandlers(mediaDal, storageClient, amqpClient, storagePartSize);
   const router = Router();
   const upload = multer({ storage: multer.diskStorage({ destination: './tmp' }) });
 

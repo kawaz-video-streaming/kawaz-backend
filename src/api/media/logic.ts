@@ -7,13 +7,14 @@ import { MediaDal } from "../../dal/media";
 export const createMediaLogic = (
   mediaDal: MediaDal,
   storageClient: StorageClient,
-  amqpClient: AmqpClient
+  amqpClient: AmqpClient,
+  storagePartSize: number
 ) => ({
   uploadMedia: async ({ path: filePath, originalname: fileName, mimetype: fileType, size: fileSize }: RequestFile) => {
     const fileData = createReadStream(filePath);
     const bucket = "kawaz-plus";
     const path = `raw/${fileName}`;
-    await storageClient.uploadObject(bucket, path, fileData, { ensureBucket: true });
+    await storageClient.uploadObject(bucket, path, fileData, { ensureBucket: true, multipartUpload: fileSize > storagePartSize });
     await mediaDal.createMedia(fileName, fileType, fileSize);
     if (fileType === "video/mp4") {
       amqpClient.publish("converter", "uploaded.media", { bucket, path });

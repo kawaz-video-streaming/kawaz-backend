@@ -8,7 +8,7 @@ import { createMediaRouter } from "./media";
 import { swaggerSpec } from "./swagger";
 
 
-export const registerRoutes = (storageClient: StorageClient, amqpClient: AmqpClient, { mediaDal }: Dals) =>
+export const registerRoutes = (storageClient: StorageClient, storagePartSize: number, amqpClient: AmqpClient, { mediaDal }: Dals) =>
     (app: Application) => {
         /**
          * @openapi
@@ -30,7 +30,7 @@ export const registerRoutes = (storageClient: StorageClient, amqpClient: AmqpCli
         app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
         // API routes
-        app.use("/media", createMediaRouter(mediaDal, storageClient, amqpClient));
+        app.use("/media", createMediaRouter(mediaDal, storageClient, amqpClient, storagePartSize));
 
         return app;
     };

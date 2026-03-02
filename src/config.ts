@@ -20,7 +20,7 @@ export type Environment = typeof environments[number];
 
 const environmentVariablesSchema = z.object({
   NODE_ENV: z.enum(environments).default("development")
-}).strict();
+});
 
 export interface SystemConfig {
   nodeEnv: Environment;
