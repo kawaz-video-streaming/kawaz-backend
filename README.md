@@ -36,6 +36,7 @@ npm install
 Create a `.env` file in the project root:
 
 ```env
+NODE_ENV=local
 PORT=8080
 SECURED=false
 
@@ -51,10 +52,14 @@ AWS_MAX_CONCURRENCY=4
 ```
 
 Notes:
-- `SECURED` toggles `https.createServer` (`true`) vs `http.createServer` (`false`).
+- `NODE_ENV` supports `development`, `local`, `test` (default is `development`).
+- `PORT` is required.
+- `SECURED` toggles `https.createServer` () vs `http.createServer` ().
+- Keep `SECURED=false` unless you provide TLS setup in the runtime environment.
 - `AMQP_CONNECTION_STRING` is required.
 - `AWS_PART_SIZE` defaults to `134217728` (128 MiB) if not provided.
 - `AWS_MAX_CONCURRENCY` defaults to `4` if not provided.
+- Uploads are written to `./tmp` by Multer. With `NODE_ENV=local`, the service creates that folder on startup.
 
 ## Scripts
 
@@ -106,5 +111,5 @@ Swagger UI:
 4. Temporary file is deleted from `./tmp`.
 5. If the uploaded file MIME type is `video/mp4`, an AMQP event is published:
 	- exchange: `converter`
-	- routing key: `media.uploaded`
+	- routing key: `uploaded.media`
 	- payload: `{ bucket, path }`
