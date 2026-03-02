@@ -1,4 +1,4 @@
-import mongoose, { Schema, Model } from "mongoose";
+import { MongoClient, Schema, Model } from "@ido_kawaz/mongo-client";
 
 export interface Media {
   filename: string;
@@ -15,7 +15,6 @@ const mediaSchema = new Schema<Media>(
   { timestamps: true, versionKey: false },
 );
 
-export type MediaModel = Model<Media>;
+export const createMediaModel = (client: MongoClient) => client.createModel("Media", mediaSchema);
 
-export const createMediaModel = (connection: mongoose.Connection): MediaModel =>
-  connection.model<Media>("media", mediaSchema);
+export type MediaModel = Model<Media>;

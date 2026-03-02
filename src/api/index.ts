@@ -1,21 +1,13 @@
-import bodyParser from "body-parser";
-import cors from "cors";
-import express, { Express } from "express";
 import { StatusCodes } from "http-status-codes";
 import swaggerUi from "swagger-ui-express";
-import { createMediaRouter } from "../../api/media/media.routes";
 import { StorageClient } from "@ido_kawaz/storage-client";
-import { Dals } from "../db/types";
-import { RequestErrorHandler } from "../../utils/decorators";
-import { swaggerSpec } from "../swagger";
 import { AmqpClient } from "@ido_kawaz/amqp-client";
+import { Express } from "express";
+import { Dals } from "../dal/types";
+import { swaggerSpec } from "./swagger";
+import { createMediaRouter } from "./media";
+import { RequestErrorHandler } from "./decorators";
 
-export const registerMiddlewares = (app: Express) => {
-    app.use(cors());
-    app.use(express.json());
-    app.use(bodyParser.urlencoded({ extended: true }));
-    return app;
-};
 
 export const registerRoutes = (app: Express, storageClient: StorageClient, amqpClient: AmqpClient, { mediaDal }: Dals) => {
     /**

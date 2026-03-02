@@ -2,10 +2,15 @@ import express from "express";
 import http from "http";
 import https from "https";
 import { StorageClient } from "@ido_kawaz/storage-client";
-import { ServerConfig } from "./types";
-import { registerMiddlewares, registerRoutes } from "./utils";
-import { Dals } from "../db/types";
 import { AmqpClient } from "@ido_kawaz/amqp-client";
+import { Dals } from "../dal/types";
+import { registerMiddlewares } from "../api/utils";
+import { registerRoutes } from "../api";
+
+export interface ServerConfig {
+  port: number;
+  secured: boolean;
+}
 
 export const startServer = async (
   config: ServerConfig,

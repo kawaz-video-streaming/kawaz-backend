@@ -1,9 +1,9 @@
 import Joi from "joi";
 import { isNotNil } from "ramda";
-import { DatabaseConfig } from "./services/db/types";
-import { ServerConfig } from "./services/server/types";
-import { StorageClientConfig } from "@ido_kawaz/storage-client";
-import { AmqpConfig } from "@ido_kawaz/amqp-client";
+import { AmqpConfig, createAmqpConfig } from "@ido_kawaz/amqp-client";
+import { createMongoConfig, MongoConfig } from "@ido_kawaz/mongo-client";
+import { createStorageClientConfig, StorageClientConfig } from "@ido_kawaz/storage-client";
+import { ServerConfig } from "./services/server";
 
 class InvalidConfigError extends Error {
   constructor(error: Joi.ValidationError) {
@@ -12,37 +12,28 @@ class InvalidConfigError extends Error {
   }
 }
 
+const environments = ["development", "local", "test"] as const;
+
+type Environment = typeof environments[number];
+
 interface EnvironmentVariables {
+  NODE_ENV: Environment;
   PORT: number;
   SECURED: boolean;
-  MONGO_CONNECTION_STRING: string;
-  AMQP_CONNECTION_STRING: string;
-  AWS_ENDPOINT: string;
-  AWS_REGION: string;
-  AWS_ACCESS_KEY_ID: string;
-  AWS_SECRET_ACCESS_KEY: string;
-  AWS_PART_SIZE: number;
-  AWS_MAX_CONCURRENCY: number;
 }
 
 const environmentVariablesSchema = Joi.object<EnvironmentVariables>({
+  NODE_ENV: Joi.string().valid(...environments).default("development"),
   PORT: Joi.number().required(),
-  SECURED: Joi.boolean().default(false),
-  MONGO_CONNECTION_STRING: Joi.string().uri().required(),
-  AMQP_CONNECTION_STRING: Joi.string().uri().required(),
-  AWS_ENDPOINT: Joi.string().uri().required(),
-  AWS_REGION: Joi.string().default("us-east-1"),
-  AWS_ACCESS_KEY_ID: Joi.string().required(),
-  AWS_SECRET_ACCESS_KEY: Joi.string().required(),
-  AWS_PART_SIZE: Joi.number().default(128 * 1024 * 1024),
-  AWS_MAX_CONCURRENCY: Joi.number().default(4)
+  SECURED: Joi.boolean().default(false)
 }).unknown();
 
 export interface SystemConfig {
-  amqp: AmqpConfig;
-  storage: StorageClientConfig;
-  server: ServerConfig;
-  db: DatabaseConfig;
+  nodeEnv: Environment;
+  amqpConfig: AmqpConfig;
+  storageConfig: StorageClientConfig;
+  serverConfig: ServerConfig;
+  dbConfig: MongoConfig;
 }
 
 export const getConfig = (env: NodeJS.ProcessEnv): SystemConfig => {
@@ -52,25 +43,13 @@ export const getConfig = (env: NodeJS.ProcessEnv): SystemConfig => {
   }
   const envVars = value as EnvironmentVariables;
   return {
-    storage: {
-      region: envVars.AWS_REGION,
-      endpoint: envVars.AWS_ENDPOINT,
-      credentials: {
-        accessKeyId: envVars.AWS_ACCESS_KEY_ID,
-        secretAccessKey: envVars.AWS_SECRET_ACCESS_KEY
-      },
-      partSize: envVars.AWS_PART_SIZE,
-      maxConcurrency: envVars.AWS_MAX_CONCURRENCY
-    },
-    amqp: {
-      amqpConnectionString: envVars.AMQP_CONNECTION_STRING
-    },
-    server: {
+    nodeEnv: envVars.NODE_ENV,
+    storageConfig: createStorageClientConfig(),
+    amqpConfig: createAmqpConfig(),
+    dbConfig: createMongoConfig(),
+    serverConfig: {
       port: envVars.PORT,
       secured: envVars.SECURED
     },
-    db: {
-      dbConnectionString: envVars.MONGO_CONNECTION_STRING
-    }
   }
 }

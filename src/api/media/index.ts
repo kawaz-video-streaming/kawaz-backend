@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { StorageClient } from "@ido_kawaz/storage-client";
-import { createMediaHandlers } from "./media.handlers";
-import { MediaDal } from "../../models/media/media.dal";
+import { createMediaHandlers } from "./handlers";
+import { MediaDal } from "../../dal/media/media.dal";
 import multer from "multer";
 import { AmqpClient } from "@ido_kawaz/amqp-client";
 

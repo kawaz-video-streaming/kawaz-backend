@@ -1,7 +1,7 @@
 import { AmqpClient } from "@ido_kawaz/amqp-client";
 import { StorageClient } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
-import { MediaDal } from "../../models/media/media.dal";
+import { MediaDal } from "../../dal/media/media.dal";
 
 export const createMediaLogic = (
   mediaDal: MediaDal,
