@@ -11,7 +11,8 @@
     "start:dev": "npm run build && npm run start",
     "dev": "ts-node-dev --respawn --env-file .env src/index.ts",
     "clean": "rimraf dist",
-    "clean:advanced": "rimraf dist && rimraf node_modules && rimraf package-lock.json"
+    "clean:advanced": "rimraf dist && rimraf node_modules && rimraf package-lock.json",
+    "test": "npm run build && jest --runInBand --verbose --config jest.config.js"
   },
   "dependencies": {
     "ramda": "^0.32.0",
@@ -25,9 +26,14 @@
     "@ido_kawaz/server-framework": "^3.0.0",
     "@ido_kawaz/mongo-client": "^2.0.0",
     "@types/ramda": "^0.31.1",
+    "@types/jest": "^30.0.0",
+    "@types/supertest": "^6.0.3",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.6",
+    "jest": "^30.0.0",
     "rimraf": "^5.0.0",
+    "supertest": "^7.1.4",
+    "ts-jest": "^29.0.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.2.2"
   }

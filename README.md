@@ -1,29 +1,32 @@
 # kawaz-backend
 
-Kawaz Plus video streaming backend service
+Kawaz Plus media backend service.
 
-It provides:
-- health check endpoint
-- media upload endpoint (`multipart/form-data`)
-- OpenAPI/Swagger UI docs
-- MongoDB persistence for media metadata
-- object storage upload via `@ido_kawaz/storage-client`
-- AMQP-based event publishing integration
+## What it does
 
-## Tech Stack
+- Exposes a health endpoint (`GET /health`)
+- Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`)
+- Publishes upload jobs to AMQP (`upload` exchange, `upload.media` topic)
+- Consumes upload jobs and uploads files to object storage
+- Persists media metadata and status in MongoDB
+- Exposes OpenAPI docs at `GET /api-docs`
+
+## Tech stack
 
 - Node.js + TypeScript
-- Express
-- Mongoose
+- `@ido_kawaz/server-framework`
+- `@ido_kawaz/mongo-client`
+- `@ido_kawaz/amqp-client`
+- `@ido_kawaz/storage-client`
 - Multer
 - Swagger (`swagger-jsdoc`, `swagger-ui-express`)
 
 ## Prerequisites
 
-- Node.js 20+ (required for `node --env-file` used by `npm run start`)
-- MongoDB instance
-- S3-compatible object storage endpoint
-- AMQP broker (e.g. RabbitMQ)
+- Node.js 20+
+- MongoDB
+- AMQP broker (for example RabbitMQ)
+- S3-compatible object storage
 
 ## Installation
 
@@ -31,9 +34,22 @@ It provides:
 npm install
 ```
 
-## Environment Variables
+## Environment variables
 
-Create a `.env` file in the project root:
+This service directly validates these variables:
+
+- `NODE_ENV` (`development` | `local` | `test`, defaults to `development`)
+- `UPLOAD_STORAGE_BUCKET` (target bucket for uploaded media)
+- `UPLOAD_STORAGE_KEY_PREFIX` (prefix for uploaded object keys)
+
+It also requires the environment variables expected by these shared clients:
+
+- server config (`createServerConfig`)
+- Mongo config (`createMongoConfig`)
+- AMQP config (`createAmqpConfig`)
+- storage config (`createStorageConfig`)
+
+A typical local setup looks like:
 
 ```env
 NODE_ENV=local
@@ -49,28 +65,22 @@ AWS_ACCESS_KEY_ID=your-access-key
 AWS_SECRET_ACCESS_KEY=your-secret-key
 AWS_PART_SIZE=134217728
 AWS_MAX_CONCURRENCY=4
-```
 
-Notes:
-- `NODE_ENV` supports `development`, `local`, `test` (default is `development`).
-- `PORT` is required.
-- `SECURED` toggles `https.createServer` () vs `http.createServer` ().
-- Keep `SECURED=false` unless you provide TLS setup in the runtime environment.
-- `AMQP_CONNECTION_STRING` is required.
-- `AWS_PART_SIZE` defaults to `134217728` (128 MiB) if not provided.
-- `AWS_MAX_CONCURRENCY` defaults to `4` if not provided.
-- Uploads are written to `./tmp` by Multer. With `NODE_ENV=local`, the service creates that folder on startup.
+UPLOAD_STORAGE_BUCKET=kawaz-plus
+UPLOAD_STORAGE_KEY_PREFIX=raw
+```
 
 ## Scripts
 
-- `npm run dev` - run in development mode with `ts-node-dev`
-- `npm run build` - clean `dist` and compile TypeScript
+- `npm run dev` - run with `ts-node-dev`
+- `npm run build` - clean and compile
 - `npm run build:watch` - compile in watch mode
-- `npm run start` - run compiled app from `dist` using `.env`
-- `npm run start:dev` - build then start compiled app
+- `npm run start` - run compiled app from `dist` with `.env`
+- `npm run start:dev` - build, then start compiled app
+- `npm test` - run unit tests with Jest
 - `npm run clean` - remove `dist`
 - `npm run clean:advanced` - remove `dist`, `node_modules`, and `package-lock.json`
-- `npm run build:advanced` - advanced clean, fresh install, then build
+- `npm run build:advanced` - clean, install, and compile
 
 ## Running
 
@@ -87,29 +97,29 @@ npm run build
 npm run start
 ```
 
-## API Endpoints
+## API
 
 Base URL (local): `http://localhost:8080`
 
-- `GET /health`
-	- returns `200 OK` when server is running
+### `GET /health`
 
-- `POST /media/upload`
-	- content type: `multipart/form-data`
-	- form field: `file`
-	- response: `201 { "message": "Media uploaded successfully" }`
+Returns `200 OK` if service is running.
 
-Swagger UI:
+### `POST /media/upload`
 
-- `GET /api-docs`
+- Content type: `multipart/form-data`
+- Required file field: `file`
+- Optional body field: `includeSubtitles` (boolean-like value)
+- Success response: `200 { "message": "Media Started Uploading" }`
 
-## Upload Flow
+### `GET /api-docs`
 
-1. File is received via Multer and written to `./tmp`.
-2. File is uploaded to object storage bucket `kawaz-plus` under `raw/<originalname>`.
-3. Metadata (`filename`, `contentType`, `size`, `uploadedAt`) is saved to MongoDB.
-4. Temporary file is deleted from `./tmp`.
-5. If the uploaded file MIME type is `video/mp4`, an AMQP event is published:
-	- exchange: `converter`
-	- routing key: `uploaded.media`
-	- payload: `{ bucket, path }`
+Swagger UI for API documentation.
+
+## Upload processing flow
+
+1. API receives a file and stores initial media metadata in MongoDB (`pending` status).
+2. API publishes an upload event to AMQP (`upload` / `upload.media`).
+3. Upload consumer reads the temporary file and uploads it to object storage.
+4. If media type is video, consumer publishes convert event (`converter` / `uploaded.media`) and sets status to `processing`.
+5. If media type is image, consumer sets status to `completed`.
