@@ -22,17 +22,10 @@ interface ValidatedMediaUploadRequest {
     file: RequestFile;
 }
 
-export interface ConvertMediaMessage {
-    mediaName: string;
-    mediaStorageBucket: string;
-    mediaRoutingKey: string;
-    areSubtitlesIncluded: boolean;
-}
-
 export const validateMediaUploadRequest = (req: Request): ValidatedMediaUploadRequest => {
-    const res = mediaUploadRequestSchema.safeParse(req);
-    if (!res.success) {
-        throw new BadRequestError(`Invalid request: \n${res.error.issues.map(detail => detail.message).join(',\n')}`);
+    const validationResult = mediaUploadRequestSchema.safeParse(req);
+    if (!validationResult.success) {
+        throw new BadRequestError(`Invalid request: \n${validationResult.error.issues.map(detail => detail.message).join(',\n')}`);
     }
     return req as ValidatedMediaUploadRequest;
 }

@@ -21,9 +21,9 @@
   },
   "devDependencies": {
     "@ido_kawaz/amqp-client": "^5.0.0",
-    "@ido_kawaz/mongo-client": "^2.0.0",
-    "@ido_kawaz/server-framework": "^2.2.0",
     "@ido_kawaz/storage-client": "^5.0.0",
+    "@ido_kawaz/server-framework": "^3.0.0",
+    "@ido_kawaz/mongo-client": "^2.0.0",
     "@types/ramda": "^0.31.1",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.6",

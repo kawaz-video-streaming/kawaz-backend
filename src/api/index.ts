@@ -1,6 +1,5 @@
 import { AmqpClient } from "@ido_kawaz/amqp-client";
 import { Application } from "@ido_kawaz/server-framework";
-import { StorageClient } from "@ido_kawaz/storage-client";
 import { StatusCodes } from "http-status-codes";
 import swaggerUi from "swagger-ui-express";
 import { Dals } from "../dal/types";
@@ -8,8 +7,9 @@ import { createMediaRouter } from "./media";
 import { swaggerSpec } from "./swagger";
 
 
-export const registerRoutes = (storageClient: StorageClient, storagePartSize: number, amqpClient: AmqpClient, { mediaDal }: Dals) =>
+export const registerRoutes = (amqpClient: AmqpClient, dals: Dals) =>
     (app: Application) => {
+        const { mediaDal } = dals;
         /**
          * @openapi
          * /health:
@@ -30,7 +30,7 @@ export const registerRoutes = (storageClient: StorageClient, storagePartSize: nu
         app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
         // API routes
-        app.use("/media", createMediaRouter(mediaDal, storageClient, amqpClient, storagePartSize));
+        app.use("/media", createMediaRouter(mediaDal, amqpClient));
 
         return app;
     };
