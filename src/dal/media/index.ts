@@ -16,7 +16,7 @@ export class MediaDal extends Dal<Media> {
         size,
         ...(isNotNil(includesSubtitles) ? { includesSubtitles } : {})
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after" }
     ).lean<MediaDocument>().exec();
 
   updateMediaStatus = async (mediaId: Types.ObjectId, status: MediaStatus): Promise<UpdateWriteOpResult> =>

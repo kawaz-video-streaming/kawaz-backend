@@ -35,6 +35,8 @@ describe('End-to-end media upload and processing flow', () => {
     };
 
     const actualFs = jest.requireActual('fs') as typeof import('fs');
+    const tmpDir = path.join(process.cwd(), 'tmp');
+    let tmpEntriesBeforeEach = new Set<string>();
 
     beforeAll(() => {
         fixtureDir = actualFs.mkdtempSync(path.join(os.tmpdir(), 'integration-test-'));
@@ -47,6 +49,7 @@ describe('End-to-end media upload and processing flow', () => {
     });
 
     beforeEach(() => {
+        tmpEntriesBeforeEach = new Set(actualFs.existsSync(tmpDir) ? actualFs.readdirSync(tmpDir) : []);
         mediaDal = {
             createMedia: jest.fn().mockResolvedValue({
                 _id: new Types.ObjectId(),
@@ -76,6 +79,18 @@ describe('End-to-end media upload and processing flow', () => {
             const message = error instanceof Error ? error.message : 'Internal server error';
             res.status(500).json({ message });
         });
+    });
+
+    afterEach(() => {
+        if (!actualFs.existsSync(tmpDir)) {
+            return;
+        }
+
+        for (const entry of actualFs.readdirSync(tmpDir)) {
+            if (!tmpEntriesBeforeEach.has(entry)) {
+                actualFs.rmSync(path.join(tmpDir, entry), { recursive: true, force: true });
+            }
+        }
     });
 
     it('completes full media upload to background processing flow for video', async () => {

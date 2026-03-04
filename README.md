@@ -60,7 +60,7 @@ If the app fails to start, verify:
 1. All required variables (`UPLOAD_STORAGE_BUCKET`, `UPLOAD_STORAGE_KEY_PREFIX`) are set
 2. Shared client environment variables are valid (MongoDB, AMQP, S3 credentials)
 3. `NODE_ENV` is one of the supported values
-
+ 
 **Example local setup:**
 
 ```env
