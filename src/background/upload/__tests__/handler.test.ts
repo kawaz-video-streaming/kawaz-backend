@@ -122,7 +122,7 @@ describe('uploadMediaHandler', () => {
         await handler({ media, path: fixtureFile });
 
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
-        expect(amqpClient.publish).toHaveBeenCalledWith('converter', 'uploaded.media', {
+        expect(amqpClient.publish).toHaveBeenCalledWith('convert', 'convert.media', {
             mediaName: 'video.mp4',
             mediaStorageBucket: 'test-bucket',
             mediaRoutingKey: 'raw/video.mp4',
@@ -168,8 +168,8 @@ describe('uploadMediaHandler', () => {
         await handler({ media, path: fixtureFile });
 
         expect(amqpClient.publish).toHaveBeenCalledWith(
-            'converter',
-            'uploaded.media',
+            'convert',
+            'convert.media',
             expect.objectContaining({ includesSubtitles: false }),
         );
     });

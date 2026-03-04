@@ -155,8 +155,8 @@ describe('End-to-end media upload and processing flow', () => {
         // Verify convert event was published for video
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
         const [converterExchange, converterTopic, convertMessage] = (amqpClient.publish as jest.Mock).mock.calls[0];
-        expect(converterExchange).toBe('converter');
-        expect(converterTopic).toBe('uploaded.media');
+        expect(converterExchange).toBe('convert');
+        expect(converterTopic).toBe('convert.media');
         expect(convertMessage).toEqual({
             mediaName: 'sample.mp4',
             mediaStorageBucket: 'media-bucket',
