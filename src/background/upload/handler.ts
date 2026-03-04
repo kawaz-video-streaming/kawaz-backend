@@ -1,6 +1,6 @@
 import { StorageClient } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
-import { ConvertMediaMessage, Upload } from "./types";
+import { ConvertMessage, Upload } from "./types";
 import { UploadConfig } from "./config";
 import { AmqpClient } from "@ido_kawaz/amqp-client";
 import { MediaDal } from "../../dal/media";
@@ -11,13 +11,13 @@ export const uploadMediaHandler = (storageClient: StorageClient, amqpClient: Amq
         const uploadKey = `${uploadKeyPrefix}/${media.name}`;
         await storageClient.uploadObject(uploadBucket, uploadKey, fileData, { ensureBucket: true, multipartUpload: media.size > partSize });
         if (media.type.includes("video")) {
-            const message: ConvertMediaMessage = {
+            const message: ConvertMessage = {
                 mediaName: media.name,
                 mediaStorageBucket: uploadBucket,
                 mediaRoutingKey: uploadKey,
                 includesSubtitles: media.includesSubtitles ?? false
             };
-            amqpClient.publish("converter", "uploaded.media", message);
+            amqpClient.publish("convert", "convert.media", message);
             await mediaDal.updateMediaStatus(media._id, "processing");
         } else if (media.type.includes("image")) {
             await mediaDal.updateMediaStatus(media._id, "completed");

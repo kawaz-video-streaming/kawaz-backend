@@ -9,7 +9,7 @@ export interface Upload {
     path: string;
 }
 
-export interface ConvertMediaMessage {
+export interface ConvertMessage {
     mediaName: string;
     mediaStorageBucket: string;
     mediaRoutingKey: string;
