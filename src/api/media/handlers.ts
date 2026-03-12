@@ -13,8 +13,8 @@ export const createMediaHandlers = (mediaDal: MediaDal, amqpClient: AmqpClient) 
             requestHandlerDecorator(
                 'upload media',
                 async (rawReq: Request, res: Response) => {
-                    const { file, body } = validateMediaUploadRequest(rawReq);
-                    await logic.uploadMedia(file, body.includeSubtitles);
+                    const { file } = validateMediaUploadRequest(rawReq);
+                    await logic.uploadMedia(file);
                     res.status(StatusCodes.OK).json({ message: 'Media Started Uploading' });
                 })
     };

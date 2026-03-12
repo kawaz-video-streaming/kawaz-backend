@@ -87,14 +87,13 @@ describe('POST /media/upload route', () => {
     it('returns 200 and publishes upload event for valid multipart request', async () => {
         const response = await request(app)
             .post('/media/upload')
-            .field('includeSubtitles', 'true')
             .attach('file', fixtureFile);
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({ message: 'Media Started Uploading' });
 
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
-        expect(mediaDal.createMedia).toHaveBeenCalledWith('sample-upload.txt', 'text/plain', 19, 'true');
+        expect(mediaDal.createMedia).toHaveBeenCalledWith('sample-upload.txt', 'text/plain', 19);
 
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
         expect(amqpClient.publish).toHaveBeenCalledWith(

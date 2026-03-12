@@ -2,9 +2,6 @@ import { BadRequestError, Request, RequestFile } from "@ido_kawaz/server-framewo
 import z from "zod";
 
 export const mediaUploadRequestSchema = z.object({
-    body: z.object({
-        includeSubtitles: z.coerce.boolean().optional()
-    }).optional(),
     file: z.object({
         path: z.string(),
         originalname: z.string(),
@@ -16,9 +13,6 @@ export const mediaUploadRequestSchema = z.object({
 });
 
 interface ValidatedMediaUploadRequest {
-    body: {
-        includeSubtitles?: boolean;
-    };
     file: RequestFile;
 }
 

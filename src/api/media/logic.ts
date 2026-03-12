@@ -8,8 +8,8 @@ export const createMediaLogic = (
   mediaDal: MediaDal,
   amqpClient: AmqpClient,
 ) => ({
-  uploadMedia: async ({ path, originalname, mimetype, size }: RequestFile, includeSubtitles?: boolean) => {
-    const media = await mediaDal.createMedia(originalname, mimetype, size, includeSubtitles);
+  uploadMedia: async ({ path, originalname, mimetype, size }: RequestFile) => {
+    const media = await mediaDal.createMedia(originalname, mimetype, size);
     amqpClient.publish<Upload>(UPLOAD_CONSUMER_EXCHANGE, UPLOAD_CONSUMER_TOPIC, { media, path });
   }
 });

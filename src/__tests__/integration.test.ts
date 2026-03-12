@@ -97,7 +97,6 @@ describe('End-to-end media upload and processing flow', () => {
         // Step 1: Upload media via API
         const uploadResponse = await request(app)
             .post('/media/upload')
-            .field('includeSubtitles', 'false')
             .attach('file', fixtureFile);
 
         expect(uploadResponse.status).toBe(200);
@@ -105,7 +104,7 @@ describe('End-to-end media upload and processing flow', () => {
 
         // Verify media was persisted
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
-        expect(mediaDal.createMedia).toHaveBeenCalledWith('sample.mp4', 'video/mp4', expect.any(Number), 'false');
+        expect(mediaDal.createMedia).toHaveBeenCalledWith('sample.mp4', 'video/mp4', expect.any(Number));
 
         // Verify upload event was published to AMQP
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
@@ -158,10 +157,10 @@ describe('End-to-end media upload and processing flow', () => {
         expect(converterExchange).toBe('convert');
         expect(converterTopic).toBe('convert.media');
         expect(convertMessage).toEqual({
+            mediaId: uploadedMedia._id,
             mediaName: 'sample.mp4',
             mediaStorageBucket: 'media-bucket',
             mediaRoutingKey: 'raw/sample.mp4',
-            includesSubtitles: false,
         });
 
         // Verify status was updated to processing
@@ -171,7 +170,7 @@ describe('End-to-end media upload and processing flow', () => {
 
     it('handles image media differently than video in background processing', async () => {
         mediaDal.createMedia.mockResolvedValueOnce({
-            _id: new Types.ObjectId(),
+            _id: new Types.ObjectId().toString(),
             name: 'photo.png',
             type: 'image/png',
             size: expect.any(Number),

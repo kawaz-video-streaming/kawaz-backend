@@ -3,9 +3,9 @@ import { AmqpClient } from '@ido_kawaz/amqp-client';
 import { Types } from '@ido_kawaz/mongo-client';
 import { Readable } from 'stream';
 import { MediaDal } from '../../../dal/media';
-import { MediaDocument } from '../../../dal/media/model';
 import { UploadConfig } from '../config';
 import { uploadMediaHandler } from '../handler';
+import { Media } from '../../../dal/media/model';
 
 jest.mock('fs', () => ({
     createReadStream: jest.fn(() => Readable.from(['fake file content'])),
@@ -19,8 +19,8 @@ describe('uploadMediaHandler', () => {
     let mediaDal: { updateMediaStatus: jest.Mock };
     let config: UploadConfig;
 
-    const makeMedia = (overrides: Partial<MediaDocument> = {}): MediaDocument => ({
-        _id: new Types.ObjectId(),
+    const makeMedia = (overrides: Partial<Media> = {}): Media => ({
+        _id: new Types.ObjectId().toString(),
         name: 'test-media.mp4',
         type: 'video/mp4',
         size: 1024,
@@ -108,9 +108,9 @@ describe('uploadMediaHandler', () => {
 
     it('publishes convert event and sets status to processing for video media', async () => {
         const media = makeMedia({
+            _id: new Types.ObjectId().toString(),
             name: 'video.mp4',
             type: 'video/mp4',
-            includesSubtitles: true,
         });
         const handler = uploadMediaHandler(
             storageClient as unknown as StorageClient,
@@ -123,10 +123,10 @@ describe('uploadMediaHandler', () => {
 
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
         expect(amqpClient.publish).toHaveBeenCalledWith('convert', 'convert.media', {
+            mediaId: media._id,
             mediaName: 'video.mp4',
             mediaStorageBucket: 'test-bucket',
             mediaRoutingKey: 'raw/video.mp4',
-            includesSubtitles: true,
         });
 
         expect(mediaDal.updateMediaStatus).toHaveBeenCalledTimes(1);
@@ -150,28 +150,6 @@ describe('uploadMediaHandler', () => {
         expect(amqpClient.publish).not.toHaveBeenCalled();
         expect(mediaDal.updateMediaStatus).toHaveBeenCalledTimes(1);
         expect(mediaDal.updateMediaStatus).toHaveBeenCalledWith(media._id, 'completed');
-    });
-
-    it('defaults includesSubtitles to false when not provided for video', async () => {
-        const media = makeMedia({
-            name: 'no-subs.mp4',
-            type: 'video/mp4',
-            includesSubtitles: undefined,
-        });
-        const handler = uploadMediaHandler(
-            storageClient as unknown as StorageClient,
-            amqpClient as unknown as AmqpClient,
-            mediaDal as unknown as MediaDal,
-            config,
-        );
-
-        await handler({ media, path: fixtureFile });
-
-        expect(amqpClient.publish).toHaveBeenCalledWith(
-            'convert',
-            'convert.media',
-            expect.objectContaining({ includesSubtitles: false }),
-        );
     });
 
     it('does not update status for non-video and non-image media types', async () => {

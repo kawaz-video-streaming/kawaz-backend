@@ -32,10 +32,10 @@ describe('createMediaLogic.uploadMedia', () => {
 
         const logic = createMediaLogic(mediaDal, amqpClient);
 
-        await logic.uploadMedia(file, false);
+        await logic.uploadMedia(file);
 
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
-        expect(mediaDal.createMedia).toHaveBeenCalledWith('image.png', 'image/png', 64, false);
+        expect(mediaDal.createMedia).toHaveBeenCalledWith('image.png', 'image/png', 64);
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
         expect(amqpClient.publish).toHaveBeenCalledWith(UPLOAD_CONSUMER_EXCHANGE, UPLOAD_CONSUMER_TOPIC, {
             media,
@@ -62,40 +62,12 @@ describe('createMediaLogic.uploadMedia', () => {
 
         const logic = createMediaLogic(mediaDal, amqpClient);
 
-        await logic.uploadMedia(file, true);
+        await logic.uploadMedia(file);
 
         const createMediaCallOrder = (mediaDal.createMedia as jest.Mock).mock.invocationCallOrder[0];
         const publishCallOrder = (amqpClient.publish as jest.Mock).mock.invocationCallOrder[0];
 
         expect(createMediaCallOrder).toBeLessThan(publishCallOrder);
-    });
-
-    it('sends undefined subtitles flag when includeSubtitles is not provided', async () => {
-        const media = { _id: 'm2', name: 'clip.mp4', type: 'video/mp4', size: 100 };
-        const file = makeFile({
-            path: '/tmp/clip.mp4',
-            originalname: 'clip.mp4',
-            mimetype: 'video/mp4',
-            size: 100,
-        });
-
-        const mediaDal = {
-            createMedia: jest.fn().mockResolvedValue(media),
-        } as unknown as MediaDal;
-
-        const amqpClient = {
-            publish: jest.fn(),
-        } as unknown as AmqpClient;
-
-        const logic = createMediaLogic(mediaDal, amqpClient);
-
-        await logic.uploadMedia(file);
-
-        expect(mediaDal.createMedia).toHaveBeenCalledWith('clip.mp4', 'video/mp4', 100, undefined);
-        expect(amqpClient.publish).toHaveBeenCalledWith(UPLOAD_CONSUMER_EXCHANGE, UPLOAD_CONSUMER_TOPIC, {
-            media,
-            path: '/tmp/clip.mp4',
-        });
     });
 
     it('propagates DAL failure and never publishes event', async () => {
@@ -117,7 +89,7 @@ describe('createMediaLogic.uploadMedia', () => {
         const logic = createMediaLogic(mediaDal, amqpClient);
 
         await expect(
-            logic.uploadMedia(file, true),
+            logic.uploadMedia(file),
         ).rejects.toThrow('db write failed');
 
         expect(amqpClient.publish).not.toHaveBeenCalled();

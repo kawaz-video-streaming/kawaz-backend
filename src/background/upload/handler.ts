@@ -12,10 +12,10 @@ export const uploadMediaHandler = (storageClient: StorageClient, amqpClient: Amq
         await storageClient.uploadObject(uploadBucket, uploadKey, fileData, { ensureBucket: true, multipartUpload: media.size > partSize });
         if (media.type.includes("video")) {
             const message: ConvertMessage = {
+                mediaId: media._id,
                 mediaName: media.name,
                 mediaStorageBucket: uploadBucket,
                 mediaRoutingKey: uploadKey,
-                includesSubtitles: media.includesSubtitles ?? false
             };
             amqpClient.publish("convert", "convert.media", message);
             await mediaDal.updateMediaStatus(media._id, "processing");
