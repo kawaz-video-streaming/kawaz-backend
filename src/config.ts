@@ -1,76 +1,58 @@
-import Joi from "joi";
-import { isNotNil } from "ramda";
-import { DatabaseConfig } from "./services/db/types";
-import { ServerConfig } from "./services/server/types";
-import { StorageClientConfig } from "@ido_kawaz/storage-client";
-import { AmqpConfig } from "@ido_kawaz/amqp-client";
+import { createServerConfig, ServerConfig } from "@ido_kawaz/server-framework";
+import { createMongoConfig, MongoConfig } from "@ido_kawaz/mongo-client";
+import { AmqpConfig, createAmqpConfig } from "@ido_kawaz/amqp-client";
+import { createStorageConfig, StorageConfig } from "@ido_kawaz/storage-client";
+import { mergeDeepRight } from "ramda";
+import { z } from 'zod';
+import { ConsumersConfig } from "./background/config";
 
 class InvalidConfigError extends Error {
-  constructor(error: Joi.ValidationError) {
-    const message = `Invalid configuration: \n${error.details.map(detail => detail.message).join(',\n')}`;
+  constructor(error: z.ZodError) {
+    const message = `Invalid configuration: \n${error.issues.map(detail => detail.message).join(',\n')}`;
     super(message);
   }
 }
 
-interface EnvironmentVariables {
-  PORT: number;
-  SECURED: boolean;
-  MONGO_CONNECTION_STRING: string;
-  AMQP_CONNECTION_STRING: string;
-  AWS_ENDPOINT: string;
-  AWS_REGION: string;
-  AWS_ACCESS_KEY_ID: string;
-  AWS_SECRET_ACCESS_KEY: string;
-  AWS_PART_SIZE: number;
-  AWS_MAX_CONCURRENCY: number;
-}
+export const SERVICE_NAME = "kawaz-backend";
 
-const environmentVariablesSchema = Joi.object<EnvironmentVariables>({
-  PORT: Joi.number().required(),
-  SECURED: Joi.boolean().default(false),
-  MONGO_CONNECTION_STRING: Joi.string().uri().required(),
-  AMQP_CONNECTION_STRING: Joi.string().uri().required(),
-  AWS_ENDPOINT: Joi.string().uri().required(),
-  AWS_REGION: Joi.string().default("us-east-1"),
-  AWS_ACCESS_KEY_ID: Joi.string().required(),
-  AWS_SECRET_ACCESS_KEY: Joi.string().required(),
-  AWS_PART_SIZE: Joi.number().default(128 * 1024 * 1024),
-  AWS_MAX_CONCURRENCY: Joi.number().default(4)
-}).unknown();
+const environments = ["development", "local", "test"] as const;
+
+export type Environment = typeof environments[number];
+
+const environmentVariablesSchema = z.object({
+  NODE_ENV: z.enum(environments).default("development"),
+  UPLOAD_STORAGE_BUCKET: z.string(),
+  UPLOAD_STORAGE_KEY_PREFIX: z.string()
+});
 
 export interface SystemConfig {
-  amqp: AmqpConfig;
-  storage: StorageClientConfig;
-  server: ServerConfig;
-  db: DatabaseConfig;
+  nodeEnv: Environment;
+  amqpConfig: AmqpConfig;
+  consumersConfig: ConsumersConfig;
+  storageConfig: StorageConfig;
+  serverConfig: ServerConfig;
+  dbConfig: MongoConfig;
 }
 
-export const getConfig = (env: NodeJS.ProcessEnv): SystemConfig => {
-  const { error, value } = environmentVariablesSchema.validate(env, { abortEarly: false, convert: true });
-  if (isNotNil(error)) {
-    throw new InvalidConfigError(error);
+export const getConfig = (env: {} = {}): SystemConfig => {
+  const parseResult = environmentVariablesSchema.safeParse(mergeDeepRight(process.env, env));
+  if (!parseResult.success) {
+    throw new InvalidConfigError(parseResult.error);
   }
-  const envVars = value as EnvironmentVariables;
+  const envVars = parseResult.data;
+  const storageConfig = createStorageConfig();
   return {
-    storage: {
-      region: envVars.AWS_REGION,
-      endpoint: envVars.AWS_ENDPOINT,
-      credentials: {
-        accessKeyId: envVars.AWS_ACCESS_KEY_ID,
-        secretAccessKey: envVars.AWS_SECRET_ACCESS_KEY
-      },
-      partSize: envVars.AWS_PART_SIZE,
-      maxConcurrency: envVars.AWS_MAX_CONCURRENCY
-    },
-    amqp: {
-      amqpConnectionString: envVars.AMQP_CONNECTION_STRING
-    },
-    server: {
-      port: envVars.PORT,
-      secured: envVars.SECURED
-    },
-    db: {
-      dbConnectionString: envVars.MONGO_CONNECTION_STRING
+    nodeEnv: envVars.NODE_ENV,
+    serverConfig: createServerConfig(),
+    dbConfig: createMongoConfig(),
+    storageConfig: storageConfig,
+    amqpConfig: createAmqpConfig(),
+    consumersConfig: {
+      upload: {
+        uploadBucket: envVars.UPLOAD_STORAGE_BUCKET,
+        uploadKeyPrefix: envVars.UPLOAD_STORAGE_KEY_PREFIX,
+        partSize: storageConfig.partSize,
+      }
     }
   }
 }
