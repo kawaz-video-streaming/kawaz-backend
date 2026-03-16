@@ -7,21 +7,12 @@ export class MediaDal extends Dal<Media> {
   }
 
   createMedia = async (filename: string, contentType: string, size: number): Promise<Media> => {
-    const media: Media = {
-      _id: new Types.ObjectId().toString(),
-      name: filename,
-      type: contentType,
-      size,
-      status: PENDING,
-    };
+    const media: Media = { _id: new Types.ObjectId().toString(), name: filename, type: contentType, size, status: PENDING };
     await this.model.insertOne(media);
     return media;
   }
 
   updateMediaStatus = async (mediaId: string, status: MediaStatus): Promise<UpdateWriteOpResult> =>
-    this.model.updateOne(
-      { _id: mediaId },
-      { status },
-    ).lean().exec();
+    this.model.updateOne({ _id: mediaId }, { status },).lean().exec();
 };
 

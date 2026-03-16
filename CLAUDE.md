@@ -35,7 +35,9 @@ npx jest --config jest.config.js src/api/media/__tests__/index.test.ts --verbose
 This is a **media upload microservice** with two main processing paths:
 
 1. **HTTP API** (`src/api/`) — Accepts file uploads, saves metadata to MongoDB (status: "pending"), publishes AMQP message (with temp file path) to trigger background processing.
-2. **AMQP Consumer** (`src/background/`) — Listens for upload events, uploads file to S3, updates media status, triggers video conversion if applicable, and cleans up the temp file.
+2. **AMQP Consumer** (`src/background/`) — Two consumers:
+   - **Upload** (`src/background/upload/`) — Listens for upload events, uploads file to S3, updates media status, triggers video conversion if applicable, and cleans up the temp file.
+   - **Complete** (`src/background/complete/`) — Listens for completion events and marks media status as "completed".
 
 ### Request Flow
 
@@ -123,3 +125,4 @@ Additional env vars are consumed by the internal packages (`createServerConfig()
 
 - Upload API publishes: exchange `upload`, topic `upload.media`
 - Upload consumer publishes (video): exchange `convert`, topic defined in `src/background/upload/binding.ts`
+- Complete consumer listens: exchange `complete`, topic `complete.media` (marks media as "completed")
