@@ -8,11 +8,11 @@ import { createServer } from "@ido_kawaz/server-framework";
 
 export const startSystem = async ({ storageConfig, amqpConfig, consumersConfig, dbConfig, serverConfig }: SystemConfig) => {
     const storageClient = new StorageClient(storageConfig);
-    const amqpPublishClient = new AmqpClient(amqpConfig, []);
+    const amqpClient = new AmqpClient(amqpConfig);
     const dals = await initializeDB(dbConfig);
-    const amqpClient = new AmqpClient(amqpConfig, createConsumers(consumersConfig, storageClient, amqpPublishClient, dals));
-    await amqpPublishClient.start(SERVICE_NAME);
+    const consumers = createConsumers(consumersConfig, storageClient, amqpClient, dals);
+    amqpClient.registerConsumers(consumers);
     await amqpClient.start(SERVICE_NAME);
     const server = createServer(serverConfig, registerRoutes);
-    await server.start(amqpPublishClient, dals);
+    await server.start(amqpClient, dals);
 };
