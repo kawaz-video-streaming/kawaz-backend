@@ -137,9 +137,11 @@ Swagger UI for API documentation.
 
 1. API receives a file and stores initial media metadata in MongoDB (`pending` status).
 2. API publishes an upload event to AMQP (`upload` / `upload.media`).
-3. Upload consumer reads the temporary file and uploads it to object storage.
-4. If media type is video, consumer publishes convert event (`converter` / `uploaded.media`) and sets status to `processing`.
-5. If media type is image, consumer sets status to `completed`.
+3. Upload consumer reads the temporary file and uploads it to object storage. Storage errors are retried up to 3 times.
+4. On success, if media type is video: consumer publishes convert event (`convert` / `convert.media`) and sets status to `processing`.
+5. On success, if media type is image: consumer sets status to `completed`.
+6. Temp file is deleted after successful processing (or on fatal error).
+7. Progress consumer (`progress` / `progress.media`) receives downstream events and updates media status to `completed` or `failed`.
 
 ## Project structure
 
@@ -158,6 +160,7 @@ src/
 
 - **api/media** - Media upload handlers and request validation
 - **background/upload** - AMQP consumer for processing upload jobs
+- **background/progress** - AMQP consumer for updating media status to `completed` or `failed`
 - **dal/media** - Media model and database operations
 - **services/system.ts** - Initializes API server and starts AMQP consumers
 
@@ -211,7 +214,11 @@ src/
 │   ├── logic.test.ts       # Business logic tests
 │   └── types.test.ts       # Type validation tests
 ├── background/upload/__tests__/
-│   ├── handler.test.ts     # Upload job handler tests
+│   ├── handler.test.ts     # Upload job handler tests (uploadMediaHandler + uploadSuccessHandler)
+│   ├── index.test.ts       # Consumer setup tests
+│   └── types.test.ts       # Type validation tests
+├── background/progress/__tests__/
+│   ├── handler.test.ts     # Progress handler tests
 │   ├── index.test.ts       # Consumer setup tests
 │   └── types.test.ts       # Type validation tests
 └── __tests__/
@@ -255,17 +262,23 @@ The service runs AMQP consumers that process async jobs:
 
 ### Upload consumer
 
-**Exchange:** `upload`  
-**Topic:** `upload.media`  
+**Exchange:** `upload`
+**Topic:** `upload.media`
 **Handler:** `src/background/upload/handler.ts`
 
 Triggered when API publishes upload events. Responsibilities:
 
-1. Reads file from temporary storage
-2. Uploads to S3-compatible storage
-3. Detects media type (video/image)
-4. Updates media status in MongoDB
-5. Publishes downstream event to `converter` exchange (for videos)
+1. Reads file from temporary storage and uploads to S3-compatible storage (retries up to 3× on storage errors)
+2. On success: detects media type, updates MongoDB status, publishes to `convert` exchange (for videos), cleans up temp file
+3. On fatal error: cleans up temp file
+
+### Progress consumer
+
+**Exchange:** `progress`
+**Topic:** `progress.media`
+**Handler:** `src/background/progress/handler.ts`
+
+Receives downstream progress events and updates media status to `completed` or `failed` in MongoDB.
 
 For environment configuration, see [Environment variables](#environment-variables) section.
 
