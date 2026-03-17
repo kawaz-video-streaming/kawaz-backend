@@ -11,14 +11,12 @@ export const uploadMediaHandler = (storageClient: StorageClient, { uploadBucket,
     async (payload: Upload) => {
         const { media, path } = payload;
         const fileData = createReadStream(path);
-        try {
-            await storageClient.uploadObject(uploadBucket, `${uploadKeyPrefix}/${media.name}`, fileData, { ensureBucket: true, multipartUpload: media.size > partSize });
-        } catch (error) {
+        await storageClient.uploadObject(uploadBucket, `${uploadKeyPrefix}/${media.name}`, fileData, { ensureBucket: true, multipartUpload: media.size > partSize }).catch(error => {
             if (error instanceof StorageError) {
                 throw new UploadError(payload, error);
             }
             throw error;
-        }
+        });
     };
 
 export const uploadSuccessHandler = (amqpClient: AmqpClient, mediaDal: MediaDal, { uploadBucket, uploadKeyPrefix }: UploadConfig) => async ({ media, path }: Upload) => {
