@@ -13,6 +13,6 @@ export class MediaDal extends Dal<Media> {
   }
 
   updateMediaStatus = async (mediaId: string, status: MediaStatus): Promise<UpdateWriteOpResult> =>
-    this.model.updateOne({ _id: mediaId }, { status },).lean().exec();
+    this.model.updateOne({ _id: mediaId }, { status }).lean().exec();
 };
 

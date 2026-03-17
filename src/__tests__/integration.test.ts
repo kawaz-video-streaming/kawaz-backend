@@ -10,7 +10,7 @@ import { Types } from '@ido_kawaz/mongo-client';
 import { Readable } from 'stream';
 import { MediaDal } from '../dal/media';
 import { createMediaRouter } from '../api/media';
-import { uploadMediaHandler } from '../background/upload/handler';
+import { uploadMediaHandler, uploadSuccessHandler } from '../background/upload/handler';
 import { UploadConfig } from '../background/upload/config';
 
 jest.mock('fs', () => ({
@@ -133,14 +133,18 @@ describe('End-to-end media upload and processing flow', () => {
         mediaDal.updateMediaStatus.mockClear();
         amqpClient.publish.mockClear();
 
-        const handler = uploadMediaHandler(
+        const uploadHandler = uploadMediaHandler(
             storageClient as unknown as StorageClient,
+            uploadConfig
+        );
+        const successHandler = uploadSuccessHandler(
             amqpClient as unknown as AmqpClient,
             mediaDal as unknown as MediaDal,
-            uploadConfig,
+            uploadConfig
         );
 
-        await handler({ media: uploadedMedia, path: uploadPayload.path });
+        await uploadHandler({ media: uploadedMedia, path: uploadPayload.path });
+        await successHandler({ media: uploadedMedia, path: uploadPayload.path });
 
         // Verify file was uploaded to storage
         expect(storageClient.uploadObject).toHaveBeenCalledTimes(1);
@@ -198,14 +202,18 @@ describe('End-to-end media upload and processing flow', () => {
             partSize: 128 * 1024 * 1024,
         };
 
-        const handler = uploadMediaHandler(
+        const uploadHandler = uploadMediaHandler(
             storageClient as unknown as StorageClient,
+            uploadConfig
+        );
+        const successHandler = uploadSuccessHandler(
             amqpClient as unknown as AmqpClient,
             mediaDal as unknown as MediaDal,
-            uploadConfig,
+            uploadConfig
         );
 
-        await handler({ media: uploadedMedia, path: uploadPayload.path });
+        await uploadHandler({ media: uploadedMedia, path: uploadPayload.path });
+        await successHandler({ media: uploadedMedia, path: uploadPayload.path });
 
         // Verify NO convert event for images
         expect(amqpClient.publish).not.toHaveBeenCalled();

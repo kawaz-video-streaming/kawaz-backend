@@ -36,8 +36,8 @@ This is a **media upload microservice** with two main processing paths:
 
 1. **HTTP API** (`src/api/`) — Accepts file uploads, saves metadata to MongoDB (status: "pending"), publishes AMQP message (with temp file path) to trigger background processing.
 2. **AMQP Consumer** (`src/background/`) — Two consumers:
-   - **Upload** (`src/background/upload/`) — Listens for upload events, uploads file to S3, updates media status, triggers video conversion if applicable, and cleans up the temp file.
-   - **Complete** (`src/background/complete/`) — Listens for completion events and marks media status as "completed".
+   - **Upload** (`src/background/upload/`) — Listens for upload events, uploads file to S3 (`uploadMediaHandler`), then on success triggers video conversion / updates status and cleans up the temp file (`uploadSuccessHandler`). Storage errors are wrapped as `UploadError` (retriable via `AmqpRetriableError`).
+   - **Progress** (`src/background/progress/`) — Listens for progress events and updates media status to `"completed"` or `"failed"`.
 
 ### Request Flow
 
@@ -51,10 +51,13 @@ POST /media/upload
 
 AMQP consumer (exchange: "upload", topic: "upload.media")
   → Validate payload (Zod)
-  → Upload file to storage (S3) from temp path
-  → For video: Update media status → "processing", publish to "convert" exchange
-  → For image: Update media status → "completed"
-  → Delete temp file (also deleted on fatal error)
+  → uploadMediaHandler: Upload file to storage (S3) from temp path
+      → On StorageError: throw UploadError (retriable, max 3 retries)
+  → uploadSuccessHandler (handleSuccess):
+      → For video: Update media status → "processing", publish to "convert" exchange
+      → For image: Update media status → "completed"
+      → Delete temp file
+  → On fatal error: Delete temp file
 ```
 
 ### HTTP Endpoints
@@ -125,4 +128,4 @@ Additional env vars are consumed by the internal packages (`createServerConfig()
 
 - Upload API publishes: exchange `upload`, topic `upload.media`
 - Upload consumer publishes (video): exchange `convert`, topic defined in `src/background/upload/binding.ts`
-- Complete consumer listens: exchange `complete`, topic `complete.media` (marks media as "completed")
+- Progress consumer listens: exchange `progress`, topic `progress.media` (updates media status to `"completed"` or `"failed"`)

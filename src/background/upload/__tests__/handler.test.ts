@@ -1,22 +1,24 @@
-import { StorageClient } from '@ido_kawaz/storage-client';
 import { AmqpClient } from '@ido_kawaz/amqp-client';
 import { Types } from '@ido_kawaz/mongo-client';
+import { StorageClient } from '@ido_kawaz/storage-client';
 import { Readable } from 'stream';
 import { MediaDal } from '../../../dal/media';
-import { UploadConfig } from '../config';
-import { uploadMediaHandler } from '../handler';
 import { Media } from '../../../dal/media/model';
+import { UploadConfig } from '../config';
+import { uploadMediaHandler, uploadSuccessHandler } from '../handler';
 
 jest.mock('fs', () => ({
     createReadStream: jest.fn(() => Readable.from(['fake file content'])),
+}));
+
+jest.mock('fs/promises', () => ({
+    unlink: jest.fn().mockResolvedValue(undefined),
 }));
 
 describe('uploadMediaHandler', () => {
     const fixtureFile = '/tmp/test-media.mp4';
 
     let storageClient: { uploadObject: jest.Mock };
-    let amqpClient: { publish: jest.Mock };
-    let mediaDal: { updateMediaStatus: jest.Mock };
     let config: UploadConfig;
 
     const makeMedia = (overrides: Partial<Media> = {}): Media => ({
@@ -33,14 +35,6 @@ describe('uploadMediaHandler', () => {
             uploadObject: jest.fn().mockResolvedValue(undefined),
         };
 
-        amqpClient = {
-            publish: jest.fn(),
-        };
-
-        mediaDal = {
-            updateMediaStatus: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
-        };
-
         config = {
             uploadBucket: 'test-bucket',
             uploadKeyPrefix: 'raw',
@@ -52,9 +46,7 @@ describe('uploadMediaHandler', () => {
         const media = makeMedia({ name: 'clip.mp4', type: 'video/mp4' });
         const handler = uploadMediaHandler(
             storageClient as unknown as StorageClient,
-            amqpClient as unknown as AmqpClient,
-            mediaDal as unknown as MediaDal,
-            config,
+            config
         );
 
         await handler({ media, path: fixtureFile });
@@ -72,9 +64,7 @@ describe('uploadMediaHandler', () => {
         const media = makeMedia({ name: 'large.mp4', type: 'video/mp4', size: 200 * 1024 * 1024 });
         const handler = uploadMediaHandler(
             storageClient as unknown as StorageClient,
-            amqpClient as unknown as AmqpClient,
-            mediaDal as unknown as MediaDal,
-            config,
+            config
         );
 
         await handler({ media, path: fixtureFile });
@@ -91,9 +81,7 @@ describe('uploadMediaHandler', () => {
         const media = makeMedia({ name: 'small.mp4', type: 'video/mp4', size: 1024 });
         const handler = uploadMediaHandler(
             storageClient as unknown as StorageClient,
-            amqpClient as unknown as AmqpClient,
-            mediaDal as unknown as MediaDal,
-            config,
+            config
         );
 
         await handler({ media, path: fixtureFile });
@@ -106,17 +94,61 @@ describe('uploadMediaHandler', () => {
         );
     });
 
+    it('propagates non-StorageError upload errors', async () => {
+        storageClient.uploadObject.mockRejectedValueOnce(new Error('storage failure'));
+
+        const media = makeMedia({ name: 'fail.mp4', type: 'video/mp4' });
+        const handler = uploadMediaHandler(
+            storageClient as unknown as StorageClient,
+            config
+        );
+
+        await expect(handler({ media, path: fixtureFile })).rejects.toThrow('storage failure');
+    });
+});
+
+describe('uploadSuccessHandler', () => {
+    const fixtureFile = '/tmp/test-media.mp4';
+
+    let amqpClient: { publish: jest.Mock };
+    let mediaDal: { updateMediaStatus: jest.Mock };
+    let config: UploadConfig;
+
+    const makeMedia = (overrides: Partial<Media> = {}): Media => ({
+        _id: new Types.ObjectId().toString(),
+        name: 'test-media.mp4',
+        type: 'video/mp4',
+        size: 1024,
+        status: 'pending',
+        ...overrides,
+    });
+
+    beforeEach(() => {
+        amqpClient = {
+            publish: jest.fn(),
+        };
+
+        mediaDal = {
+            updateMediaStatus: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+        };
+
+        config = {
+            uploadBucket: 'test-bucket',
+            uploadKeyPrefix: 'raw',
+            partSize: 128 * 1024 * 1024,
+        };
+    });
+
     it('publishes convert event and sets status to processing for video media', async () => {
         const media = makeMedia({
             _id: new Types.ObjectId().toString(),
             name: 'video.mp4',
             type: 'video/mp4',
         });
-        const handler = uploadMediaHandler(
-            storageClient as unknown as StorageClient,
+        const handler = uploadSuccessHandler(
             amqpClient as unknown as AmqpClient,
             mediaDal as unknown as MediaDal,
-            config,
+            config
         );
 
         await handler({ media, path: fixtureFile });
@@ -138,11 +170,10 @@ describe('uploadMediaHandler', () => {
             name: 'photo.png',
             type: 'image/png',
         });
-        const handler = uploadMediaHandler(
-            storageClient as unknown as StorageClient,
+        const handler = uploadSuccessHandler(
             amqpClient as unknown as AmqpClient,
             mediaDal as unknown as MediaDal,
-            config,
+            config
         );
 
         await handler({ media, path: fixtureFile });
@@ -157,32 +188,13 @@ describe('uploadMediaHandler', () => {
             name: 'document.pdf',
             type: 'application/pdf',
         });
-        const handler = uploadMediaHandler(
-            storageClient as unknown as StorageClient,
+        const handler = uploadSuccessHandler(
             amqpClient as unknown as AmqpClient,
             mediaDal as unknown as MediaDal,
-            config,
+            config
         );
 
         await handler({ media, path: fixtureFile });
-
-        expect(storageClient.uploadObject).toHaveBeenCalledTimes(1);
-        expect(amqpClient.publish).not.toHaveBeenCalled();
-        expect(mediaDal.updateMediaStatus).not.toHaveBeenCalled();
-    });
-
-    it('propagates storage upload error and does not update status', async () => {
-        storageClient.uploadObject.mockRejectedValueOnce(new Error('storage failure'));
-
-        const media = makeMedia({ name: 'fail.mp4', type: 'video/mp4' });
-        const handler = uploadMediaHandler(
-            storageClient as unknown as StorageClient,
-            amqpClient as unknown as AmqpClient,
-            mediaDal as unknown as MediaDal,
-            config,
-        );
-
-        await expect(handler({ media, path: fixtureFile })).rejects.toThrow('storage failure');
 
         expect(amqpClient.publish).not.toHaveBeenCalled();
         expect(mediaDal.updateMediaStatus).not.toHaveBeenCalled();

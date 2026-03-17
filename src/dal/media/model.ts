@@ -1,6 +1,10 @@
 import { Model, MongoClient, Schema, Types } from "@ido_kawaz/mongo-client";
 
-export const mediaStatuses = ["pending", "processing", "completed", "failed"] as const;
+export const mediaResultStatuses = ["completed", "failed"] as const;
+
+export type MediaResultStatus = typeof mediaResultStatuses[number];
+
+export const mediaStatuses = ["pending", "processing", ...mediaResultStatuses] as const;
 
 export type MediaStatus = typeof mediaStatuses[number];
 

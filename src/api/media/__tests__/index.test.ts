@@ -1,10 +1,10 @@
+import { AmqpClient } from '@ido_kawaz/amqp-client';
 import type { Application } from '@ido_kawaz/server-framework';
 import { ApiError } from '@ido_kawaz/server-framework';
 import express from 'express';
-import fs from 'fs';
+import { existsSync, mkdirSync, readdirSync, rmdirSync, rmSync, writeFileSync } from 'fs';
 import path from 'path';
 import request from 'supertest';
-import { AmqpClient } from '@ido_kawaz/amqp-client';
 import { MediaDal } from '../../../dal/media';
 import { createMediaRouter } from '../index';
 
@@ -22,12 +22,12 @@ describe('POST /media/upload route', () => {
     let amqpClient: { publish: jest.Mock };
 
     beforeAll(() => {
-        tmpDirExistedBeforeAll = fs.existsSync(tmpDir);
-        fixtureDirExistedBeforeAll = fs.existsSync(fixtureDir);
+        tmpDirExistedBeforeAll = existsSync(tmpDir);
+        fixtureDirExistedBeforeAll = existsSync(fixtureDir);
 
-        fs.mkdirSync(fixtureDir, { recursive: true });
-        fs.writeFileSync(fixtureFile, 'test upload content');
-        fs.mkdirSync(tmpDir, { recursive: true });
+        mkdirSync(fixtureDir, { recursive: true });
+        writeFileSync(fixtureFile, 'test upload content');
+        mkdirSync(tmpDir, { recursive: true });
     });
 
     beforeEach(() => {
@@ -44,7 +44,7 @@ describe('POST /media/upload route', () => {
             publish: jest.fn(),
         };
 
-        tmpEntriesBeforeEach = new Set(fs.existsSync(tmpDir) ? fs.readdirSync(tmpDir) : []);
+        tmpEntriesBeforeEach = new Set(existsSync(tmpDir) ? readdirSync(tmpDir) : []);
 
         app = express();
         app.use('/media', createMediaRouter(mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient));
@@ -59,28 +59,28 @@ describe('POST /media/upload route', () => {
     });
 
     afterEach(() => {
-        if (!fs.existsSync(tmpDir)) {
+        if (!existsSync(tmpDir)) {
             return;
         }
 
-        for (const entry of fs.readdirSync(tmpDir)) {
+        for (const entry of readdirSync(tmpDir)) {
             if (!tmpEntriesBeforeEach.has(entry)) {
-                fs.rmSync(path.join(tmpDir, entry), { recursive: true, force: true });
+                rmSync(path.join(tmpDir, entry), { recursive: true, force: true });
             }
         }
     });
 
     afterAll(() => {
-        if (fs.existsSync(fixtureFile)) {
-            fs.rmSync(fixtureFile, { force: true });
+        if (existsSync(fixtureFile)) {
+            rmSync(fixtureFile, { force: true });
         }
 
-        if (!fixtureDirExistedBeforeAll && fs.existsSync(fixtureDir) && fs.readdirSync(fixtureDir).length === 0) {
-            fs.rmdirSync(fixtureDir);
+        if (!fixtureDirExistedBeforeAll && existsSync(fixtureDir) && readdirSync(fixtureDir).length === 0) {
+            rmdirSync(fixtureDir);
         }
 
-        if (!tmpDirExistedBeforeAll && fs.existsSync(tmpDir) && fs.readdirSync(tmpDir).length === 0) {
-            fs.rmdirSync(tmpDir);
+        if (!tmpDirExistedBeforeAll && existsSync(tmpDir) && readdirSync(tmpDir).length === 0) {
+            rmdirSync(tmpDir);
         }
     });
 
