@@ -21,12 +21,6 @@ describe('validateUploadPayload', () => {
         expect(validateUploadPayload(payload)).toBe(true);
     });
 
-    it('returns true when includesSubtitles is provided', () => {
-        const payload = makeValidPayload({ media: { includesSubtitles: true } });
-
-        expect(validateUploadPayload(payload)).toBe(true);
-    });
-
     it('returns true when size is provided as string (coerced to number)', () => {
         const payload = makeValidPayload({ media: { size: '2048' } });
 

@@ -150,8 +150,7 @@ describe('End-to-end media upload and processing flow', () => {
         expect(storageClient.uploadObject).toHaveBeenCalledTimes(1);
         expect(storageClient.uploadObject).toHaveBeenCalledWith(
             'media-bucket',
-            'raw/sample.mp4',
-            expect.anything(),
+            expect.objectContaining({ key: 'raw/sample.mp4', data: expect.anything() }),
             expect.objectContaining({ ensureBucket: true, multipartUpload: false }),
         );
 
@@ -239,8 +238,7 @@ describe('End-to-end media upload and processing flow', () => {
 
     it('validates request and returns 400 for missing file', async () => {
         const response = await request(app)
-            .post('/media/upload')
-            .field('includeSubtitles', 'false');
+            .post('/media/upload');
 
         expect(response.status).toBe(400);
         expect(response.body.message).toContain('Invalid request');

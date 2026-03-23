@@ -126,7 +126,6 @@ Returns `200 OK` if service is running.
 
 - Content type: `multipart/form-data`
 - Required file field: `file`
-- Optional body field: `includeSubtitles` (boolean-like value)
 - Success response: `200 { "message": "Media Started Uploading" }`
 
 ### `GET /api-docs`
@@ -179,7 +178,6 @@ Stores metadata for uploaded media files.
 | `type` | String | Yes | MIME type (e.g., `video/mp4`, `image/jpeg`) |
 | `size` | Number | Yes | File size in bytes |
 | `status` | String | Yes | One of: `pending`, `processing`, `completed`, `failed` |
-| `includesSubtitles` | Boolean | No | Whether video includes subtitle track |
 
 Example document:
 ```json
@@ -188,8 +186,7 @@ Example document:
   "name": "presentation.mp4",
   "type": "video/mp4",
   "size": 52428800,
-  "status": "processing",
-  "includesSubtitles": true
+  "status": "processing"
 }
 ```
 

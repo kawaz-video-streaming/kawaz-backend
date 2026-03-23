@@ -1,5 +1,5 @@
 import { AmqpClient } from "@ido_kawaz/amqp-client";
-import { StorageClient, StorageError } from "@ido_kawaz/storage-client";
+import { StorageClient, StorageError, StorageObject } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
 import { MediaDal } from "../../dal/media";
 import { cleanupPath } from "../../utils/files";
@@ -11,7 +11,8 @@ export const uploadMediaHandler = (storageClient: StorageClient, { uploadBucket,
     async (payload: Upload) => {
         const { media, path } = payload;
         const fileData = createReadStream(path);
-        await storageClient.uploadObject(uploadBucket, `${uploadKeyPrefix}/${media.name}`, fileData, { ensureBucket: true, multipartUpload: media.size > partSize }).catch(error => {
+        const storageObject: StorageObject = { key: `${uploadKeyPrefix}/${media.name}`, data: fileData };
+        await storageClient.uploadObject(uploadBucket, storageObject, { ensureBucket: true, multipartUpload: media.size > partSize }).catch(error => {
             if (error instanceof StorageError) {
                 throw new UploadError(payload, error);
             }

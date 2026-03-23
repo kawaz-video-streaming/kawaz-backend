@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@ido_kawaz/amqp-client": "^7.0.0",
-    "@ido_kawaz/storage-client": "^5.0.0",
+    "@ido_kawaz/storage-client": "^7.0.0",
     "@ido_kawaz/server-framework": "^3.0.0",
     "@ido_kawaz/mongo-client": "^3.0.0",
     "@types/ramda": "^0.31.1",

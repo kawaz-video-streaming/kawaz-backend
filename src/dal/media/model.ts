@@ -16,7 +16,6 @@ export interface Media {
   type: string;
   size: number;
   status: MediaStatus;
-  includesSubtitles?: boolean;
 }
 
 const mediaSchema = new Schema<Media>(
@@ -26,7 +25,6 @@ const mediaSchema = new Schema<Media>(
     type: { type: String, required: true },
     size: { type: Number, required: true },
     status: { type: String, enum: mediaStatuses, default: PENDING },
-    includesSubtitles: { type: Boolean, required: false },
   },
   { versionKey: false },
 );

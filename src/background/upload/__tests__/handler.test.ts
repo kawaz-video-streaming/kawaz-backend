@@ -54,8 +54,7 @@ describe('uploadMediaHandler', () => {
         expect(storageClient.uploadObject).toHaveBeenCalledTimes(1);
         expect(storageClient.uploadObject).toHaveBeenCalledWith(
             'test-bucket',
-            'raw/clip.mp4',
-            expect.anything(),
+            expect.objectContaining({ key: 'raw/clip.mp4', data: expect.anything() }),
             expect.objectContaining({ ensureBucket: true }),
         );
     });
@@ -71,8 +70,7 @@ describe('uploadMediaHandler', () => {
 
         expect(storageClient.uploadObject).toHaveBeenCalledWith(
             expect.any(String),
-            expect.any(String),
-            expect.anything(),
+            expect.objectContaining({ key: expect.any(String), data: expect.anything() }),
             expect.objectContaining({ multipartUpload: true }),
         );
     });
@@ -88,8 +86,7 @@ describe('uploadMediaHandler', () => {
 
         expect(storageClient.uploadObject).toHaveBeenCalledWith(
             expect.any(String),
-            expect.any(String),
-            expect.anything(),
+            expect.objectContaining({ key: expect.any(String), data: expect.anything() }),
             expect.objectContaining({ multipartUpload: false }),
         );
     });

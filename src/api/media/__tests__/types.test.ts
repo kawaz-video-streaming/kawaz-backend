@@ -3,7 +3,6 @@ import { validateMediaUploadRequest } from '../types';
 describe('validateMediaUploadRequest', () => {
     it('returns file and body fields for a valid upload payload', () => {
         const req = {
-            body: { includeSubtitles: 'true' },
             file: {
                 path: '/tmp/video.mp4',
                 originalname: 'video.mp4',
@@ -15,7 +14,6 @@ describe('validateMediaUploadRequest', () => {
         const result = validateMediaUploadRequest(req as any);
 
         expect(result).toMatchObject({
-            body: { includeSubtitles: 'true' },
             file: {
                 path: '/tmp/video.mp4',
                 originalname: 'video.mp4',
@@ -26,16 +24,13 @@ describe('validateMediaUploadRequest', () => {
     });
 
     it('throws Invalid request when file is missing', () => {
-        const req = {
-            body: { includeSubtitles: false },
-        };
+        const req = {};
 
         expect(() => validateMediaUploadRequest(req as any)).toThrow('Invalid request');
     });
 
     it('throws when file size is not a number', () => {
         const req = {
-            body: { includeSubtitles: true },
             file: {
                 path: '/tmp/video.mp4',
                 originalname: 'video.mp4',

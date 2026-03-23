@@ -113,8 +113,7 @@ describe('POST /media/upload route', () => {
 
     it('returns 400 when request is missing file', async () => {
         const response = await request(app)
-            .post('/media/upload')
-            .field('includeSubtitles', 'true');
+            .post('/media/upload');
 
         expect(response.status).toBe(400);
         expect(response.body.message).toContain('Invalid request');
