@@ -7,5 +7,6 @@ module.exports = {
     collectCoverageFrom: ['src/**/*.ts', '!src/index.ts'],
     transform: {
         '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.jest.json' }]
-    }
+    },
+    globalTeardown: './jest.teardown.js'
 };

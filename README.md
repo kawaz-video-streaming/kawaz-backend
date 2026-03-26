@@ -5,7 +5,8 @@ Kawaz Plus media backend service.
 ## What it does
 
 - Exposes a health endpoint (`GET /health`)
-- Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`)
+- Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`) — JWT-based authentication
+- Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`) — requires JWT
 - Publishes upload jobs to AMQP for async processing
 - Consumes upload jobs and uploads files to object storage
 - Persists media metadata and status in MongoDB
@@ -42,6 +43,7 @@ This service validates all environment variables at startup using Zod schemas. M
 
 - `UPLOAD_STORAGE_BUCKET` - Target bucket for uploaded media
 - `UPLOAD_STORAGE_KEY_PREFIX` - Prefix for uploaded object keys
+- `JWT_SECRET` - Secret key used to sign and verify JWT tokens
 
 **Optional variables:**
 
@@ -67,6 +69,8 @@ If the app fails to start, verify:
 NODE_ENV=local
 PORT=8080
 SECURED=false
+
+JWT_SECRET=your-local-secret
 
 MONGO_CONNECTION_STRING=mongodb://localhost:27017/kawaz
 AMQP_CONNECTION_STRING=amqp://localhost:5672
@@ -122,8 +126,23 @@ Base URL (local): `http://localhost:8080`
 
 Returns `200 OK` if service is running.
 
+### `POST /auth/signup`
+
+- Content type: `application/json`
+- Body: `{ "username": string (min 3), "password": string (min 12) }`
+- Success response: `201 { "token": "<jwt>" }`
+- Error responses: `400` (invalid body), `409` (username taken)
+
+### `POST /auth/login`
+
+- Content type: `application/json`
+- Body: `{ "username": string, "password": string }`
+- Success response: `200 { "token": "<jwt>" }`
+- Error responses: `400` (invalid body), `401` (invalid credentials)
+
 ### `POST /media/upload`
 
+- Requires: `Authorization: Bearer <token>` header
 - Content type: `multipart/form-data`
 - Required file field: `file`
 - Success response: `200 { "message": "Media Started Uploading" }`

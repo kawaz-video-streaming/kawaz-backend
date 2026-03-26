@@ -14,5 +14,5 @@ export const startSystem = async ({ storageConfig, amqpConfig, consumersConfig, 
     amqpClient.registerConsumers(consumers);
     await amqpClient.start(SERVICE_NAME);
     const server = createServer(serverConfig, registerRoutes);
-    await server.start(amqpClient, dals);
+    await server.start(serverConfig, amqpClient, dals);
 };

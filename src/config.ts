@@ -22,15 +22,21 @@ export type Environment = typeof environments[number];
 const environmentVariablesSchema = z.object({
   NODE_ENV: z.enum(environments).default("development"),
   UPLOAD_STORAGE_BUCKET: z.string(),
-  UPLOAD_STORAGE_KEY_PREFIX: z.string()
+  UPLOAD_STORAGE_KEY_PREFIX: z.string(),
+  JWT_SECRET: z.string()
 });
+
+export interface BackendServerConfig extends ServerConfig {
+  env: Environment;
+  jwtSecret: string;
+}
 
 export interface SystemConfig {
   nodeEnv: Environment;
   amqpConfig: AmqpConfig;
   consumersConfig: ConsumersConfig;
   storageConfig: StorageConfig;
-  serverConfig: ServerConfig;
+  serverConfig: BackendServerConfig;
   dbConfig: MongoConfig;
 }
 
@@ -43,7 +49,11 @@ export const getConfig = (env: {} = {}): SystemConfig => {
   const storageConfig = createStorageConfig();
   return {
     nodeEnv: envVars.NODE_ENV,
-    serverConfig: createServerConfig(),
+    serverConfig: {
+      ...createServerConfig(),
+      env: envVars.NODE_ENV,
+      jwtSecret: envVars.JWT_SECRET,
+    },
     dbConfig: createMongoConfig(),
     storageConfig: storageConfig,
     amqpConfig: createAmqpConfig(),
