@@ -5,11 +5,16 @@ import swaggerUi from "swagger-ui-express";
 import { Dals } from "../dal/types";
 import { createMediaRouter } from "./media";
 import { swaggerSpec } from "./swagger";
+import { createAuthMiddleware, createLocalAuthMiddleware } from "./middleware";
+import { BackendServerConfig } from "../config";
 
 
-export const registerRoutes = (amqpClient: AmqpClient, dals: Dals) =>
+export const registerRoutes = (config: BackendServerConfig, amqpClient: AmqpClient, dals: Dals) =>
     (app: Application) => {
         const { mediaDal } = dals;
+        const authMiddleware = config.env === 'local' ? createLocalAuthMiddleware : createAuthMiddleware;
+        app.use(authMiddleware(config.jwtSecret, dals)); // Apply authentication middleware to all routes
+
         /**
          * @openapi
          * /health:
