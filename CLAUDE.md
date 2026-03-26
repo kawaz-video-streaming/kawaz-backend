@@ -62,11 +62,13 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 
 ### HTTP Endpoints
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/media/upload` | Upload a media file (multipart/form-data) |
-| `GET` | `/health` | Health check — returns 200 OK |
-| `GET` | `/api-docs` | Swagger UI (OpenAPI documentation) |
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/auth/signup` | No | Register a new user, returns JWT |
+| `POST` | `/auth/login` | No | Login, returns JWT |
+| `POST` | `/media/upload` | Yes | Upload a media file (multipart/form-data) |
+| `GET` | `/health` | No | Health check — returns 200 OK |
+| `GET` | `/api-docs` | No | Swagger UI (OpenAPI documentation) |
 
 ### Media Model (`src/dal/media/model.ts`)
 
@@ -106,7 +108,7 @@ All `@ido_kawaz/*` packages are listed as **devDependencies** (resolved locally 
 
 - **Factory functions** for all modules: `createMediaHandlers(deps)`, `createUploadConsumer(deps)`, etc.
 - **Zod validation** at every boundary: HTTP requests (`validateMediaUploadRequest`), AMQP payloads (`validateUploadPayload`), and env config (`src/config.ts`).
-- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Methods: `createMedia()`, `updateMediaStatus()`.
+- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia()`, `updateMediaStatus()`. User: `createUser()`, `findUser()`, `verifyUser()`.
 - **Colocated tests**: `__tests__/` directories next to the source they test.
 - **Handler decorator** from server-framework wraps route handlers for logging and error propagation.
 
@@ -121,6 +123,7 @@ Service-specific env vars validated in `src/config.ts`:
 | `NODE_ENV` | No (default: `"development"`) | `"development"` \| `"local"` \| `"test"` |
 | `UPLOAD_STORAGE_BUCKET` | Yes | S3 bucket name for uploads |
 | `UPLOAD_STORAGE_KEY_PREFIX` | Yes | Key prefix for uploaded objects |
+| `JWT_SECRET` | Yes | Secret for signing/verifying JWT tokens |
 
 Additional env vars are consumed by the internal packages (`createServerConfig()`, `createMongoConfig()`, `createAmqpConfig()`, `createStorageConfig()`) — refer to each package's documentation for their required variables.
 

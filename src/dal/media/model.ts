@@ -29,6 +29,6 @@ const mediaSchema = new Schema<Media>(
   { versionKey: false },
 );
 
-export const createMediaModel = (client: MongoClient) => client.createModel("Media", mediaSchema);
+export const createMediaModel = (client: MongoClient) => client.createModel("media", mediaSchema);
 
 export type MediaModel = Model<Media>;

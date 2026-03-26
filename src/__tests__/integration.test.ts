@@ -1,5 +1,6 @@
 import type { Application } from '@ido_kawaz/server-framework';
 import { ApiError } from '@ido_kawaz/server-framework';
+import bcrypt from 'bcrypt';
 import express from 'express';
 import os from 'os';
 import path from 'path';
@@ -9,9 +10,16 @@ import { StorageClient } from '@ido_kawaz/storage-client';
 import { Types } from '@ido_kawaz/mongo-client';
 import { Readable } from 'stream';
 import { MediaDal } from '../dal/media';
+import { UserDal } from '../dal/user';
 import { createMediaRouter } from '../api/media';
+import { createAuthRouter } from '../api/auth';
+import { createAuthMiddleware } from '../api/middleware';
 import { uploadMediaHandler, uploadSuccessHandler } from '../background/upload/handler';
 import { UploadConfig } from '../background/upload/config';
+
+jest.mock('bcrypt');
+
+const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
 jest.mock('fs', () => ({
     ...jest.requireActual('fs'),
@@ -246,5 +254,130 @@ describe('End-to-end media upload and processing flow', () => {
         // Verify no media was created or published
         expect(mediaDal.createMedia).not.toHaveBeenCalled();
         expect(amqpClient.publish).not.toHaveBeenCalled();
+    });
+});
+
+describe('Authentication + Media upload end-to-end flow', () => {
+    const JWT_SECRET = 'integration-test-secret';
+
+    let app: Application;
+    let mediaDal: { createMedia: jest.Mock; updateMediaStatus: jest.Mock };
+    let userDal: { verifyUser: jest.Mock; createUser: jest.Mock; findUser: jest.Mock };
+    let amqpClient: { publish: jest.Mock };
+
+    const actualFs = jest.requireActual('fs') as typeof import('fs');
+    let fixtureDir: string;
+    let fixtureFile: string;
+
+    beforeAll(() => {
+        fixtureDir = actualFs.mkdtempSync(path.join(os.tmpdir(), 'auth-integration-test-'));
+        fixtureFile = path.join(fixtureDir, 'sample.mp4');
+        actualFs.writeFileSync(fixtureFile, 'test video content');
+    });
+
+    afterAll(() => {
+        actualFs.rmSync(fixtureDir, { recursive: true, force: true });
+    });
+
+    beforeEach(() => {
+        mediaDal = {
+            createMedia: jest.fn().mockResolvedValue({
+                _id: new Types.ObjectId().toString(),
+                name: 'sample.mp4',
+                type: 'video/mp4',
+                size: 18,
+                status: 'pending',
+            }),
+            updateMediaStatus: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+        };
+
+        userDal = {
+            verifyUser: jest.fn().mockResolvedValue(true),
+            createUser: jest.fn().mockResolvedValue(undefined),
+            findUser: jest.fn().mockResolvedValue({ name: 'ido', password: 'hashed-password' }),
+        };
+
+        amqpClient = { publish: jest.fn() };
+
+        mockedBcrypt.hash.mockResolvedValue('hashed-password' as never);
+        mockedBcrypt.compare.mockResolvedValue(true as never);
+
+        app = express();
+        app.use(express.json());
+        app.use('/auth', createAuthRouter(JWT_SECRET, userDal as unknown as UserDal));
+        app.use(createAuthMiddleware(JWT_SECRET, userDal as unknown as UserDal));
+        app.use('/media', createMediaRouter(mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient));
+        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+            if (error instanceof ApiError) {
+                res.status(error.statusCode).json({ message: error.message });
+                return;
+            }
+            const message = error instanceof Error ? error.message : 'Internal server error';
+            res.status(500).json({ message });
+        });
+    });
+
+    it('signup → login → upload media with token', async () => {
+        // First call to verifyUser is the signup existence check (user doesn't exist yet)
+        userDal.verifyUser.mockResolvedValueOnce(false);
+
+        // Step 1: Sign up
+        const signupRes = await request(app)
+            .post('/auth/signup')
+            .send({ username: 'ido', password: 'strongpassword123' });
+
+        expect(signupRes.status).toBe(201);
+        const signupToken = signupRes.body.token;
+        expect(signupToken).toBeDefined();
+
+        // Step 2: Login
+        const loginRes = await request(app)
+            .post('/auth/login')
+            .send({ username: 'ido', password: 'strongpassword123' });
+
+        expect(loginRes.status).toBe(200);
+        const loginToken = loginRes.body.token;
+        expect(loginToken).toBeDefined();
+
+        // Step 3: Upload media using the token
+        const uploadRes = await request(app)
+            .post('/media/upload')
+            .set('Authorization', `Bearer ${loginToken}`)
+            .attach('file', fixtureFile);
+
+        expect(uploadRes.status).toBe(200);
+        expect(uploadRes.body).toEqual({ message: 'Media Started Uploading' });
+        expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
+        expect(amqpClient.publish).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 401 when accessing protected route without token', async () => {
+        const response = await request(app)
+            .post('/media/upload')
+            .attach('file', fixtureFile);
+
+        expect(response.status).toBe(401);
+        expect(mediaDal.createMedia).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 when accessing protected route with invalid token', async () => {
+        const response = await request(app)
+            .post('/media/upload')
+            .set('Authorization', 'Bearer invalid.token.here')
+            .attach('file', fixtureFile);
+
+        expect(response.status).toBe(401);
+        expect(mediaDal.createMedia).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 on duplicate signup', async () => {
+        userDal.verifyUser.mockResolvedValue(true);
+
+        const response = await request(app)
+            .post('/auth/signup')
+            .send({ username: 'ido', password: 'strongpassword123' });
+
+        expect(response.status).toBe(409);
+        expect(userDal.createUser).not.toHaveBeenCalled();
     });
 });

@@ -1,8 +1,8 @@
-import { Request, Response, NextFunction } from "@ido_kawaz/server-framework";
+import { NextFunction, Request, Response } from "@ido_kawaz/server-framework";
 import jwt, { JwtPayload } from "jsonwebtoken";
-import { Dals } from "../dal/types";
+import { UserDal } from "../dal/user";
 
-export const createLocalAuthMiddleware = (jwtSecret: string, { userDal }: Dals) =>
+export const createLocalAuthMiddleware = (jwtSecret: string, userDal: UserDal) =>
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         const authHeader = req.headers["authorization"];
         if (!authHeader?.startsWith("Bearer ")) {
@@ -22,7 +22,7 @@ export const createLocalAuthMiddleware = (jwtSecret: string, { userDal }: Dals) 
         }
     }
 
-export const createAuthMiddleware = (jwtSecret: string, { userDal }: Dals) =>
+export const createAuthMiddleware = (jwtSecret: string, userDal: UserDal) =>
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         const authHeader = req.headers["authorization"];
         if (!authHeader?.startsWith("Bearer ")) {
