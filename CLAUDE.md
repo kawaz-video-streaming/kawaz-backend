@@ -66,7 +66,8 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 |---|---|---|---|
 | `POST` | `/auth/signup` | No | Register a new user, returns JWT |
 | `POST` | `/auth/login` | No | Login, returns JWT |
-| `POST` | `/media/upload` | Yes | Upload a media file (multipart/form-data) |
+| `POST` | `/auth/promote` | No (x-admin-secret header) | Promote a user to admin role |
+| `POST` | `/media/upload` | Yes (admin only) | Upload a media file (multipart/form-data) |
 | `GET` | `/health` | No | Health check — returns 200 OK |
 | `GET` | `/api-docs` | No | Swagger UI (OpenAPI documentation) |
 

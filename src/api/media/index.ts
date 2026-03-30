@@ -3,6 +3,7 @@ import { Router } from "@ido_kawaz/server-framework";
 import multer from "multer";
 import { MediaDal } from "../../dal/media";
 import { createMediaHandlers } from "./handlers";
+import { requireAdmin } from "../middleware";
 
 export const createMediaRouter = (mediaDal: MediaDal, amqpClient: AmqpClient) => {
   const mediaHandlers = createMediaHandlers(mediaDal, amqpClient);
@@ -50,6 +51,6 @@ export const createMediaRouter = (mediaDal: MediaDal, amqpClient: AmqpClient) =>
    *             schema:
    *               $ref: '#/components/schemas/InternalServerError'
    */
-  router.post("/upload", upload.single("file"), mediaHandlers.uploadMedia);
+  router.post("/upload", requireAdmin, upload.single("file"), mediaHandlers.uploadMedia);
   return router;
 };

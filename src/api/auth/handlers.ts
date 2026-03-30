@@ -3,10 +3,10 @@ import { StatusCodes } from "http-status-codes";
 import { UserDal } from '../../dal/user';
 import { requestHandlerDecorator } from "../../utils/decorator";
 import { createAuthLogic } from './logic';
-import { validateAuthRequest } from "./types";
+import { AuthConfig, validateAuthRequest, validatePromoteRequest } from "./types";
 
-export const createAuthHandlers = (jwtSecret: string, userDal: UserDal) => {
-    const logic = createAuthLogic(jwtSecret, userDal);
+export const createAuthHandlers = (authConfig: AuthConfig, userDal: UserDal) => {
+    const logic = createAuthLogic(authConfig, userDal);
     return {
         signUp:
             requestHandlerDecorator(
@@ -23,6 +23,14 @@ export const createAuthHandlers = (jwtSecret: string, userDal: UserDal) => {
                     const { username, password } = validateAuthRequest(req);
                     const token = await logic.login(username, password);
                     res.status(StatusCodes.OK).json({ token });
+                }),
+        promoteAdmin:
+            requestHandlerDecorator(
+                'promoteAdmin',
+                async (req: Request, res: Response) => {
+                    const { secret, username } = validatePromoteRequest(req);
+                    await logic.promoteAdmin(secret, username);
+                    res.status(StatusCodes.OK).json({ message: `User "${username}" promoted to admin` });
                 })
     };
 }

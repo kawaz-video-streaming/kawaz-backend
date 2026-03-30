@@ -3,12 +3,16 @@ import type { Application } from '@ido_kawaz/server-framework';
 import { ApiError } from '@ido_kawaz/server-framework';
 import express from 'express';
 import { existsSync, mkdirSync, readdirSync, rmdirSync, rmSync, writeFileSync } from 'fs';
+import jwt from 'jsonwebtoken';
 import path from 'path';
 import request from 'supertest';
 import { MediaDal } from '../../../dal/media';
+import { UserDal } from '../../../dal/user';
+import { createAuthMiddleware } from '../../middleware';
 import { createMediaRouter } from '../index';
 
 describe('POST /media/upload route', () => {
+    const AUTH_CONFIG = { jwtSecret: 'media-test-secret', adminPromotionSecret: 'admin-secret' };
     const fixtureDir = path.join(process.cwd(), 'src', 'api', 'media', '__tests__', 'fixtures');
     const fixtureFile = path.join(fixtureDir, 'sample-upload.txt');
     const tmpDir = path.join(process.cwd(), 'tmp');
@@ -19,7 +23,9 @@ describe('POST /media/upload route', () => {
 
     let app: Application;
     let mediaDal: { createMedia: jest.Mock };
+    let userDal: { findUser: jest.Mock };
     let amqpClient: { publish: jest.Mock };
+    let adminToken: string;
 
     beforeAll(() => {
         tmpDirExistedBeforeAll = existsSync(tmpDir);
@@ -40,13 +46,20 @@ describe('POST /media/upload route', () => {
             }),
         };
 
+        userDal = {
+            findUser: jest.fn().mockResolvedValue({ name: 'admin', password: 'hash', role: 'admin' }),
+        };
+
         amqpClient = {
             publish: jest.fn(),
         };
 
         tmpEntriesBeforeEach = new Set(existsSync(tmpDir) ? readdirSync(tmpDir) : []);
 
+        adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
+
         app = express();
+        app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
         app.use('/media', createMediaRouter(mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
@@ -87,6 +100,7 @@ describe('POST /media/upload route', () => {
     it('returns 200 and publishes upload event for valid multipart request', async () => {
         const response = await request(app)
             .post('/media/upload')
+            .set('Authorization', `Bearer ${adminToken}`)
             .attach('file', fixtureFile);
 
         expect(response.status).toBe(200);
@@ -113,7 +127,8 @@ describe('POST /media/upload route', () => {
 
     it('returns 400 when request is missing file', async () => {
         const response = await request(app)
-            .post('/media/upload');
+            .post('/media/upload')
+            .set('Authorization', `Bearer ${adminToken}`);
 
         expect(response.status).toBe(400);
         expect(response.body.message).toContain('Invalid request');
@@ -127,6 +142,7 @@ describe('POST /media/upload route', () => {
 
         const response = await request(app)
             .post('/media/upload')
+            .set('Authorization', `Bearer ${adminToken}`)
             .attach('file', fixtureFile);
 
         expect(response.status).toBe(500);

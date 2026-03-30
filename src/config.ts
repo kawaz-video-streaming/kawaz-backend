@@ -5,6 +5,7 @@ import { createStorageConfig, StorageConfig } from "@ido_kawaz/storage-client";
 import { mergeDeepRight } from "ramda";
 import { z } from 'zod';
 import { ConsumersConfig } from "./background/config";
+import { AuthConfig } from "./api/auth/types";
 
 class InvalidConfigError extends Error {
   constructor(error: z.ZodError) {
@@ -23,12 +24,12 @@ const environmentVariablesSchema = z.object({
   NODE_ENV: z.enum(environments).default("development"),
   UPLOAD_STORAGE_BUCKET: z.string(),
   UPLOAD_STORAGE_KEY_PREFIX: z.string(),
-  JWT_SECRET: z.string()
+  JWT_SECRET: z.string(),
+  ADMIN_PROMOTION_SECRET: z.string()
 });
 
 export interface BackendServerConfig extends ServerConfig {
-  env: Environment;
-  jwtSecret: string;
+  authConfig: AuthConfig;
 }
 
 export interface SystemConfig {
@@ -51,8 +52,10 @@ export const getConfig = (env: {} = {}): SystemConfig => {
     nodeEnv: envVars.NODE_ENV,
     serverConfig: {
       ...createServerConfig(),
-      env: envVars.NODE_ENV,
-      jwtSecret: envVars.JWT_SECRET,
+      authConfig: {
+        jwtSecret: envVars.JWT_SECRET,
+        adminPromotionSecret: envVars.ADMIN_PROMOTION_SECRET,
+      }
     },
     dbConfig: createMongoConfig(),
     storageConfig: storageConfig,

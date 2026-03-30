@@ -2,6 +2,7 @@ import type { Application } from '@ido_kawaz/server-framework';
 import { ApiError } from '@ido_kawaz/server-framework';
 import bcrypt from 'bcrypt';
 import express from 'express';
+import jwt from 'jsonwebtoken';
 import os from 'os';
 import path from 'path';
 import request from 'supertest';
@@ -26,25 +27,22 @@ jest.mock('fs', () => ({
     createReadStream: jest.fn(() => Readable.from(['fake file content'])),
 }));
 
-describe('End-to-end media upload and processing flow', () => {
-    let fixtureDir: string;
-    let fixtureFile: string;
+describe('Media upload integration', () => {
+    const AUTH_CONFIG = { jwtSecret: 'integration-test-secret', adminPromotionSecret: 'integration-admin-secret' };
 
     let app: Application;
-    let mediaDal: {
-        createMedia: jest.Mock;
-        updateMediaStatus: jest.Mock;
-    };
-    let amqpClient: {
-        publish: jest.Mock;
-    };
-    let storageClient: {
-        uploadObject: jest.Mock;
-    };
+    let mediaDal: { createMedia: jest.Mock; updateMediaStatus: jest.Mock };
+    let userDal: { verifyUser: jest.Mock; createUser: jest.Mock; findUser: jest.Mock; promoteToAdmin: jest.Mock };
+    let amqpClient: { publish: jest.Mock };
+    let storageClient: { uploadObject: jest.Mock };
+    let adminToken: string;
 
     const actualFs = jest.requireActual('fs') as typeof import('fs');
     const tmpDir = path.join(process.cwd(), 'tmp');
     let tmpEntriesBeforeEach = new Set<string>();
+
+    let fixtureDir: string;
+    let fixtureFile: string;
 
     beforeAll(() => {
         fixtureDir = actualFs.mkdtempSync(path.join(os.tmpdir(), 'integration-test-'));
@@ -58,6 +56,7 @@ describe('End-to-end media upload and processing flow', () => {
 
     beforeEach(() => {
         tmpEntriesBeforeEach = new Set(actualFs.existsSync(tmpDir) ? actualFs.readdirSync(tmpDir) : []);
+
         mediaDal = {
             createMedia: jest.fn().mockResolvedValue({
                 _id: new Types.ObjectId(),
@@ -69,15 +68,26 @@ describe('End-to-end media upload and processing flow', () => {
             updateMediaStatus: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
         };
 
-        amqpClient = {
-            publish: jest.fn(),
+        userDal = {
+            verifyUser: jest.fn().mockResolvedValue(true),
+            createUser: jest.fn().mockResolvedValue(undefined),
+            findUser: jest.fn().mockResolvedValue({ name: 'admin', password: 'hashed-password', role: 'admin' }),
+            promoteToAdmin: jest.fn(),
         };
 
-        storageClient = {
-            uploadObject: jest.fn().mockResolvedValue(undefined),
-        };
+        amqpClient = { publish: jest.fn() };
+
+        storageClient = { uploadObject: jest.fn().mockResolvedValue(undefined) };
+
+        mockedBcrypt.hash.mockResolvedValue('hashed-password' as never);
+        mockedBcrypt.compare.mockResolvedValue(true as never);
+
+        adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
 
         app = express();
+        app.use(express.json());
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
         app.use('/media', createMediaRouter(mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
@@ -93,7 +103,6 @@ describe('End-to-end media upload and processing flow', () => {
         if (!actualFs.existsSync(tmpDir)) {
             return;
         }
-
         for (const entry of actualFs.readdirSync(tmpDir)) {
             if (!tmpEntriesBeforeEach.has(entry)) {
                 actualFs.rmSync(path.join(tmpDir, entry), { recursive: true, force: true });
@@ -105,6 +114,7 @@ describe('End-to-end media upload and processing flow', () => {
         // Step 1: Upload media via API
         const uploadResponse = await request(app)
             .post('/media/upload')
+            .set('Authorization', `Bearer ${adminToken}`)
             .attach('file', fixtureFile);
 
         expect(uploadResponse.status).toBe(200);
@@ -137,7 +147,6 @@ describe('End-to-end media upload and processing flow', () => {
             partSize: 128 * 1024 * 1024,
         };
 
-        // Reset mocks to track background processing
         mediaDal.updateMediaStatus.mockClear();
         amqpClient.publish.mockClear();
 
@@ -188,18 +197,16 @@ describe('End-to-end media upload and processing flow', () => {
             status: 'pending',
         });
 
-        // Step 1: Upload image via API
         const uploadResponse = await request(app)
             .post('/media/upload')
+            .set('Authorization', `Bearer ${adminToken}`)
             .attach('file', fixtureFile);
 
         expect(uploadResponse.status).toBe(200);
 
-        // Get the uploaded media from the AMQP publish call
         const uploadPayload = (amqpClient.publish as jest.Mock).mock.calls[0][2];
         const uploadedMedia = uploadPayload.media;
 
-        // Step 2: Process image in background
         mediaDal.updateMediaStatus.mockClear();
         amqpClient.publish.mockClear();
 
@@ -232,114 +239,49 @@ describe('End-to-end media upload and processing flow', () => {
     it('handles upload failure gracefully with proper error responses', async () => {
         mediaDal.createMedia.mockRejectedValueOnce(new Error('database connection lost'));
 
-        // Attempt to upload with DB failure
         const uploadResponse = await request(app)
             .post('/media/upload')
+            .set('Authorization', `Bearer ${adminToken}`)
             .attach('file', fixtureFile);
 
         expect(uploadResponse.status).toBe(500);
         expect(uploadResponse.body.message).toContain('database connection lost');
-
-        // Verify no AMQP event was published on failure
         expect(amqpClient.publish).not.toHaveBeenCalled();
     });
 
     it('validates request and returns 400 for missing file', async () => {
         const response = await request(app)
-            .post('/media/upload');
+            .post('/media/upload')
+            .set('Authorization', `Bearer ${adminToken}`);
 
         expect(response.status).toBe(400);
         expect(response.body.message).toContain('Invalid request');
-
-        // Verify no media was created or published
         expect(mediaDal.createMedia).not.toHaveBeenCalled();
         expect(amqpClient.publish).not.toHaveBeenCalled();
     });
-});
 
-describe('Authentication + Media upload end-to-end flow', () => {
-    const JWT_SECRET = 'integration-test-secret';
-
-    let app: Application;
-    let mediaDal: { createMedia: jest.Mock; updateMediaStatus: jest.Mock };
-    let userDal: { verifyUser: jest.Mock; createUser: jest.Mock; findUser: jest.Mock };
-    let amqpClient: { publish: jest.Mock };
-
-    const actualFs = jest.requireActual('fs') as typeof import('fs');
-    let fixtureDir: string;
-    let fixtureFile: string;
-
-    beforeAll(() => {
-        fixtureDir = actualFs.mkdtempSync(path.join(os.tmpdir(), 'auth-integration-test-'));
-        fixtureFile = path.join(fixtureDir, 'sample.mp4');
-        actualFs.writeFileSync(fixtureFile, 'test video content');
-    });
-
-    afterAll(() => {
-        actualFs.rmSync(fixtureDir, { recursive: true, force: true });
-    });
-
-    beforeEach(() => {
-        mediaDal = {
-            createMedia: jest.fn().mockResolvedValue({
-                _id: new Types.ObjectId().toString(),
-                name: 'sample.mp4',
-                type: 'video/mp4',
-                size: 18,
-                status: 'pending',
-            }),
-            updateMediaStatus: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
-        };
-
-        userDal = {
-            verifyUser: jest.fn().mockResolvedValue(true),
-            createUser: jest.fn().mockResolvedValue(undefined),
-            findUser: jest.fn().mockResolvedValue({ name: 'ido', password: 'hashed-password' }),
-        };
-
-        amqpClient = { publish: jest.fn() };
-
-        mockedBcrypt.hash.mockResolvedValue('hashed-password' as never);
-        mockedBcrypt.compare.mockResolvedValue(true as never);
-
-        app = express();
-        app.use(express.json());
-        app.use('/auth', createAuthRouter(JWT_SECRET, userDal as unknown as UserDal));
-        app.use(createAuthMiddleware(JWT_SECRET, userDal as unknown as UserDal));
-        app.use('/media', createMediaRouter(mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient));
-        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-            if (error instanceof ApiError) {
-                res.status(error.statusCode).json({ message: error.message });
-                return;
-            }
-            const message = error instanceof Error ? error.message : 'Internal server error';
-            res.status(500).json({ message });
-        });
-    });
-
-    it('signup → login → upload media with token', async () => {
+    it('signup → login → upload media with admin token', async () => {
         // First call to verifyUser is the signup existence check (user doesn't exist yet)
         userDal.verifyUser.mockResolvedValueOnce(false);
 
         // Step 1: Sign up
         const signupRes = await request(app)
             .post('/auth/signup')
-            .send({ username: 'ido', password: 'strongpassword123' });
+            .send({ username: 'admin', password: 'strongpassword123' });
 
         expect(signupRes.status).toBe(201);
-        const signupToken = signupRes.body.token;
-        expect(signupToken).toBeDefined();
+        expect(signupRes.body.token).toBeDefined();
 
         // Step 2: Login
         const loginRes = await request(app)
             .post('/auth/login')
-            .send({ username: 'ido', password: 'strongpassword123' });
+            .send({ username: 'admin', password: 'strongpassword123' });
 
         expect(loginRes.status).toBe(200);
         const loginToken = loginRes.body.token;
         expect(loginToken).toBeDefined();
 
-        // Step 3: Upload media using the token
+        // Step 3: Upload media using the admin token
         const uploadRes = await request(app)
             .post('/media/upload')
             .set('Authorization', `Bearer ${loginToken}`)
@@ -349,6 +291,19 @@ describe('Authentication + Media upload end-to-end flow', () => {
         expect(uploadRes.body).toEqual({ message: 'Media Started Uploading' });
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 401 when non-admin user tries to upload', async () => {
+        userDal.findUser.mockResolvedValue({ name: 'ido', password: 'hashed-password', role: 'user' });
+        const userToken = jwt.sign({ username: 'ido', role: 'user' }, AUTH_CONFIG.jwtSecret);
+
+        const uploadRes = await request(app)
+            .post('/media/upload')
+            .set('Authorization', `Bearer ${userToken}`)
+            .attach('file', fixtureFile);
+
+        expect(uploadRes.status).toBe(401);
+        expect(mediaDal.createMedia).not.toHaveBeenCalled();
     });
 
     it('returns 401 when accessing protected route without token', async () => {
@@ -371,8 +326,6 @@ describe('Authentication + Media upload end-to-end flow', () => {
     });
 
     it('returns 409 on duplicate signup', async () => {
-        userDal.verifyUser.mockResolvedValue(true);
-
         const response = await request(app)
             .post('/auth/signup')
             .send({ username: 'ido', password: 'strongpassword123' });

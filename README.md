@@ -5,8 +5,8 @@ Kawaz Plus media backend service.
 ## What it does
 
 - Exposes a health endpoint (`GET /health`)
-- Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`) — JWT-based authentication
-- Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`) — requires JWT
+- Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`, `POST /auth/promote`) — JWT-based authentication with role support
+- Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`) — requires JWT with admin role
 - Publishes upload jobs to AMQP for async processing
 - Consumes upload jobs and uploads files to object storage
 - Persists media metadata and status in MongoDB
@@ -44,6 +44,7 @@ This service validates all environment variables at startup using Zod schemas. M
 - `UPLOAD_STORAGE_BUCKET` - Target bucket for uploaded media
 - `UPLOAD_STORAGE_KEY_PREFIX` - Prefix for uploaded object keys
 - `JWT_SECRET` - Secret key used to sign and verify JWT tokens
+- `ADMIN_PROMOTION_SECRET` - Secret required in `x-admin-secret` header to promote a user to admin
 
 **Optional variables:**
 
@@ -71,6 +72,7 @@ PORT=8080
 SECURED=false
 
 JWT_SECRET=your-local-secret
+ADMIN_PROMOTION_SECRET=your-admin-secret
 
 MONGO_CONNECTION_STRING=mongodb://localhost:27017/kawaz
 AMQP_CONNECTION_STRING=amqp://localhost:5672
@@ -140,9 +142,17 @@ Returns `200 OK` if service is running.
 - Success response: `200 { "token": "<jwt>" }`
 - Error responses: `400` (invalid body), `401` (invalid credentials)
 
+### `POST /auth/promote`
+
+- Header: `x-admin-secret: <ADMIN_PROMOTION_SECRET>`
+- Content type: `application/json`
+- Body: `{ "username": string }`
+- Success response: `200 { "message": "User \"<username>\" promoted to admin" }`
+- Error responses: `400` (missing header/body), `401` (wrong secret), `404` (user not found)
+
 ### `POST /media/upload`
 
-- Requires: `Authorization: Bearer <token>` header
+- Requires: `Authorization: Bearer <token>` header with **admin role**
 - Content type: `multipart/form-data`
 - Required file field: `file`
 - Success response: `200 { "message": "Media Started Uploading" }`

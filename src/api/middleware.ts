@@ -1,44 +1,37 @@
 import { NextFunction, Request, Response } from "@ido_kawaz/server-framework";
-import jwt, { JwtPayload } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
+import { isNil } from "ramda";
 import { UserDal } from "../dal/user";
+import { ADMIN_ROLE, AuthenticatedRequest } from "../utils/types";
+import { AuthConfig, TokenPayload } from "./auth/types";
 
-export const createLocalAuthMiddleware = (jwtSecret: string, userDal: UserDal) =>
+export const createAuthMiddleware = ({ jwtSecret }: AuthConfig, userDal: UserDal) =>
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         const authHeader = req.headers["authorization"];
-        if (!authHeader?.startsWith("Bearer ")) {
-            res.redirect("/auth/login");
+        if (isNil(authHeader) || !authHeader.startsWith("Bearer ")) {
+            res.status(401).json({ message: "no token provided" });
             return;
         }
         try {
             const token = authHeader.split(" ")[1];
-            const payload = jwt.verify(token, jwtSecret) as JwtPayload;
-            const userExists: boolean = await userDal.verifyUser(payload.username); // Verify user exists
-            if (!userExists) {
-                res.redirect("/auth/login");
-            }
-            next();
-        } catch {
-            res.redirect("/auth/login");
-        }
-    }
-
-export const createAuthMiddleware = (jwtSecret: string, userDal: UserDal) =>
-    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-        const authHeader = req.headers["authorization"];
-        if (!authHeader?.startsWith("Bearer ")) {
-            res.status(401).json({ message: "Unauthorized" });
-            return;
-        }
-        try {
-            const token = authHeader.split(" ")[1];
-            const payload = jwt.verify(token, jwtSecret) as JwtPayload;
-            const userExists: boolean = await userDal.verifyUser(payload.username); // Verify user exists
-            if (!userExists) {
-                res.status(401).json({ message: "Unauthorized" });
+            const payload = jwt.verify(token, jwtSecret) as TokenPayload;
+            const user = await userDal.findUser(payload.username);
+            if (isNil(user) || user.role !== payload.role) {
+                res.status(401).json({ message: "Invalid or expired token" });
                 return;
             }
+            (req as AuthenticatedRequest).user = { username: user.name, role: user.role };
             next();
         } catch {
             res.status(401).json({ message: "Invalid or expired token" });
         }
     }
+
+export const requireAdmin = (req: Request, res: Response, next: NextFunction): void => {
+    const authenticatedReq = req as AuthenticatedRequest;
+    if (authenticatedReq.user.role !== ADMIN_ROLE) {
+        res.status(401).json({ message: "Admin access required" });
+        return;
+    }
+    next();
+}

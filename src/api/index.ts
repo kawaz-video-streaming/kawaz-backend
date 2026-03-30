@@ -2,17 +2,18 @@ import { AmqpClient } from "@ido_kawaz/amqp-client";
 import { Application } from "@ido_kawaz/server-framework";
 import { StatusCodes } from "http-status-codes";
 import swaggerUi from "swagger-ui-express";
-import { Dals } from "../dal/types";
-import { createMediaRouter } from "./media";
-import { swaggerSpec } from "./swagger";
-import { createAuthMiddleware, createLocalAuthMiddleware } from "./middleware";
 import { BackendServerConfig } from "../config";
+import { Dals } from "../dal/types";
 import { createAuthRouter } from "./auth";
+import { createMediaRouter } from "./media";
+import { createAuthMiddleware } from "./middleware";
+import { swaggerSpec } from "./swagger";
 
 
 export const registerRoutes = (config: BackendServerConfig, amqpClient: AmqpClient, dals: Dals) =>
     (app: Application) => {
         const { mediaDal, userDal } = dals;
+        const { authConfig } = config;
 
         /**
          * @openapi
@@ -34,11 +35,10 @@ export const registerRoutes = (config: BackendServerConfig, amqpClient: AmqpClie
         app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
         // Authentication routes
-        app.use('/auth', createAuthRouter(config.jwtSecret, userDal));
+        app.use('/auth', createAuthRouter(authConfig, userDal));
 
         // Apply authentication middleware to all API routes
-        const authMiddleware = config.env === 'local' ? createLocalAuthMiddleware : createAuthMiddleware;
-        app.use(authMiddleware(config.jwtSecret, userDal));
+        app.use(createAuthMiddleware(authConfig, userDal));
 
         // API routes
         app.use("/media", createMediaRouter(mediaDal, amqpClient));

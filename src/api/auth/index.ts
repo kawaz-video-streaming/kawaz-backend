@@ -1,9 +1,10 @@
 import { Router } from "@ido_kawaz/server-framework";
 import { UserDal } from "../../dal/user";
 import { createAuthHandlers } from "./handlers"
+import { AuthConfig } from "./types";
 
-export const createAuthRouter = (jwtSecret: string, userDal: UserDal) => {
-  const authHandlers = createAuthHandlers(jwtSecret, userDal);
+export const createAuthRouter = (authConfig: AuthConfig, userDal: UserDal) => {
+  const authHandlers = createAuthHandlers(authConfig, userDal);
   const router = Router();
 
   /**
@@ -89,6 +90,45 @@ export const createAuthRouter = (jwtSecret: string, userDal: UserDal) => {
    *         description: Invalid username or password
    */
   router.post("/login", authHandlers.login);
+
+  /**
+   * @openapi
+   * /auth/promote:
+   *   post:
+   *     summary: Promote a user to admin
+   *     description: Promotes a user to the admin role. Requires the x-admin-secret header with the correct secret.
+   *     tags:
+   *       - Auth
+   *     parameters:
+   *       - in: header
+   *         name: x-admin-secret
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Admin promotion secret
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - username
+   *             properties:
+   *               username:
+   *                 type: string
+   *                 description: Username to promote to admin
+   *     responses:
+   *       200:
+   *         description: User promoted to admin successfully
+   *       400:
+   *         description: Missing header or invalid request body
+   *       401:
+   *         description: Invalid admin secret
+   *       404:
+   *         description: User not found
+   */
+  router.post("/promote", authHandlers.promoteAdmin);
 
   return router;
 };
