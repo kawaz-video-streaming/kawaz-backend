@@ -7,13 +7,12 @@ import { AuthConfig, TokenPayload } from "./auth/types";
 
 export const createAuthMiddleware = ({ jwtSecret }: AuthConfig, userDal: UserDal) =>
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-        const authHeader = req.headers["authorization"];
-        if (isNil(authHeader) || !authHeader.startsWith("Bearer ")) {
+        const token = req.cookies?.["kawaz-token"];
+        if (isNil(token)) {
             res.status(401).json({ message: "no token provided" });
             return;
         }
         try {
-            const token = authHeader.split(" ")[1];
             const payload = jwt.verify(token, jwtSecret) as TokenPayload;
             const user = await userDal.findUser(payload.username);
             if (isNil(user) || user.role !== payload.role) {

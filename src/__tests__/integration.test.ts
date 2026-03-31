@@ -1,7 +1,17 @@
 import type { Application } from '@ido_kawaz/server-framework';
 import { ApiError } from '@ido_kawaz/server-framework';
 import bcrypt from 'bcrypt';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
+
+const parseCookies = (req: Request, _res: Response, next: NextFunction) => {
+    req.cookies = {};
+    const header = req.headers.cookie ?? '';
+    for (const pair of header.split(';')) {
+        const idx = pair.indexOf('=');
+        if (idx > 0) req.cookies[pair.slice(0, idx).trim()] = pair.slice(idx + 1).trim();
+    }
+    next();
+};
 import jwt from 'jsonwebtoken';
 import os from 'os';
 import path from 'path';
@@ -87,6 +97,7 @@ describe('Media upload integration', () => {
         const authMiddleware = createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal);
 
         app = express();
+        app.use(parseCookies);
         app.use(express.json());
         app.use('/auth', createAuthRouter(AUTH_CONFIG, authMiddleware, userDal as unknown as UserDal));
         app.use(authMiddleware);
@@ -116,7 +127,7 @@ describe('Media upload integration', () => {
         // Step 1: Upload media via API
         const uploadResponse = await request(app)
             .post('/media/upload')
-            .set('Authorization', `Bearer ${adminToken}`)
+            .set('Cookie', `kawaz-token=${adminToken}`)
             .attach('file', fixtureFile);
 
         expect(uploadResponse.status).toBe(200);
@@ -201,7 +212,7 @@ describe('Media upload integration', () => {
 
         const uploadResponse = await request(app)
             .post('/media/upload')
-            .set('Authorization', `Bearer ${adminToken}`)
+            .set('Cookie', `kawaz-token=${adminToken}`)
             .attach('file', fixtureFile);
 
         expect(uploadResponse.status).toBe(200);
@@ -243,7 +254,7 @@ describe('Media upload integration', () => {
 
         const uploadResponse = await request(app)
             .post('/media/upload')
-            .set('Authorization', `Bearer ${adminToken}`)
+            .set('Cookie', `kawaz-token=${adminToken}`)
             .attach('file', fixtureFile);
 
         expect(uploadResponse.status).toBe(500);
@@ -254,7 +265,7 @@ describe('Media upload integration', () => {
     it('validates request and returns 400 for missing file', async () => {
         const response = await request(app)
             .post('/media/upload')
-            .set('Authorization', `Bearer ${adminToken}`);
+            .set('Cookie', `kawaz-token=${adminToken}`);
 
         expect(response.status).toBe(400);
         expect(response.body.message).toContain('Invalid request');
@@ -287,10 +298,10 @@ describe('Media upload integration', () => {
         const loginToken = tokenCookie!.split(';')[0].split('=')[1];
         expect(loginToken).toBeDefined();
 
-        // Step 3: Upload media using the admin token
+        // Step 3: Upload media using the token from the login cookie
         const uploadRes = await request(app)
             .post('/media/upload')
-            .set('Authorization', `Bearer ${loginToken}`)
+            .set('Cookie', `kawaz-token=${loginToken}`)
             .attach('file', fixtureFile);
 
         expect(uploadRes.status).toBe(200);
@@ -305,7 +316,7 @@ describe('Media upload integration', () => {
 
         const uploadRes = await request(app)
             .post('/media/upload')
-            .set('Authorization', `Bearer ${userToken}`)
+            .set('Cookie', `kawaz-token=${userToken}`)
             .attach('file', fixtureFile);
 
         expect(uploadRes.status).toBe(401);
@@ -324,7 +335,7 @@ describe('Media upload integration', () => {
     it('returns 401 when accessing protected route with invalid token', async () => {
         const response = await request(app)
             .post('/media/upload')
-            .set('Authorization', 'Bearer invalid.token.here')
+            .set('Cookie', 'kawaz-token=invalid.token.here')
             .attach('file', fixtureFile);
 
         expect(response.status).toBe(401);

@@ -68,7 +68,7 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 | `POST` | `/auth/login` | No | Login, sets `kawaz-token` HttpOnly cookie |
 | `POST` | `/auth/promote` | No (x-admin-secret header) | Promote a user to admin role |
 | `GET` | `/auth/me` | Yes | Returns the authenticated user's info (`username`, `role`) |
-| `POST` | `/media/upload` | Yes (admin only) | Upload a media file (multipart/form-data) |
+| `POST` | `/media/upload` | Yes (admin only, via `kawaz-token` cookie) | Upload a media file (multipart/form-data) |
 | `GET` | `/health` | No | Health check — returns 200 OK |
 | `GET` | `/api-docs` | No | Swagger UI (OpenAPI documentation) |
 

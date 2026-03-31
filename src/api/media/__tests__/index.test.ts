@@ -11,6 +11,16 @@ import { UserDal } from '../../../dal/user';
 import { createAuthMiddleware } from '../../middleware';
 import { createMediaRouter } from '../index';
 
+const parseCookies = (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+    req.cookies = {};
+    const header = req.headers.cookie ?? '';
+    for (const pair of header.split(';')) {
+        const idx = pair.indexOf('=');
+        if (idx > 0) req.cookies[pair.slice(0, idx).trim()] = pair.slice(idx + 1).trim();
+    }
+    next();
+};
+
 describe('POST /media/upload route', () => {
     const AUTH_CONFIG = { jwtSecret: 'media-test-secret', adminPromotionSecret: 'admin-secret' };
     const fixtureDir = path.join(process.cwd(), 'src', 'api', 'media', '__tests__', 'fixtures');
@@ -59,6 +69,7 @@ describe('POST /media/upload route', () => {
         adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
 
         app = express();
+        app.use(parseCookies);
         app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
         app.use('/media', createMediaRouter(mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -100,7 +111,7 @@ describe('POST /media/upload route', () => {
     it('returns 200 and publishes upload event for valid multipart request', async () => {
         const response = await request(app)
             .post('/media/upload')
-            .set('Authorization', `Bearer ${adminToken}`)
+            .set('Cookie', `kawaz-token=${adminToken}`)
             .attach('file', fixtureFile);
 
         expect(response.status).toBe(200);
@@ -128,7 +139,7 @@ describe('POST /media/upload route', () => {
     it('returns 400 when request is missing file', async () => {
         const response = await request(app)
             .post('/media/upload')
-            .set('Authorization', `Bearer ${adminToken}`);
+            .set('Cookie', `kawaz-token=${adminToken}`);
 
         expect(response.status).toBe(400);
         expect(response.body.message).toContain('Invalid request');
@@ -142,7 +153,7 @@ describe('POST /media/upload route', () => {
 
         const response = await request(app)
             .post('/media/upload')
-            .set('Authorization', `Bearer ${adminToken}`)
+            .set('Cookie', `kawaz-token=${adminToken}`)
             .attach('file', fixtureFile);
 
         expect(response.status).toBe(500);
