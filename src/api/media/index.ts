@@ -96,15 +96,17 @@ export const createMediaRouter = (mediaDal: MediaDal, amqpClient: AmqpClient, vo
    *               $ref: '#/components/schemas/Video'
    *       401:
    *         description: Unauthorized
+   *       404:
+   *         description: Video not found
    */
   router.get("/videos/:id", mediaHandlers.getVideoById);
 
   /**
    * @openapi
-   * /media/videos/{id}/manifest:
+   * /media/videos/{id}/output.mpd:
    *   get:
    *     summary: Get video manifest
-   *     description: Returns the HLS manifest for a video
+   *     description: Returns the MPEG-DASH manifest for a video as a stream
    *     tags:
    *       - Media
    *     security:
@@ -118,9 +120,9 @@ export const createMediaRouter = (mediaDal: MediaDal, amqpClient: AmqpClient, vo
    *         description: Video ID
    *     responses:
    *       200:
-   *         description: HLS manifest content
+   *         description: MPEG-DASH manifest content
    *         content:
-   *           application/vnd.apple.mpegurl:
+   *           application/dash+xml:
    *             schema:
    *               type: string
    *       401:
@@ -128,14 +130,14 @@ export const createMediaRouter = (mediaDal: MediaDal, amqpClient: AmqpClient, vo
    *       500:
    *         description: Internal server error - manifest not found or VOD service error
    */
-  router.get("/videos/:id/manifest", mediaHandlers.getManifest);
+  router.get(/^\/videos\/([^/]+)\/output\.mpd$/, mediaHandlers.getManifest);
 
   /**
    * @openapi
-   * /media/videos/{id}/segments/{filename}:
+   * /media/videos/{id}/{filename}.m4s:
    *   get:
-   *     summary: Get segment URL
-   *     description: Returns the URL for a specific video segment
+   *     summary: Get video segment
+   *     description: Redirects to the URL for a specific video segment (.m4s files only)
    *     tags:
    *       - Media
    *     security:
@@ -152,30 +154,24 @@ export const createMediaRouter = (mediaDal: MediaDal, amqpClient: AmqpClient, vo
    *         required: true
    *         schema:
    *           type: string
-   *         description: Segment filename
+   *           pattern: '^.+\.m4s$'
+   *         description: Segment filename (must end in .m4s)
    *     responses:
-   *       200:
-   *         description: Segment URL
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 url:
-   *                   type: string
+   *       302:
+   *         description: Redirects to the segment URL
    *       401:
    *         description: Unauthorized
    *       500:
    *         description: Internal server error - segment not found or VOD service error
    */
-  router.get("/videos/:id/segments/:filename", mediaHandlers.getSegmentUrl);
+  router.get(/^\/videos\/([^/]+)\/([^/]+\.m4s)$/, mediaHandlers.getSegmentUrl);
 
   /**
    * @openapi
-   * /media/videos/{id}/vtt/{filename}:
+   * /media/videos/{id}/{filename}.vtt:
    *   get:
    *     summary: Get VTT subtitle file
-   *     description: Returns the VTT subtitle content for a video
+   *     description: Returns the VTT subtitle content for a video (.vtt files only)
    *     tags:
    *       - Media
    *     security:
@@ -192,7 +188,8 @@ export const createMediaRouter = (mediaDal: MediaDal, amqpClient: AmqpClient, vo
    *         required: true
    *         schema:
    *           type: string
-   *         description: VTT filename
+   *           pattern: '^.+\.vtt$'
+   *         description: VTT filename (must end in .vtt)
    *     responses:
    *       200:
    *         description: VTT subtitle content
@@ -205,7 +202,7 @@ export const createMediaRouter = (mediaDal: MediaDal, amqpClient: AmqpClient, vo
    *       500:
    *         description: Internal server error - VTT not found or VOD service error
    */
-  router.get("/videos/:id/vtt/:filename", mediaHandlers.getVtt);
+  router.get(/^\/videos\/([^/]+)\/([^/]+\.vtt)$/, mediaHandlers.getVtt);
 
   return router;
 };

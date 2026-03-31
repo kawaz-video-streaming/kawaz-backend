@@ -52,27 +52,29 @@ export const createMediaHandlers = (mediaDal: MediaDal, amqpClient: AmqpClient, 
             requestHandlerDecorator(
                 'get video manifest',
                 async (req: Request, res: Response) => {
-                    const videoId = req.params.id as string;
-                    const manifest = await logic.getManifest(videoId);
-                    res.status(StatusCodes.OK).send(manifest);
+                    const videoId = req.params[0] as string;
+                    const manifestStream = await logic.getManifest(videoId);
+                    res.setHeader("Content-Type", "application/dash+xml");
+                    manifestStream.pipe(res);
                 }),
         getSegmentUrl:
             requestHandlerDecorator(
                 'get video segment url',
                 async (req: Request, res: Response) => {
-                    const videoId = req.params.id as string;
-                    const filename = req.params.filename as string;
+                    const videoId = req.params[0] as string;
+                    const filename = req.params[1] as string;
                     const url = await logic.getSegmentUrl(videoId, filename);
-                    res.status(StatusCodes.OK).json({ url });
+                    res.redirect(url);
                 }),
         getVtt:
             requestHandlerDecorator(
                 'get video vtt',
                 async (req: Request, res: Response) => {
-                    const videoId = req.params.id as string;
-                    const filename = req.params.filename as string;
-                    const vtt = await logic.getVtt(videoId, filename);
-                    res.status(StatusCodes.OK).send(vtt);
+                    const videoId = req.params[0] as string;
+                    const filename = req.params[1] as string;
+                    const vttStream = await logic.getVtt(videoId, filename);
+                    res.setHeader("Content-Type", "text/vtt");
+                    vttStream.pipe(res);
                 }),
     }
 };
