@@ -270,7 +270,7 @@ describe('Media upload integration', () => {
             .send({ username: 'admin', password: 'strongpassword123' });
 
         expect(signupRes.status).toBe(201);
-        expect(signupRes.body.token).toBeDefined();
+        expect(signupRes.body).toEqual({ message: 'Signup successful' });
 
         // Step 2: Login
         const loginRes = await request(app)
@@ -278,7 +278,11 @@ describe('Media upload integration', () => {
             .send({ username: 'admin', password: 'strongpassword123' });
 
         expect(loginRes.status).toBe(200);
-        const loginToken = loginRes.body.token;
+        const setCookieHeader = loginRes.headers['set-cookie'] as unknown as string[] | undefined;
+        expect(setCookieHeader).toBeDefined();
+        const tokenCookie = setCookieHeader!.find((c: string) => c.startsWith('kawaz-token='));
+        expect(tokenCookie).toBeDefined();
+        const loginToken = tokenCookie!.split(';')[0].split('=')[1];
         expect(loginToken).toBeDefined();
 
         // Step 3: Upload media using the admin token

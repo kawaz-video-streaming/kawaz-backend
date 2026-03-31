@@ -14,7 +14,10 @@ export const createAuthHandlers = (authConfig: AuthConfig, userDal: UserDal) => 
                 async (req: Request, res: Response) => {
                     const { username, password } = validateAuthRequest(req);
                     const token = await logic.signUp(username, password);
-                    res.status(StatusCodes.CREATED).json({ token });
+                    res.status(StatusCodes.CREATED).cookie('kawaz-token', token, {
+                        httpOnly: true,
+                        sameSite: 'strict',
+                    }).json({ message: 'Signup successful' });
                 }),
         login:
             requestHandlerDecorator(
@@ -22,7 +25,10 @@ export const createAuthHandlers = (authConfig: AuthConfig, userDal: UserDal) => 
                 async (req: Request, res: Response) => {
                     const { username, password } = validateAuthRequest(req);
                     const token = await logic.login(username, password);
-                    res.status(StatusCodes.OK).json({ token });
+                    res.status(StatusCodes.OK).cookie('kawaz-token', token, {
+                        httpOnly: true,
+                        sameSite: 'strict',
+                    }).json({ message: 'Login successful' });
                 }),
         promoteAdmin:
             requestHandlerDecorator(

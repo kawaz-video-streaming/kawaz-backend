@@ -64,8 +64,8 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/auth/signup` | No | Register a new user, returns JWT |
-| `POST` | `/auth/login` | No | Login, returns JWT |
+| `POST` | `/auth/signup` | No | Register a new user, sets `kawaz-token` HttpOnly cookie |
+| `POST` | `/auth/login` | No | Login, sets `kawaz-token` HttpOnly cookie |
 | `POST` | `/auth/promote` | No (x-admin-secret header) | Promote a user to admin role |
 | `POST` | `/media/upload` | Yes (admin only) | Upload a media file (multipart/form-data) |
 | `GET` | `/health` | No | Health check — returns 200 OK |

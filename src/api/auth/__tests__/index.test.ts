@@ -42,13 +42,15 @@ describe('POST /auth/signup', () => {
         });
     });
 
-    it('returns 201 with token for valid signup', async () => {
+    it('returns 201 with cookie for valid signup', async () => {
         const response = await request(app)
             .post('/auth/signup')
             .send({ username: 'ido', password: 'strongpassword123' });
 
         expect(response.status).toBe(201);
-        expect(response.body).toEqual({ token: 'signed-token' });
+        expect(response.body).toEqual({ message: 'Signup successful' });
+        expect(response.headers['set-cookie']).toBeDefined();
+        expect(response.headers['set-cookie'][0]).toContain('kawaz-token=signed-token');
         expect(userDal.createUser).toHaveBeenCalledWith('ido', 'hashed-password');
     });
 
@@ -114,13 +116,15 @@ describe('POST /auth/login', () => {
         });
     });
 
-    it('returns 200 with token for valid credentials', async () => {
+    it('returns 200 with cookie for valid credentials', async () => {
         const response = await request(app)
             .post('/auth/login')
             .send({ username: 'ido', password: 'strongpassword123' });
 
         expect(response.status).toBe(200);
-        expect(response.body).toEqual({ token: 'signed-token' });
+        expect(response.body).toEqual({ message: 'Login successful' });
+        expect(response.headers['set-cookie']).toBeDefined();
+        expect(response.headers['set-cookie'][0]).toContain('kawaz-token=signed-token');
     });
 
     it('returns 401 when user does not exist', async () => {
