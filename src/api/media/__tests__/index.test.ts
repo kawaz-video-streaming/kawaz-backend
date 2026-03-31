@@ -24,7 +24,7 @@ const parseCookies = (req: express.Request, _res: express.Response, next: expres
 describe('POST /media/upload route', () => {
     const AUTH_CONFIG = { jwtSecret: 'media-test-secret', adminPromotionSecret: 'admin-secret' };
     const fixtureDir = path.join(process.cwd(), 'src', 'api', 'media', '__tests__', 'fixtures');
-    const fixtureFile = path.join(fixtureDir, 'sample-upload.txt');
+    const fixtureFile = path.join(fixtureDir, 'sample-upload.mp4');
     const tmpDir = path.join(process.cwd(), 'tmp');
 
     let tmpDirExistedBeforeAll = false;
@@ -50,8 +50,8 @@ describe('POST /media/upload route', () => {
         mediaDal = {
             createMedia: jest.fn().mockResolvedValue({
                 _id: 'media-1',
-                name: 'sample-upload.txt',
-                type: 'text/plain',
+                name: 'sample-upload.mp4',
+                type: 'video/mp4',
                 size: 19,
             }),
         };
@@ -71,7 +71,7 @@ describe('POST /media/upload route', () => {
         app = express();
         app.use(parseCookies);
         app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use('/media', createMediaRouter(mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient));
+        app.use('/media', createMediaRouter(mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient, {} as any));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -118,7 +118,7 @@ describe('POST /media/upload route', () => {
         expect(response.body).toEqual({ message: 'Media Started Uploading' });
 
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
-        expect(mediaDal.createMedia).toHaveBeenCalledWith('sample-upload.txt', 'text/plain', 19);
+        expect(mediaDal.createMedia).toHaveBeenCalledWith('sample-upload.mp4', 'video/mp4', 19);
 
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
         expect(amqpClient.publish).toHaveBeenCalledWith(
@@ -127,8 +127,8 @@ describe('POST /media/upload route', () => {
             expect.objectContaining({
                 media: expect.objectContaining({
                     _id: 'media-1',
-                    name: 'sample-upload.txt',
-                    type: 'text/plain',
+                    name: 'sample-upload.mp4',
+                    type: 'video/mp4',
                     size: 19,
                 }),
                 path: expect.stringContaining('tmp'),

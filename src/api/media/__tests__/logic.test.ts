@@ -30,7 +30,7 @@ describe('createMediaLogic.uploadMedia', () => {
             publish: jest.fn(),
         } as unknown as AmqpClient;
 
-        const logic = createMediaLogic(mediaDal, amqpClient);
+        const logic = createMediaLogic(mediaDal, amqpClient, {} as any);
 
         await logic.uploadMedia(file);
 
@@ -60,7 +60,7 @@ describe('createMediaLogic.uploadMedia', () => {
             publish: jest.fn(),
         } as unknown as AmqpClient;
 
-        const logic = createMediaLogic(mediaDal, amqpClient);
+        const logic = createMediaLogic(mediaDal, amqpClient, {} as any);
 
         await logic.uploadMedia(file);
 
@@ -86,7 +86,7 @@ describe('createMediaLogic.uploadMedia', () => {
             publish: jest.fn(),
         } as unknown as AmqpClient;
 
-        const logic = createMediaLogic(mediaDal, amqpClient);
+        const logic = createMediaLogic(mediaDal, amqpClient, {} as any);
 
         await expect(
             logic.uploadMedia(file),

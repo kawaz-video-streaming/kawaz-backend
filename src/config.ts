@@ -2,6 +2,7 @@ import { createServerConfig, ServerConfig } from "@ido_kawaz/server-framework";
 import { createMongoConfig, MongoConfig } from "@ido_kawaz/mongo-client";
 import { AmqpConfig, createAmqpConfig } from "@ido_kawaz/amqp-client";
 import { createStorageConfig, StorageConfig } from "@ido_kawaz/storage-client";
+import { createVodClientConfig, VodConfig } from "@ido_kawaz/vod-client";
 import { mergeDeepRight } from "ramda";
 import { z } from 'zod';
 import { ConsumersConfig } from "./background/config";
@@ -39,6 +40,7 @@ export interface SystemConfig {
   storageConfig: StorageConfig;
   serverConfig: BackendServerConfig;
   dbConfig: MongoConfig;
+  vodConfig: VodConfig;
 }
 
 export const getConfig = (env: {} = {}): SystemConfig => {
@@ -60,6 +62,7 @@ export const getConfig = (env: {} = {}): SystemConfig => {
     dbConfig: createMongoConfig(),
     storageConfig: storageConfig,
     amqpConfig: createAmqpConfig(),
+    vodConfig: createVodClientConfig(),
     consumersConfig: {
       upload: {
         uploadBucket: envVars.UPLOAD_STORAGE_BUCKET,

@@ -5,7 +5,10 @@ export const mediaUploadRequestSchema = z.object({
     file: z.object({
         path: z.string(),
         originalname: z.string(),
-        mimetype: z.string(),
+        mimetype: z.string().refine(
+            mime => mime.startsWith('video/'),
+            { message: "Only video files are allowed" }
+        ),
         size: z.number()
     }).refine(file => file !== undefined, {
         message: "file is required for uploading media"

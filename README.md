@@ -5,8 +5,10 @@ Kawaz Plus media backend service.
 ## What it does
 
 - Exposes a health endpoint (`GET /health`)
-- Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`, `POST /auth/promote`) — JWT-based authentication with role support
-- Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`) — requires JWT with admin role
+- Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`, `POST /auth/promote`, `GET /auth/me`) — JWT-based authentication with role support
+- Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`) — video files only, requires JWT with admin role
+- Exposes video metadata endpoints (`GET /media/videos`, `GET /media/videos/:id`) via VOD service
+- Exposes HLS streaming endpoints (`GET /media/videos/:id/manifest`, `/segments/:filename`, `/vtt/:filename`) via VOD service
 - Publishes upload jobs to AMQP for async processing
 - Consumes upload jobs and uploads files to object storage
 - Persists media metadata and status in MongoDB
@@ -19,6 +21,7 @@ Kawaz Plus media backend service.
 - `@ido_kawaz/mongo-client`
 - `@ido_kawaz/amqp-client`
 - `@ido_kawaz/storage-client`
+- `@ido_kawaz/vod-client`
 - Multer
 - Swagger (`swagger-jsdoc`, `swagger-ui-express`)
 
@@ -56,6 +59,7 @@ This service validates all environment variables at startup using Zod schemas. M
 - Mongo config via `createMongoConfig()` - Connection string
 - AMQP config via `createAmqpConfig()` - Broker connection
 - Storage config via `createStorageConfig()` - S3 credentials and endpoint
+- VOD config via `createVodClientConfig()` - VOD service connection
 
 **Troubleshooting startup:**
 
@@ -150,12 +154,49 @@ Returns `200 OK` if service is running.
 - Success response: `200 { "message": "User \"<username>\" promoted to admin" }`
 - Error responses: `400` (missing header/body), `401` (wrong secret), `404` (user not found)
 
+### `GET /auth/me`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 { "username": string, "role": "user" | "admin" }`
+- Error responses: `401` (missing or invalid token)
+
 ### `POST /media/upload`
 
-- Requires: `Authorization: Bearer <token>` header with **admin role**
+- Requires: `kawaz-token` cookie with **admin role**
 - Content type: `multipart/form-data`
-- Required file field: `file`
+- Required file field: `file` (video files only)
 - Success response: `200 { "message": "Media Started Uploading" }`
+- Error responses: `400` (missing file or non-video mimetype), `401` (unauthenticated), `403` (not admin)
+
+### `GET /media/videos`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 [{ "_id", "title", "durationInMs", "playUrl", ... }]`
+- Error responses: `401`, `404` (no videos found)
+
+### `GET /media/videos/:id`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 { "_id", "title", "durationInMs", "playUrl", ... }`
+- Error responses: `401`, `404` (video not found)
+
+### `GET /media/videos/:id/manifest`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200` HLS manifest (text)
+- Error responses: `401`, `404`
+
+### `GET /media/videos/:id/segments/:filename`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 { "url": string }`
+- Error responses: `401`, `404`
+
+### `GET /media/videos/:id/vtt/:filename`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200` VTT subtitle content (text)
+- Error responses: `401`, `404`
 
 ### `GET /api-docs`
 

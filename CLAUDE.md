@@ -68,7 +68,12 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 | `POST` | `/auth/login` | No | Login, sets `kawaz-token` HttpOnly cookie |
 | `POST` | `/auth/promote` | No (x-admin-secret header) | Promote a user to admin role |
 | `GET` | `/auth/me` | Yes | Returns the authenticated user's info (`username`, `role`) |
-| `POST` | `/media/upload` | Yes (admin only, via `kawaz-token` cookie) | Upload a media file (multipart/form-data) |
+| `POST` | `/media/upload` | Yes (admin only, via `kawaz-token` cookie) | Upload a video file (multipart/form-data); video mimetype only |
+| `GET` | `/media/videos` | Yes | List all videos metadata (via VOD service) |
+| `GET` | `/media/videos/:id` | Yes | Get a single video's metadata (via VOD service) |
+| `GET` | `/media/videos/:id/manifest` | Yes | Get HLS manifest for a video |
+| `GET` | `/media/videos/:id/segments/:filename` | Yes | Get URL for a specific video segment |
+| `GET` | `/media/videos/:id/vtt/:filename` | Yes | Get VTT subtitle content for a video |
 | `GET` | `/health` | No | Health check — returns 200 OK |
 | `GET` | `/api-docs` | No | Swagger UI (OpenAPI documentation) |
 
@@ -90,6 +95,7 @@ The upload request accepts an optional `includeSubtitles` field which is stored 
 
 Wires everything together:
 - `StorageClient` (S3-compatible)
+- `VodClient` (VOD service, config via `createVodClientConfig()`)
 - Two `AmqpClient` instances — one for publishing (API), one for consuming (background)
 - MongoDB connection + DALs
 - AMQP consumers
@@ -105,6 +111,7 @@ All `@ido_kawaz/*` packages are listed as **devDependencies** (resolved locally 
 | `@ido_kawaz/mongo-client` | MongoDB/Mongoose wrapper with base `Dal` class |
 | `@ido_kawaz/amqp-client` | RabbitMQ client (publish/consume) |
 | `@ido_kawaz/storage-client` | S3-compatible storage client |
+| `@ido_kawaz/vod-client` | VOD service client (`getVideos`, `getVideoById`, `getManifest`, `getSegmentUrl`, `getVtt`) |
 
 ### Patterns
 
