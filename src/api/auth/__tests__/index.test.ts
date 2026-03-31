@@ -1,10 +1,12 @@
 import { ApiError } from '@ido_kawaz/server-framework';
 import bcrypt from 'bcrypt';
-import express, { Application } from 'express';
+import express, { Application, NextFunction, Request, Response } from 'express';
 import * as jsonwebtoken from 'jsonwebtoken';
 import request from 'supertest';
 import { UserDal } from '../../../dal/user';
 import { createAuthRouter } from '../index';
+
+const noopMiddleware = (_req: Request, _res: Response, next: NextFunction) => next();
 
 jest.mock('bcrypt');
 jest.mock('jsonwebtoken');
@@ -31,7 +33,7 @@ describe('POST /auth/signup', () => {
 
         app = express();
         app.use(express.json());
-        app.use('/auth', createAuthRouter(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, noopMiddleware, userDal as unknown as UserDal));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -105,7 +107,7 @@ describe('POST /auth/login', () => {
 
         app = express();
         app.use(express.json());
-        app.use('/auth', createAuthRouter(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, noopMiddleware, userDal as unknown as UserDal));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -169,7 +171,7 @@ describe('POST /auth/promote', () => {
 
         app = express();
         app.use(express.json());
-        app.use('/auth', createAuthRouter(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, noopMiddleware, userDal as unknown as UserDal));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -226,5 +228,43 @@ describe('POST /auth/promote', () => {
             .send({ username: 'unknown' });
 
         expect(response.status).toBe(404);
+    });
+});
+
+describe('GET /auth/me', () => {
+    let app: Application;
+    let userDal: { verifyUser: jest.Mock; createUser: jest.Mock; findUser: jest.Mock; promoteToAdmin: jest.Mock };
+
+    const meMiddleware = (req: Request, _res: Response, next: NextFunction) => {
+        (req as any).user = { username: 'ido', role: 'user' };
+        next();
+    };
+
+    beforeEach(() => {
+        userDal = {
+            verifyUser: jest.fn(),
+            createUser: jest.fn(),
+            findUser: jest.fn(),
+            promoteToAdmin: jest.fn(),
+        };
+
+        app = express();
+        app.use(express.json());
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, meMiddleware, userDal as unknown as UserDal));
+        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+            if (error instanceof ApiError) {
+                res.status(error.statusCode).json({ message: error.message });
+                return;
+            }
+            const message = error instanceof Error ? error.message : 'Internal server error';
+            res.status(500).json({ message });
+        });
+    });
+
+    it('returns 200 with authenticated user info', async () => {
+        const response = await request(app).get('/auth/me');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ username: 'ido', role: 'user' });
     });
 });

@@ -1,9 +1,9 @@
-import { Router } from "@ido_kawaz/server-framework";
+import { RequestHandler, Router } from "@ido_kawaz/server-framework";
 import { UserDal } from "../../dal/user";
-import { createAuthHandlers } from "./handlers"
+import { createAuthHandlers } from "./handlers";
 import { AuthConfig } from "./types";
 
-export const createAuthRouter = (authConfig: AuthConfig, userDal: UserDal) => {
+export const createAuthRouter = (authConfig: AuthConfig, authMiddleware: RequestHandler, userDal: UserDal) => {
   const authHandlers = createAuthHandlers(authConfig, userDal);
   const router = Router();
 
@@ -129,6 +129,8 @@ export const createAuthRouter = (authConfig: AuthConfig, userDal: UserDal) => {
    *         description: User not found
    */
   router.post("/promote", authHandlers.promoteAdmin);
+
+  router.get("/me", authMiddleware, authHandlers.me);
 
   return router;
 };

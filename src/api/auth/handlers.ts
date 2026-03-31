@@ -4,10 +4,17 @@ import { UserDal } from '../../dal/user';
 import { requestHandlerDecorator } from "../../utils/decorator";
 import { createAuthLogic } from './logic';
 import { AuthConfig, validateAuthRequest, validatePromoteRequest } from "./types";
+import { AuthenticatedRequest } from "../../utils/types";
 
 export const createAuthHandlers = (authConfig: AuthConfig, userDal: UserDal) => {
     const logic = createAuthLogic(authConfig, userDal);
     return {
+        me: requestHandlerDecorator(
+            'me',
+            async (req: Request, res: Response) => {
+                const authenticatedReq = req as AuthenticatedRequest;
+                res.json(authenticatedReq.user);
+            }),
         signUp:
             requestHandlerDecorator(
                 'signup',

@@ -34,11 +34,13 @@ export const registerRoutes = (config: BackendServerConfig, amqpClient: AmqpClie
         // Swagger documentation
         app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+        const authMiddleware = createAuthMiddleware(authConfig, userDal);
+
         // Authentication routes
-        app.use('/auth', createAuthRouter(authConfig, userDal));
+        app.use('/auth', createAuthRouter(authConfig, authMiddleware, userDal));
 
         // Apply authentication middleware to all API routes
-        app.use(createAuthMiddleware(authConfig, userDal));
+        app.use(authMiddleware);
 
         // API routes
         app.use("/media", createMediaRouter(mediaDal, amqpClient));

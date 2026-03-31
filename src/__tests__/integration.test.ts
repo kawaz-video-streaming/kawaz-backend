@@ -84,10 +84,12 @@ describe('Media upload integration', () => {
 
         adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
 
+        const authMiddleware = createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal);
+
         app = express();
         app.use(express.json());
-        app.use('/auth', createAuthRouter(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, authMiddleware, userDal as unknown as UserDal));
+        app.use(authMiddleware);
         app.use('/media', createMediaRouter(mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
