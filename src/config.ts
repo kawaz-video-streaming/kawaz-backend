@@ -7,6 +7,7 @@ import { mergeDeepRight } from "ramda";
 import { z } from 'zod';
 import { ConsumersConfig } from "./background/config";
 import { AuthConfig } from "./api/auth/types";
+import { MediaConfig } from "./api/media/types";
 
 class InvalidConfigError extends Error {
   constructor(error: z.ZodError) {
@@ -25,12 +26,14 @@ const environmentVariablesSchema = z.object({
   NODE_ENV: z.enum(environments).default("development"),
   UPLOAD_STORAGE_BUCKET: z.string(),
   UPLOAD_STORAGE_KEY_PREFIX: z.string(),
+  VOD_STORAGE_BUCKET: z.string(),
   JWT_SECRET: z.string(),
   ADMIN_PROMOTION_SECRET: z.string()
 });
 
 export interface BackendServerConfig extends ServerConfig {
   authConfig: AuthConfig;
+  mediaConfig: MediaConfig;
 }
 
 export interface SystemConfig {
@@ -57,6 +60,9 @@ export const getConfig = (env: {} = {}): SystemConfig => {
       authConfig: {
         jwtSecret: envVars.JWT_SECRET,
         adminPromotionSecret: envVars.ADMIN_PROMOTION_SECRET,
+      },
+      mediaConfig: {
+        vodStorageBucket: envVars.VOD_STORAGE_BUCKET,
       }
     },
     dbConfig: createMongoConfig(),

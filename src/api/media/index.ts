@@ -1,13 +1,14 @@
 import { AmqpClient } from "@ido_kawaz/amqp-client";
 import { Router } from "@ido_kawaz/server-framework";
-import { VodClient } from "@ido_kawaz/vod-client";
+import { StorageClient } from "@ido_kawaz/storage-client";
 import multer from "multer";
 import { MediaDal } from "../../dal/media";
-import { createMediaHandlers } from "./handlers";
 import { requireAdmin } from "../middleware";
+import { createMediaHandlers } from "./handlers";
+import { MediaConfig } from "./types";
 
-export const createMediaRouter = (mediaDal: MediaDal, amqpClient: AmqpClient, vodClient: VodClient) => {
-  const mediaHandlers = createMediaHandlers(mediaDal, amqpClient, vodClient);
+export const createMediaRouter = (mediaConfig: MediaConfig, mediaDal: MediaDal, amqpClient: AmqpClient, storageClient: StorageClient) => {
+  const mediaHandlers = createMediaHandlers(mediaConfig, mediaDal, amqpClient, storageClient);
   const router = Router();
   const upload = multer({ storage: multer.diskStorage({ destination: './tmp' }) });
 
@@ -164,7 +165,7 @@ export const createMediaRouter = (mediaDal: MediaDal, amqpClient: AmqpClient, vo
    *       500:
    *         description: Internal server error - segment not found or VOD service error
    */
-  router.get(/^\/videos\/([^/]+)\/([^/]+\.m4s)$/, mediaHandlers.getSegmentUrl);
+  router.get(/^\/videos\/([^/]+)\/([^/]+\.m4s)$/, mediaHandlers.getSegment);
 
   /**
    * @openapi

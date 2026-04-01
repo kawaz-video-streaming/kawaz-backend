@@ -1,14 +1,15 @@
 import { AmqpClient } from '@ido_kawaz/amqp-client';
 import { Request, Response } from "@ido_kawaz/server-framework";
-import { VodClient, VideoNotFoundError, NoVideosFoundError } from "@ido_kawaz/vod-client";
+import { StorageClient } from '@ido_kawaz/storage-client';
+import { NoVideosFoundError, VideoNotFoundError } from "@ido_kawaz/vod-client";
 import { StatusCodes } from "http-status-codes";
 import { MediaDal } from '../../dal/media';
 import { requestHandlerDecorator } from "../../utils/decorator";
 import { createMediaLogic } from './logic';
-import { validateMediaUploadRequest } from './types';
+import { MediaConfig, validateMediaUploadRequest } from './types';
 
-export const createMediaHandlers = (mediaDal: MediaDal, amqpClient: AmqpClient, vodClient: VodClient) => {
-    const logic = createMediaLogic(mediaDal, amqpClient, vodClient);
+export const createMediaHandlers = (mediaConfig: MediaConfig, mediaDal: MediaDal, amqpClient: AmqpClient, storageClient: StorageClient) => {
+    const logic = createMediaLogic(mediaConfig, mediaDal, amqpClient, storageClient);
     return {
         uploadMedia:
             requestHandlerDecorator(
@@ -52,26 +53,26 @@ export const createMediaHandlers = (mediaDal: MediaDal, amqpClient: AmqpClient, 
             requestHandlerDecorator(
                 'get video manifest',
                 async (req: Request, res: Response) => {
-                    const videoId = req.params[0] as string;
+                    const videoId = req.params[0];
                     const manifestStream = await logic.getManifest(videoId);
                     res.setHeader("Content-Type", "application/dash+xml");
                     manifestStream.pipe(res);
                 }),
-        getSegmentUrl:
+        getSegment:
             requestHandlerDecorator(
-                'get video segment url',
+                'get video segment',
                 async (req: Request, res: Response) => {
-                    const videoId = req.params[0] as string;
-                    const filename = req.params[1] as string;
-                    const url = await logic.getSegmentUrl(videoId, filename);
-                    res.redirect(url);
+                    const videoId = req.params[0];
+                    const filename = req.params[1];
+                    const segmentPresignedUrl = await logic.getSegmentUrl(videoId, filename);
+                    res.redirect(segmentPresignedUrl);
                 }),
         getVtt:
             requestHandlerDecorator(
                 'get video vtt',
                 async (req: Request, res: Response) => {
-                    const videoId = req.params[0] as string;
-                    const filename = req.params[1] as string;
+                    const videoId = req.params[0];
+                    const filename = req.params[1];
                     const vttStream = await logic.getVtt(videoId, filename);
                     res.setHeader("Content-Type", "text/vtt");
                     vttStream.pipe(res);

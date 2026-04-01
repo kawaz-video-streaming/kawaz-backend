@@ -14,11 +14,11 @@ describe('createMediaLogic.uploadMedia', () => {
     } as RequestFile);
 
     it('publishes using persisted media object returned from DAL', async () => {
-        const media = { _id: 'm1', name: 'image.png', type: 'image/png', size: 64 };
+        const media = { _id: 'm1', name: 'video.mp4', size: 64 };
         const file = makeFile({
-            path: '/tmp/image.png',
-            originalname: 'image.png',
-            mimetype: 'image/png',
+            path: '/tmp/video.mp4',
+            originalname: 'video.mp4',
+            mimetype: 'video/mp4',
             size: 64,
         });
 
@@ -30,21 +30,21 @@ describe('createMediaLogic.uploadMedia', () => {
             publish: jest.fn(),
         } as unknown as AmqpClient;
 
-        const logic = createMediaLogic(mediaDal, amqpClient, {} as any);
+        const logic = createMediaLogic({ vodStorageBucket: 'vod-bucket' }, mediaDal, amqpClient, {} as any);
 
         await logic.uploadMedia(file);
 
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
-        expect(mediaDal.createMedia).toHaveBeenCalledWith('image.png', 'image/png', 64);
+        expect(mediaDal.createMedia).toHaveBeenCalledWith('video.mp4', 64);
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
         expect(amqpClient.publish).toHaveBeenCalledWith(UPLOAD_CONSUMER_EXCHANGE, UPLOAD_CONSUMER_TOPIC, {
             media,
-            path: '/tmp/image.png',
+            path: '/tmp/video.mp4',
         });
     });
 
     it('calls publish only after media creation completes', async () => {
-        const media = { _id: 'm-order', name: 'ordered.mp4', type: 'video/mp4', size: 99 };
+        const media = { _id: 'm-order', name: 'ordered.mp4', size: 99 };
         const file = makeFile({
             path: '/tmp/ordered.mp4',
             originalname: 'ordered.mp4',
@@ -60,7 +60,7 @@ describe('createMediaLogic.uploadMedia', () => {
             publish: jest.fn(),
         } as unknown as AmqpClient;
 
-        const logic = createMediaLogic(mediaDal, amqpClient, {} as any);
+        const logic = createMediaLogic({ vodStorageBucket: 'vod-bucket' }, mediaDal, amqpClient, {} as any);
 
         await logic.uploadMedia(file);
 
@@ -86,7 +86,7 @@ describe('createMediaLogic.uploadMedia', () => {
             publish: jest.fn(),
         } as unknown as AmqpClient;
 
-        const logic = createMediaLogic(mediaDal, amqpClient, {} as any);
+        const logic = createMediaLogic({ vodStorageBucket: 'vod-bucket' }, mediaDal, amqpClient, {} as any);
 
         await expect(
             logic.uploadMedia(file),

@@ -1,6 +1,10 @@
 import { BadRequestError, Request, RequestFile } from "@ido_kawaz/server-framework";
 import z from "zod";
 
+export interface MediaConfig {
+    vodStorageBucket: string;
+}
+
 export const mediaUploadRequestSchema = z.object({
     file: z.object({
         path: z.string(),

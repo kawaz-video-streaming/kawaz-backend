@@ -21,17 +21,13 @@ export const uploadMediaHandler = (storageClient: StorageClient, { uploadBucket,
     };
 
 export const uploadSuccessHandler = (amqpClient: AmqpClient, mediaDal: MediaDal, { uploadBucket, uploadKeyPrefix }: UploadConfig) => async ({ media, path }: Upload) => {
-    if (media.type.includes("video")) {
-        const message: ConvertMessage = {
-            mediaId: media._id,
-            mediaName: media.name,
-            mediaStorageBucket: uploadBucket,
-            mediaRoutingKey: `${uploadKeyPrefix}/${media.name}`
-        };
-        amqpClient.publish("convert", "convert.media", message);
-        await mediaDal.updateMediaStatus(media._id, "processing");
-    } else if (media.type.includes("image")) {
-        await mediaDal.updateMediaStatus(media._id, "completed");
-    }
+    const message: ConvertMessage = {
+        mediaId: media._id,
+        mediaName: media.name,
+        mediaStorageBucket: uploadBucket,
+        mediaRoutingKey: `${uploadKeyPrefix}/${media.name}`
+    };
+    amqpClient.publish("convert", "convert.media", message);
+    await mediaDal.updateMediaStatus(media._id, "processing");
     await cleanupPath(path);
 };

@@ -71,7 +71,6 @@ describe('Media upload integration', () => {
             createMedia: jest.fn().mockResolvedValue({
                 _id: new Types.ObjectId(),
                 name: 'sample.mp4',
-                type: 'video/mp4',
                 size: 18,
                 status: 'pending',
             }),
@@ -101,7 +100,7 @@ describe('Media upload integration', () => {
         app.use(express.json());
         app.use('/auth', createAuthRouter(AUTH_CONFIG, authMiddleware, userDal as unknown as UserDal));
         app.use(authMiddleware);
-        app.use('/media', createMediaRouter(mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient, {} as any));
+        app.use('/media', createMediaRouter({ vodStorageBucket: 'vod-bucket' }, mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient, storageClient as unknown as StorageClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -135,7 +134,7 @@ describe('Media upload integration', () => {
 
         // Verify media was persisted
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
-        expect(mediaDal.createMedia).toHaveBeenCalledWith('sample.mp4', 'video/mp4', expect.any(Number));
+        expect(mediaDal.createMedia).toHaveBeenCalledWith('sample.mp4', expect.any(Number));
 
         // Verify upload event was published to AMQP
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
@@ -145,7 +144,6 @@ describe('Media upload integration', () => {
         expect(uploadPayload).toMatchObject({
             media: expect.objectContaining({
                 name: 'sample.mp4',
-                type: 'video/mp4',
                 size: 18,
                 status: 'pending',
             }),
@@ -201,15 +199,7 @@ describe('Media upload integration', () => {
         expect(mediaDal.updateMediaStatus).toHaveBeenCalledWith(uploadedMedia._id, 'processing');
     });
 
-    it('handles image media differently than video in background processing', async () => {
-        mediaDal.createMedia.mockResolvedValueOnce({
-            _id: new Types.ObjectId().toString(),
-            name: 'photo.png',
-            type: 'image/png',
-            size: expect.any(Number),
-            status: 'pending',
-        });
-
+    it('background consumer always publishes convert event and sets processing status', async () => {
         const uploadResponse = await request(app)
             .post('/media/upload')
             .set('Cookie', `kawaz-token=${adminToken}`)
@@ -229,24 +219,19 @@ describe('Media upload integration', () => {
             partSize: 128 * 1024 * 1024,
         };
 
-        const uploadHandler = uploadMediaHandler(
-            storageClient as unknown as StorageClient,
-            uploadConfig
-        );
         const successHandler = uploadSuccessHandler(
             amqpClient as unknown as AmqpClient,
             mediaDal as unknown as MediaDal,
             uploadConfig
         );
 
-        await uploadHandler({ media: uploadedMedia, path: uploadPayload.path });
         await successHandler({ media: uploadedMedia, path: uploadPayload.path });
 
-        // Verify NO convert event for images
-        expect(amqpClient.publish).not.toHaveBeenCalled();
-
-        // Verify status was set to completed (not processing)
-        expect(mediaDal.updateMediaStatus).toHaveBeenCalledWith(uploadedMedia._id, 'completed');
+        expect(amqpClient.publish).toHaveBeenCalledWith('convert', 'convert.media', expect.objectContaining({
+            mediaId: uploadedMedia._id,
+            mediaStorageBucket: 'media-bucket',
+        }));
+        expect(mediaDal.updateMediaStatus).toHaveBeenCalledWith(uploadedMedia._id, 'processing');
     });
 
     it('handles upload failure gracefully with proper error responses', async () => {
