@@ -11,12 +11,12 @@ import { Upload, validateUploadPayload } from "./types";
 export const createUploadConsumer = (storageClient: StorageClient, amqpClient: AmqpClient, mediaDal: MediaDal, config: UploadConfig) =>
     new Consumer<Upload, UploadConsumerBinding>('upload', createUploadConsumerBinding())
         .on('validateMessage', validateUploadPayload)
-        .on('handleMessage', uploadMediaHandler(storageClient, config))
+        .on('handleMessage', uploadMediaHandler(storageClient, mediaDal, config))
         .on('handleSuccess', uploadSuccessHandler(amqpClient, mediaDal, config))
         .on('handleFatalError', async (_, payload) => {
             if (validateUploadPayload(payload)) {
                 const mediaId = payload.media._id;
-                await mediaDal.updateMediaStatus(mediaId, "failed");
-                await cleanupPath(payload.path);
+                await mediaDal.updateMedia(mediaId, { status: "failed" });
+                await cleanupPath(payload.mediaPath);
             }
         });

@@ -1,53 +1,75 @@
 import { AmqpClient } from '@ido_kawaz/amqp-client';
-import { Request, Response } from "@ido_kawaz/server-framework";
+import { NotFoundError, Request, Response } from "@ido_kawaz/server-framework";
 import { StorageClient } from '@ido_kawaz/storage-client';
-import { NoVideosFoundError, VideoNotFoundError } from "@ido_kawaz/vod-client";
 import { StatusCodes } from "http-status-codes";
+import { isEmpty, isNil } from 'ramda';
 import { MediaDal } from '../../dal/media';
 import { requestHandlerDecorator } from "../../utils/decorator";
 import { createMediaLogic } from './logic';
-import { MediaConfig, validateMediaUploadRequest } from './types';
+import { MediaConfig, validateMediaRequestWithId, validateMediaUpdateRequest, validateMediaUploadRequest } from './types';
 
 export const createMediaHandlers = (mediaConfig: MediaConfig, mediaDal: MediaDal, amqpClient: AmqpClient, storageClient: StorageClient) => {
     const logic = createMediaLogic(mediaConfig, mediaDal, amqpClient, storageClient);
     return {
+        getAllMedia:
+            requestHandlerDecorator(
+                'get all media',
+                async (_req: Request, res: Response) => {
+                    const medias = await logic.getAllMedia();
+                    if (isEmpty(medias)) {
+                        throw new NotFoundError('No media found');
+                    }
+                    res.status(StatusCodes.OK).json(medias);
+                }),
         uploadMedia:
             requestHandlerDecorator(
                 'upload media',
                 async (rawReq: Request, res: Response) => {
-                    const { file } = validateMediaUploadRequest(rawReq);
-                    await logic.uploadMedia(file);
+                    const files = rawReq.files as Record<string, Express.Multer.File[]> | undefined;
+                    const normalized = {
+                        ...rawReq,
+                        file: files?.['file']?.[0],
+                        thumbnail: files?.['thumbnail']?.[0],
+                    };
+                    const { body, file, thumbnail } = validateMediaUploadRequest(normalized as unknown as Request);
+                    await logic.uploadMedia(body, file, thumbnail);
                     res.status(StatusCodes.OK).json({ message: 'Media Started Uploading' });
                 }),
-        getVideos:
+        deleteMedia:
             requestHandlerDecorator(
-                'get videos',
-                async (_req: Request, res: Response) => {
-                    try {
-                        const videos = await logic.getVideos();
-                        res.status(StatusCodes.OK).json(videos);
-                    } catch (err) {
-                        if (err instanceof NoVideosFoundError) {
-                            res.status(StatusCodes.NOT_FOUND).json({ error: err.message });
-                            return;
-                        }
-                        throw err;
-                    }
-                }),
-        getVideoById:
-            requestHandlerDecorator(
-                'get video by id',
+                'delete media',
                 async (req: Request, res: Response) => {
-                    try {
-                        const video = await logic.getVideoById(req.params.id as string);
-                        res.status(StatusCodes.OK).json(video);
-                    } catch (err) {
-                        if (err instanceof VideoNotFoundError) {
-                            res.status(StatusCodes.NOT_FOUND).json({ error: err.message });
-                            return;
-                        }
-                        throw err;
+                    const { params: { id: mediaId } } = validateMediaRequestWithId(req);
+                    await logic.deleteMedia(mediaId);
+                    res.status(StatusCodes.OK).json({ message: 'Media deleted' });
+                }),
+        updateMedia:
+            requestHandlerDecorator(
+                'update media',
+                async (req: Request, res: Response) => {
+                    const { params: { id: mediaId }, body } = validateMediaUpdateRequest(req);
+                    await logic.updateMedia(mediaId, body);
+                    res.status(StatusCodes.OK).json({ message: 'Media updated' });
+                }),
+        getMedia:
+            requestHandlerDecorator(
+                'get media',
+                async (req: Request, res: Response) => {
+                    const { params: { id: mediaId } } = validateMediaRequestWithId(req);
+                    const media = await logic.getMedia(mediaId);
+                    if (isNil(media)) {
+                        throw new NotFoundError('Media not found');
                     }
+                    res.status(StatusCodes.OK).json(media);
+                }),
+        getThumbnail:
+            requestHandlerDecorator(
+                'get media thumbnail',
+                async (req: Request, res: Response) => {
+                    const { params: { id: mediaId } } = validateMediaRequestWithId(req);
+                    const thumbnailPresignedUrl = await logic.getThumbnail(mediaId);
+                    res.setHeader("Content-Type", "image/jpeg");
+                    res.redirect(thumbnailPresignedUrl);
                 }),
         getManifest:
             requestHandlerDecorator(
@@ -65,6 +87,7 @@ export const createMediaHandlers = (mediaConfig: MediaConfig, mediaDal: MediaDal
                     const videoId = req.params[0];
                     const filename = req.params[1];
                     const segmentPresignedUrl = await logic.getSegmentUrl(videoId, filename);
+                    res.setHeader("Content-Type", "video/iso.segment");
                     res.redirect(segmentPresignedUrl);
                 }),
         getVtt:

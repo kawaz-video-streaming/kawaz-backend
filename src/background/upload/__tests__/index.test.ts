@@ -11,7 +11,7 @@ describe('createUploadConsumer', () => {
         const amqpClient = {} as AmqpClient;
         const mediaDal = {} as MediaDal;
         const config: UploadConfig = {
-            uploadBucket: 'bucket',
+            uploadStorageBucket: 'bucket',
             uploadKeyPrefix: 'prefix',
             partSize: 128 * 1024 * 1024,
         };

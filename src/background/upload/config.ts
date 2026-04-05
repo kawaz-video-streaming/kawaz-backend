@@ -1,5 +1,5 @@
 export interface UploadConfig {
-    uploadBucket: string;
+    uploadStorageBucket: string;
     uploadKeyPrefix: string;
     partSize: number;
 }

@@ -5,8 +5,5 @@ import { Progress } from "./types";
 
 export const mediaProgressHandler = (mediaDal: MediaDal) =>
     async ({ mediaId, status, metadata }: Progress) => {
-        await mediaDal.updateMediaStatus(mediaId, status);
-        if (status === COMPLETED && isNotNil(metadata)) {
-            await mediaDal.updateMediaMetadata(mediaId, metadata);
-        }
+        await mediaDal.updateMedia(mediaId, { status, ...((status === COMPLETED && isNotNil(metadata)) && { metadata }) });
     }

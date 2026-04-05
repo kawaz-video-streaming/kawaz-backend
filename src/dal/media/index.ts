@@ -1,25 +1,32 @@
-import { Dal, Types, UpdateWriteOpResult } from "@ido_kawaz/mongo-client";
-import { COMPLETED, Media, MediaMetadata, MediaModel, MediaStatus, PENDING } from "./model";
+import { Dal, DeleteResult, Types, UpdateWriteOpResult } from "@ido_kawaz/mongo-client";
+import { COMPLETED, Media, MediaModel, MediaTag, PENDING } from "./model";
 
 export class MediaDal extends Dal<Media> {
   constructor(mediaModel: MediaModel) {
     super(mediaModel);
   }
 
-  createMedia = async (filename: string, size: number): Promise<Media> => {
-    const media: Media = { _id: new Types.ObjectId().toString(), name: filename, size, status: PENDING };
+  createMedia = async (title: string, tags: MediaTag[], fileName: string, size: number, description?: string): Promise<Media> => {
+    const media: Media = {
+      _id: new Types.ObjectId().toString(),
+      fileName,
+      title,
+      ...(description && { description }),
+      tags,
+      size,
+      status: PENDING,
+    };
     await this.model.insertOne(media);
     return media;
   }
 
-  getMedias = async (): Promise<Media[]> => this.model.find({ status: COMPLETED }).lean<Media[]>().exec();
+  deleteMedia = async (mediaId: string): Promise<DeleteResult> => this.model.deleteOne({ _id: mediaId }).lean().exec();
 
-  getMediaById = async (mediaId: string): Promise<Media | null> => this.model.findOne({ _id: mediaId, status: COMPLETED }).lean<Media>().exec();
+  updateMedia = async (mediaId: string, update: Partial<Media>): Promise<UpdateWriteOpResult> =>
+    this.model.updateOne({ _id: mediaId }, { ...update }).lean().exec();
 
-  updateMediaStatus = async (mediaId: string, status: MediaStatus): Promise<UpdateWriteOpResult> =>
-    this.model.updateOne({ _id: mediaId }, { status }).lean().exec();
+  getAllMedia = async (): Promise<Media[]> => this.model.find({ status: COMPLETED }).lean<Media[]>().exec();
 
-  updateMediaMetadata = async (mediaId: string, metadata: MediaMetadata): Promise<UpdateWriteOpResult> =>
-    this.model.updateOne({ _id: mediaId, status: COMPLETED }, { metadata }).lean().exec();
+  getMedia = async (mediaId: string): Promise<Media | null> => this.model.findOne({ _id: mediaId, status: COMPLETED }).lean<Media>().exec();
 };
 

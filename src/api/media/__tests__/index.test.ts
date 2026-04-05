@@ -51,8 +51,11 @@ describe('POST /media/upload route', () => {
         mediaDal = {
             createMedia: jest.fn().mockResolvedValue({
                 _id: 'media-1',
-                name: 'sample-upload.mp4',
+                fileName: 'sample-upload.mp4',
+                title: 'My Upload',
+                tags: [],
                 size: 19,
+                status: 'pending',
             }),
         };
 
@@ -73,7 +76,7 @@ describe('POST /media/upload route', () => {
         app = express();
         app.use(parseCookies);
         app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use('/media', createMediaRouter({ vodStorageBucket: 'vod-bucket' }, mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient, storageClient as any));
+        app.use('/media', createMediaRouter({ vodStorageBucket: 'vod-bucket', uploadStorageBucket: 'upload-bucket', uploadKeyPrefix: 'raw' }, mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient, storageClient as any));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -114,13 +117,14 @@ describe('POST /media/upload route', () => {
         const response = await request(app)
             .post('/media/upload')
             .set('Cookie', `kawaz-token=${adminToken}`)
+            .field('title', 'My Upload')
             .attach('file', fixtureFile);
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({ message: 'Media Started Uploading' });
 
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
-        expect(mediaDal.createMedia).toHaveBeenCalledWith('sample-upload.mp4', 19);
+        expect(mediaDal.createMedia).toHaveBeenCalledWith('My Upload', [], 'sample-upload.mp4', expect.any(Number), undefined);
 
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
         expect(amqpClient.publish).toHaveBeenCalledWith(
@@ -129,10 +133,10 @@ describe('POST /media/upload route', () => {
             expect.objectContaining({
                 media: expect.objectContaining({
                     _id: 'media-1',
-                    name: 'sample-upload.mp4',
+                    fileName: 'sample-upload.mp4',
                     size: 19,
                 }),
-                path: expect.stringContaining('tmp'),
+                mediaPath: expect.stringContaining('tmp'),
             }),
         );
     });
@@ -155,6 +159,7 @@ describe('POST /media/upload route', () => {
         const response = await request(app)
             .post('/media/upload')
             .set('Cookie', `kawaz-token=${adminToken}`)
+            .field('title', 'My Upload')
             .attach('file', fixtureFile);
 
         expect(response.status).toBe(500);

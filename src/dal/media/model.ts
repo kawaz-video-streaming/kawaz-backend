@@ -1,6 +1,26 @@
 import { Model, MongoClient, Schema, Types } from "@ido_kawaz/mongo-client";
 import z from "zod";
 
+export const MEDIA_TAGS = [
+  'Action',
+  'Animation',
+  'Comedy',
+  'Crime',
+  'Documentary',
+  'Drama',
+  'Education',
+  'Horror',
+  'Kids',
+  'Music',
+  'News',
+  'Romance',
+  'Sci-Fi',
+  'Sport',
+  'Thriller',
+] as const
+
+export type MediaTag = (typeof MEDIA_TAGS)[number]
+
 export const mediaResultStatuses = ["completed", "failed"] as const;
 
 export type MediaResultStatus = typeof mediaResultStatuses[number];
@@ -35,8 +55,7 @@ export interface VideoChapter {
 }
 
 export interface MediaMetadata {
-  _id: string;
-  title: string;
+  name: string;
   durationInMs: number;
   playUrl: string;
   chaptersUrl?: string;
@@ -68,8 +87,7 @@ const audioStreamZodSchema = languageStreamZodSchema satisfies z.ZodType<AudioSt
 const subtitleStreamZodSchema = languageStreamZodSchema satisfies z.ZodType<SubtitleStream>;
 
 export const mediaMetadataZodSchema = z.object({
-  _id: z.string(),
-  title: z.string(),
+  name: z.string(),
   durationInMs: z.coerce.number(),
   playUrl: z.string(),
   chaptersUrl: z.string().optional(),
@@ -102,7 +120,7 @@ const audioStreamSchema = new Schema<AudioStream>(languageStreamSchemaObject, { 
 const subtitleStreamSchema = new Schema<SubtitleStream>(languageStreamSchemaObject, { _id: false });
 
 const mediaMetadataSchema = new Schema<MediaMetadata>({
-  title: { type: String, required: true },
+  name: { type: String, required: true },
   durationInMs: { type: Number, required: true },
   playUrl: { type: String, required: true },
   chaptersUrl: { type: String, required: false },
@@ -114,16 +132,35 @@ const mediaMetadataSchema = new Schema<MediaMetadata>({
 
 export interface Media {
   _id: string;
-  name: string;
+  fileName: string;
+  title: string;
+  description?: string;
+  tags: MediaTag[];
   size: number;
   status: MediaStatus;
+  thumbnailUrl?: string;
   metadata?: MediaMetadata;
 }
+
+export const mediaZodSchema = z.object({
+  _id: z.string().refine((v) => Types.ObjectId.isValid(v), { message: 'Invalid ObjectId' }),
+  fileName: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  tags: z.array(z.enum(MEDIA_TAGS)).default([]),
+  size: z.coerce.number(),
+  status: z.enum(mediaStatuses).default(PENDING),
+  thumbnailUrl: z.string().optional(),
+  metadata: mediaMetadataZodSchema.optional()
+}) satisfies z.ZodType<Media>;
 
 const mediaSchema = new Schema<Media>(
   {
     _id: { type: String, default: () => new Types.ObjectId().toString() },
-    name: { type: String, required: true },
+    fileName: { type: String, required: true },
+    title: { type: String, required: true },
+    description: { type: String, required: false },
+    tags: { type: [String], enum: MEDIA_TAGS, default: [] },
     size: { type: Number, required: true },
     status: { type: String, enum: mediaStatuses, default: PENDING },
     metadata: { type: mediaMetadataSchema, required: false },

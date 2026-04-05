@@ -6,9 +6,9 @@ Kawaz Plus media backend service.
 
 - Exposes a health endpoint (`GET /health`)
 - Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`, `POST /auth/promote`, `GET /auth/me`) — JWT-based authentication with role support
-- Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`) — video files only, requires JWT with admin role
-- Exposes video metadata endpoints (`GET /media/videos`, `GET /media/videos/:id`) via VOD service
-- Exposes HLS streaming endpoints (`GET /media/videos/:id/manifest`, `/segments/:filename`, `/vtt/:filename`) via VOD service
+- Exposes media CRUD endpoints (`GET /media`, `GET /media/:id`, `PUT /media/:id`, `DELETE /media/:id`) — served from MongoDB
+- Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`) — video + optional thumbnail, requires admin role
+- Exposes MPEG-DASH streaming endpoints (`/media/stream/:id/output.mpd`, `*.m4s`, `*.vtt`) direct from VOD storage
 - Publishes upload jobs to AMQP for async processing
 - Consumes upload jobs and uploads files to object storage
 - Persists media metadata and status in MongoDB
@@ -59,12 +59,11 @@ This service validates all environment variables at startup using Zod schemas. M
 - Mongo config via `createMongoConfig()` - Connection string
 - AMQP config via `createAmqpConfig()` - Broker connection
 - Storage config via `createStorageConfig()` - S3 credentials and endpoint
-- VOD config via `createVodClientConfig()` - VOD service connection
 
 **Troubleshooting startup:**
 
 If the app fails to start, verify:
-1. All required variables (`UPLOAD_STORAGE_BUCKET`, `UPLOAD_STORAGE_KEY_PREFIX`) are set
+1. All required variables (`UPLOAD_STORAGE_BUCKET`, `UPLOAD_STORAGE_KEY_PREFIX`, `VOD_STORAGE_BUCKET`) are set
 2. Shared client environment variables are valid (MongoDB, AMQP, S3 credentials)
 3. `NODE_ENV` is one of the supported values
  
@@ -90,6 +89,7 @@ AWS_MAX_CONCURRENCY=4
 
 UPLOAD_STORAGE_BUCKET=kawaz-plus
 UPLOAD_STORAGE_KEY_PREFIX=raw
+VOD_STORAGE_BUCKET=kawaz-plus-vod
 ```
 
 ## Scripts
@@ -164,39 +164,59 @@ Returns `200 OK` if service is running.
 
 - Requires: `kawaz-token` cookie with **admin role**
 - Content type: `multipart/form-data`
-- Required file field: `file` (video files only)
+- Fields: `title` (required string), `description` (optional), `tags` (optional array), `file` (video, required), `thumbnail` (image, optional)
 - Success response: `200 { "message": "Media Started Uploading" }`
-- Error responses: `400` (missing file or non-video mimetype), `401` (unauthenticated), `403` (not admin)
+- Error responses: `400` (missing file/title or non-video mimetype), `401` (unauthenticated), `403` (not admin)
 
-### `GET /media/videos`
-
-- Requires: `kawaz-token` cookie with valid JWT
-- Success response: `200 [{ "_id", "title", "durationInMs", "playUrl", ... }]`
-- Error responses: `401`, `404` (no videos found)
-
-### `GET /media/videos/:id`
+### `GET /media`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `200 { "_id", "title", "durationInMs", "playUrl", ... }`
-- Error responses: `401`, `404` (video not found)
+- Success response: `200 [{ "_id", "fileName", "title", "tags", "size", "status", "metadata", ... }]`
+- Error responses: `401`, `404` (no media found)
 
-### `GET /media/videos/:id/manifest`
+### `GET /media/:id`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `200` HLS manifest (text)
+- Success response: `200 { "_id", "fileName", "title", "tags", "size", "status", "metadata", ... }`
+- Error responses: `401`, `404` (media not found)
+
+### `PUT /media/:id`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Content type: `application/json`
+- Body: `{ "title": string, "description"?: string, "tags"?: string[] }`
+- Success response: `200 { "message": "Media updated" }`
+- Error responses: `400` (invalid id or body), `401`, `403`
+
+### `DELETE /media/:id`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Success response: `200 { "message": "Media deleted" }`
+- Error responses: `400` (invalid id), `401`, `403`
+
+### `GET /media/:id/thumbnail`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `302` redirect to presigned thumbnail URL
 - Error responses: `401`, `404`
 
-### `GET /media/videos/:id/segments/:filename`
+### `GET /media/stream/:id/output.mpd`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `200 { "url": string }`
-- Error responses: `401`, `404`
+- Success response: `200` MPEG-DASH manifest (application/dash+xml)
+- Error responses: `401`, `500`
 
-### `GET /media/videos/:id/vtt/:filename`
+### `GET /media/stream/:id/:filename.m4s`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `200` VTT subtitle content (text)
-- Error responses: `401`, `404`
+- Success response: `302` redirect to presigned segment URL
+- Error responses: `401`, `500`
+
+### `GET /media/stream/:id/:filename.vtt`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200` VTT subtitle content (text/vtt)
+- Error responses: `401`, `500`
 
 ### `GET /api-docs`
 
@@ -243,20 +263,26 @@ Stores metadata for uploaded media files.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `_id` | ObjectId | Yes | Unique identifier |
-| `name` | String | Yes | Original filename |
-| `type` | String | Yes | MIME type (e.g., `video/mp4`, `image/jpeg`) |
+| `_id` | String (ObjectId) | Yes | Unique identifier |
+| `fileName` | String | Yes | Original filename |
+| `title` | String | Yes | User-provided display title |
+| `description` | String | No | Optional description |
+| `tags` | String[] | Yes | Content tags (e.g. `"Action"`, `"Comedy"`) |
 | `size` | Number | Yes | File size in bytes |
 | `status` | String | Yes | One of: `pending`, `processing`, `completed`, `failed` |
+| `thumbnailUrl` | String | No | Storage key of the uploaded thumbnail |
+| `metadata` | Object | No | Populated on completion (durationInMs, playUrl, streams, etc.) |
 
 Example document:
 ```json
 {
-  "_id": "ObjectId(...)",
-  "name": "presentation.mp4",
-  "type": "video/mp4",
+  "_id": "64a1f...",
+  "fileName": "presentation.mp4",
+  "title": "Q2 Highlights",
+  "tags": ["Education"],
   "size": 52428800,
-  "status": "processing"
+  "status": "completed",
+  "metadata": { "name": "presentation.mp4", "durationInMs": 120000, "playUrl": "..." }
 }
 ```
 

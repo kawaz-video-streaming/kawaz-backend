@@ -67,12 +67,15 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 | `POST` | `/auth/login` | No | Login, sets `kawaz-token` HttpOnly cookie |
 | `POST` | `/auth/promote` | No (x-admin-secret header) | Promote a user to admin role |
 | `GET` | `/auth/me` | Yes | Returns the authenticated user's info (`username`, `role`) |
-| `POST` | `/media/upload` | Yes (admin only, via `kawaz-token` cookie) | Upload a video file (multipart/form-data); video mimetype only |
-| `GET` | `/media/videos` | Yes | List all completed videos from MongoDB |
-| `GET` | `/media/videos/:id` | Yes | Get a single video's metadata from MongoDB |
-| `GET` | `/media/videos/:id/manifest` | Yes | Stream HLS manifest from VOD storage bucket |
-| `GET` | `/media/videos/:id/segments/:filename` | Yes | Redirect to presigned URL for a video segment |
-| `GET` | `/media/videos/:id/vtt/:filename` | Yes | Stream VTT subtitle file from VOD storage bucket |
+| `POST` | `/media/upload` | Yes (admin only) | Upload video + optional thumbnail (multipart/form-data); requires `title` field |
+| `GET` | `/media` | Yes | List all completed media from MongoDB |
+| `GET` | `/media/:id` | Yes | Get a single media's metadata from MongoDB |
+| `PUT` | `/media/:id` | Yes (admin only) | Update media title, description, or tags |
+| `DELETE` | `/media/:id` | Yes (admin only) | Delete media from DB and VOD storage |
+| `GET` | `/media/:id/thumbnail` | Yes | Redirect to presigned thumbnail URL |
+| `GET` | `/media/stream/:id/output.mpd` | Yes | Stream MPEG-DASH manifest from VOD storage bucket |
+| `GET` | `/media/stream/:id/:filename.m4s` | Yes | Redirect to presigned URL for a video segment |
+| `GET` | `/media/stream/:id/:filename.vtt` | Yes | Stream VTT subtitle file from VOD storage bucket |
 | `GET` | `/health` | No | Health check — returns 200 OK |
 | `GET` | `/api-docs` | No | Swagger UI (OpenAPI documentation) |
 
@@ -80,14 +83,19 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 
 ```ts
 interface Media {
-  name: string;           // original filename
-  size: number;           // file size in bytes
-  status: MediaStatus;    // "pending" | "processing" | "completed" | "failed"
+  _id: string;
+  fileName: string;         // original filename
+  title: string;            // user-provided display title
+  description?: string;
+  tags: MediaTag[];         // e.g. "Action", "Comedy", etc.
+  size: number;             // file size in bytes
+  status: MediaStatus;      // "pending" | "processing" | "completed" | "failed"
+  thumbnailUrl?: string;    // storage key of the uploaded thumbnail
   metadata?: MediaMetadata; // populated by progress consumer on completion
 }
 ```
 
-`MediaMetadata` contains title, durationInMs, playUrl, chapters, videoStreams, audioStreams, and subtitleStreams — populated when the progress consumer receives a completed event from the media processor.
+`MediaMetadata` contains name, durationInMs, playUrl, chaptersUrl, chapters, videoStreams, audioStreams, and subtitleStreams — populated when the progress consumer receives a completed event from the media processor.
 
 ### System Initialization (`src/services/system.ts`)
 
@@ -108,13 +116,13 @@ All `@ido_kawaz/*` packages are listed as **devDependencies** (resolved locally 
 | `@ido_kawaz/mongo-client` | MongoDB/Mongoose wrapper with base `Dal` class |
 | `@ido_kawaz/amqp-client` | RabbitMQ client (publish/consume) |
 | `@ido_kawaz/storage-client` | S3-compatible storage client |
-| `@ido_kawaz/vod-client` | VOD service client (`getVideos`, `getVideoById`, `getManifest`, `getSegmentUrl`, `getVtt`) |
+| `@ido_kawaz/vod-client` | VOD service client (streaming routes only — manifest, segment, VTT) |
 
 ### Patterns
 
 - **Factory functions** for all modules: `createMediaHandlers(deps)`, `createUploadConsumer(deps)`, etc.
 - **Zod validation** at every boundary: HTTP requests (`validateMediaUploadRequest`), AMQP payloads (`validateUploadPayload`), and env config (`src/config.ts`).
-- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia()`, `updateMediaStatus()`. User: `createUser()`, `findUser()`, `verifyUser()`.
+- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia()`, `updateMedia()`, `deleteMedia()`, `getAllMedia()`, `getMedia()`. User: `createUser()`, `findUser()`, `verifyUser()`.
 - **Colocated tests**: `__tests__/` directories next to the source they test.
 - **Handler decorator** from server-framework wraps route handlers for logging and error propagation.
 
