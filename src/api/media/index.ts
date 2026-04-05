@@ -12,7 +12,6 @@ export const createMediaRouter = (mediaConfig: MediaConfig, mediaDal: MediaDal, 
   const router = Router();
   const upload = multer({ storage: multer.diskStorage({ destination: './tmp' }) });
 
-
   /**
    * @openapi
    * /media:

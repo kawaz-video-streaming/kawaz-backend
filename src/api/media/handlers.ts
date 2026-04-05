@@ -25,13 +25,7 @@ export const createMediaHandlers = (mediaConfig: MediaConfig, mediaDal: MediaDal
             requestHandlerDecorator(
                 'upload media',
                 async (rawReq: Request, res: Response) => {
-                    const files = rawReq.files as Record<string, Express.Multer.File[]> | undefined;
-                    const normalized = {
-                        ...rawReq,
-                        file: files?.['file']?.[0],
-                        thumbnail: files?.['thumbnail']?.[0],
-                    };
-                    const { body, file, thumbnail } = validateMediaUploadRequest(normalized as unknown as Request);
+                    const { body, file, thumbnail } = validateMediaUploadRequest(rawReq);
                     await logic.uploadMedia(body, file, thumbnail);
                     res.status(StatusCodes.OK).json({ message: 'Media Started Uploading' });
                 }),

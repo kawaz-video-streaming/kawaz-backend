@@ -43,31 +43,32 @@ const requestWithIdParamSchema = z.object({
 
 export type UploadedFile = Pick<RequestFile, 'path' | 'originalname' | 'mimetype' | 'size'>;
 
-interface ValidatedMediaUploadRequest extends MediaUpdateRequest {
+export interface ValidatedMediaUploadRequest extends MediaUpdateRequest {
     file: UploadedFile;
     thumbnail?: UploadedFile;
 }
 
+const uploadedFileSchema = (mimePrefix: string, errorMessage: string) => z.object({
+    path: z.string(),
+    originalname: z.string(),
+    mimetype: z.string().refine(
+        mime => mime.startsWith(mimePrefix),
+        { message: errorMessage }
+    ),
+    size: z.number()
+});
+
 export const mediaUploadRequestSchema = z.object({
-    file: z.object({
-        path: z.string(),
-        originalname: z.string(),
-        mimetype: z.string().refine(
-            mime => mime.startsWith('video/'),
-            { message: "Only video files are allowed" }
-        ),
-        size: z.number()
+    files: z.object({
+        file: z.array(uploadedFileSchema('video/', 'Only video files are allowed')).length(1),
+        thumbnail: z.array(uploadedFileSchema('image/', 'Only image files are allowed')).length(1).optional(),
     }),
-    thumbnail: z.object({
-        path: z.string(),
-        originalname: z.string(),
-        mimetype: z.string().refine(
-            mime => mime.startsWith('image/'),
-            { message: "Only image files are allowed" }
-        ),
-        size: z.number()
-    }).optional()
-}).extend(mediaUpdateRequestSchema.shape) satisfies z.ZodType<ValidatedMediaUploadRequest>;
+    body: mediaUpdateBodySchema,
+}).transform(({ files, body }) => ({
+    body,
+    file: files.file[0],
+    thumbnail: files.thumbnail?.[0],
+})) satisfies z.ZodType<ValidatedMediaUploadRequest>;
 
 interface mediaUpdateRequestWithId extends RequestWithIdParam, MediaUpdateRequest { }
 

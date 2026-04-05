@@ -1,7 +1,7 @@
 import { validateMediaUploadRequest } from '../types';
 
 describe('validateMediaUploadRequest', () => {
-    const makeFile = (overrides: Record<string, unknown> = {}) => ({
+    const makeFileEntry = (overrides: Record<string, unknown> = {}) => ({
         path: '/tmp/video.mp4',
         originalname: 'video.mp4',
         mimetype: 'video/mp4',
@@ -14,64 +14,48 @@ describe('validateMediaUploadRequest', () => {
         ...overrides,
     });
 
-    it('returns file and body fields for a valid upload payload', () => {
-        const req = { file: makeFile(), body: makeBody() };
+    const makeReq = (overrides: Record<string, unknown> = {}) => ({
+        files: { file: [makeFileEntry()] },
+        body: makeBody(),
+        ...overrides,
+    });
 
-        const result = validateMediaUploadRequest(req as any);
+    it('returns file and body fields for a valid upload payload', () => {
+        const result = validateMediaUploadRequest(makeReq() as any);
 
         expect(result).toMatchObject({
-            file: {
-                path: '/tmp/video.mp4',
-                originalname: 'video.mp4',
-                mimetype: 'video/mp4',
-                size: 111,
-            },
+            file: { path: '/tmp/video.mp4', originalname: 'video.mp4', mimetype: 'video/mp4', size: 111 },
             body: { title: 'My Video', tags: [] },
         });
     });
 
     it('throws Invalid request when file is missing', () => {
-        const req = { body: makeBody() };
-
-        expect(() => validateMediaUploadRequest(req as any)).toThrow('Invalid request');
+        expect(() => validateMediaUploadRequest(makeReq({ files: {} }) as any)).toThrow('Invalid request');
     });
 
     it('throws when mimetype is not a video', () => {
-        const req = {
-            file: makeFile({ mimetype: 'application/pdf', originalname: 'doc.pdf' }),
-            body: makeBody(),
-        };
-
+        const req = makeReq({ files: { file: [makeFileEntry({ mimetype: 'application/pdf' })] } });
         expect(() => validateMediaUploadRequest(req as any)).toThrow('Only video files are allowed');
     });
 
     it('throws when file size is not a number', () => {
-        const req = {
-            file: makeFile({ size: '111' }),
-            body: makeBody(),
-        };
-
+        const req = makeReq({ files: { file: [makeFileEntry({ size: '111' })] } });
         expect(() => validateMediaUploadRequest(req as any)).toThrow('Invalid request');
     });
 
     it('throws when title is empty in body', () => {
-        const req = {
-            file: makeFile(),
-            body: { title: '' },
-        };
-
+        const req = makeReq({ body: { title: '' } });
         expect(() => validateMediaUploadRequest(req as any)).toThrow('Title is required');
     });
 
     it('accepts optional thumbnail', () => {
-        const req = {
-            file: makeFile(),
-            thumbnail: makeFile({ mimetype: 'image/jpeg', originalname: 'thumb.jpg' }),
-            body: makeBody(),
-        };
-
+        const req = makeReq({
+            files: {
+                file: [makeFileEntry()],
+                thumbnail: [makeFileEntry({ mimetype: 'image/jpeg', originalname: 'thumb.jpg' })],
+            },
+        });
         const result = validateMediaUploadRequest(req as any);
-
         expect(result.thumbnail).toMatchObject({ originalname: 'thumb.jpg', mimetype: 'image/jpeg' });
     });
 });
