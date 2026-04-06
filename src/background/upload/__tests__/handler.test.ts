@@ -17,9 +17,9 @@ jest.mock('fs/promises', () => ({
 
 describe('uploadMediaHandler', () => {
     const fixtureFile = '/tmp/test-media.mp4';
+    const fixtureThumbnail = '/tmp/test-thumbnail.jpg';
 
     let storageClient: { uploadObject: jest.Mock };
-    let mediaDal: { updateMedia: jest.Mock };
     let config: UploadConfig;
 
     const makeMedia = (overrides: Partial<Media> = {}): Media => ({
@@ -29,16 +29,13 @@ describe('uploadMediaHandler', () => {
         tags: [],
         size: 1024,
         status: 'pending',
+        thumbnailFocalPoint: { x: 0.5, y: 0.5 },
         ...overrides,
     });
 
     beforeEach(() => {
         storageClient = {
             uploadObject: jest.fn().mockResolvedValue(undefined),
-        };
-
-        mediaDal = {
-            updateMedia: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
         };
 
         config = {
@@ -48,17 +45,15 @@ describe('uploadMediaHandler', () => {
         };
     });
 
-    it('uploads file to storage with correct bucket and key prefix', async () => {
+    it('uploads media file to storage with correct bucket and key prefix', async () => {
         const media = makeMedia({ fileName: 'clip.mp4' });
         const handler = uploadMediaHandler(
             storageClient as unknown as StorageClient,
-            mediaDal as unknown as MediaDal,
             config
         );
 
-        await handler({ media, mediaPath: fixtureFile });
+        await handler({ media, mediaPath: fixtureFile, thumbnailPath: fixtureThumbnail });
 
-        expect(storageClient.uploadObject).toHaveBeenCalledTimes(1);
         expect(storageClient.uploadObject).toHaveBeenCalledWith(
             'test-bucket',
             expect.objectContaining({ key: 'raw/clip.mp4', data: expect.anything() }),
@@ -66,19 +61,46 @@ describe('uploadMediaHandler', () => {
         );
     });
 
+    it('uploads thumbnail to storage under thumbnails key', async () => {
+        const media = makeMedia({ fileName: 'clip.mp4' });
+        const handler = uploadMediaHandler(
+            storageClient as unknown as StorageClient,
+            config
+        );
+
+        await handler({ media, mediaPath: fixtureFile, thumbnailPath: fixtureThumbnail });
+
+        expect(storageClient.uploadObject).toHaveBeenCalledWith(
+            'test-bucket',
+            expect.objectContaining({ key: `raw/thumbnails/${media._id}.jpg`, data: expect.anything() }),
+            undefined,
+        );
+    });
+
+    it('uploads both media and thumbnail (two storage calls total)', async () => {
+        const media = makeMedia({ fileName: 'clip.mp4' });
+        const handler = uploadMediaHandler(
+            storageClient as unknown as StorageClient,
+            config
+        );
+
+        await handler({ media, mediaPath: fixtureFile, thumbnailPath: fixtureThumbnail });
+
+        expect(storageClient.uploadObject).toHaveBeenCalledTimes(2);
+    });
+
     it('uses multipart upload when file size exceeds partSize', async () => {
         const media = makeMedia({ fileName: 'large.mp4', size: 200 * 1024 * 1024 });
         const handler = uploadMediaHandler(
             storageClient as unknown as StorageClient,
-            mediaDal as unknown as MediaDal,
             config
         );
 
-        await handler({ media, mediaPath: fixtureFile });
+        await handler({ media, mediaPath: fixtureFile, thumbnailPath: fixtureThumbnail });
 
         expect(storageClient.uploadObject).toHaveBeenCalledWith(
             expect.any(String),
-            expect.objectContaining({ key: expect.any(String), data: expect.anything() }),
+            expect.objectContaining({ key: 'raw/large.mp4', data: expect.anything() }),
             expect.objectContaining({ multipartUpload: true }),
         );
     });
@@ -87,15 +109,14 @@ describe('uploadMediaHandler', () => {
         const media = makeMedia({ fileName: 'small.mp4', size: 1024 });
         const handler = uploadMediaHandler(
             storageClient as unknown as StorageClient,
-            mediaDal as unknown as MediaDal,
             config
         );
 
-        await handler({ media, mediaPath: fixtureFile });
+        await handler({ media, mediaPath: fixtureFile, thumbnailPath: fixtureThumbnail });
 
         expect(storageClient.uploadObject).toHaveBeenCalledWith(
             expect.any(String),
-            expect.objectContaining({ key: expect.any(String), data: expect.anything() }),
+            expect.objectContaining({ key: 'raw/small.mp4', data: expect.anything() }),
             expect.objectContaining({ multipartUpload: false }),
         );
     });
@@ -106,16 +127,16 @@ describe('uploadMediaHandler', () => {
         const media = makeMedia({ fileName: 'fail.mp4' });
         const handler = uploadMediaHandler(
             storageClient as unknown as StorageClient,
-            mediaDal as unknown as MediaDal,
             config
         );
 
-        await expect(handler({ media, mediaPath: fixtureFile })).rejects.toThrow('storage failure');
+        await expect(handler({ media, mediaPath: fixtureFile, thumbnailPath: fixtureThumbnail })).rejects.toThrow('storage failure');
     });
 });
 
 describe('uploadSuccessHandler', () => {
     const fixtureFile = '/tmp/test-media.mp4';
+    const fixtureThumbnail = '/tmp/test-thumbnail.jpg';
 
     let amqpClient: { publish: jest.Mock };
     let mediaDal: { updateMedia: jest.Mock };
@@ -128,6 +149,7 @@ describe('uploadSuccessHandler', () => {
         tags: [],
         size: 1024,
         status: 'pending',
+        thumbnailFocalPoint: { x: 0.5, y: 0.5 },
         ...overrides,
     });
 
@@ -158,7 +180,7 @@ describe('uploadSuccessHandler', () => {
             config
         );
 
-        await handler({ media, mediaPath: fixtureFile });
+        await handler({ media, mediaPath: fixtureFile, thumbnailPath: fixtureThumbnail });
 
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
         expect(amqpClient.publish).toHaveBeenCalledWith('convert', 'convert.media', {
@@ -172,7 +194,7 @@ describe('uploadSuccessHandler', () => {
         expect(mediaDal.updateMedia).toHaveBeenCalledWith(media._id, { status: 'processing' });
     });
 
-    it('cleans up temp file after publishing', async () => {
+    it('cleans up temp media file after publishing', async () => {
         const media = makeMedia({ fileName: 'video.mp4' });
         const handler = uploadSuccessHandler(
             amqpClient as unknown as AmqpClient,
@@ -180,7 +202,7 @@ describe('uploadSuccessHandler', () => {
             config
         );
 
-        await handler({ media, mediaPath: fixtureFile });
+        await handler({ media, mediaPath: fixtureFile, thumbnailPath: fixtureThumbnail });
 
         const { unlink } = jest.requireMock('fs/promises') as { unlink: jest.Mock };
         expect(unlink).toHaveBeenCalledWith(fixtureFile);

@@ -10,9 +10,11 @@ describe('validateUploadPayload', () => {
             tags: [],
             size: 1024,
             status: 'pending',
+            thumbnailFocalPoint: { x: 0.5, y: 0.5 },
             ...mediaOverrides,
         },
         mediaPath: '/tmp/video.mp4',
+        thumbnailPath: '/tmp/thumb.jpg',
         ...payloadOverrides,
     });
 
@@ -60,7 +62,9 @@ describe('validateUploadPayload', () => {
         }
     });
 
-    it('returns true with optional thumbnailPath', () => {
-        expect(validateUploadPayload(makeValidPayload({}, { thumbnailPath: '/tmp/thumb.jpg' }))).toBe(true);
+    it('returns false when thumbnailPath is missing', () => {
+        const payload = makeValidPayload();
+        delete (payload as Record<string, unknown>).thumbnailPath;
+        expect(validateUploadPayload(payload)).toBe(false);
     });
 });

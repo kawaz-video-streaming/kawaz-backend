@@ -25,6 +25,7 @@ describe('POST /media/upload route', () => {
     const AUTH_CONFIG = { jwtSecret: 'media-test-secret', adminPromotionSecret: 'admin-secret' };
     const fixtureDir = path.join(process.cwd(), 'src', 'api', 'media', '__tests__', 'fixtures');
     const fixtureFile = path.join(fixtureDir, 'sample-upload.mp4');
+    const fixtureThumbnailFile = path.join(fixtureDir, 'sample-thumbnail.jpg');
     const tmpDir = path.join(process.cwd(), 'tmp');
 
     let tmpDirExistedBeforeAll = false;
@@ -44,6 +45,7 @@ describe('POST /media/upload route', () => {
 
         mkdirSync(fixtureDir, { recursive: true });
         writeFileSync(fixtureFile, 'test upload content');
+        writeFileSync(fixtureThumbnailFile, 'fake jpg content');
         mkdirSync(tmpDir, { recursive: true });
     });
 
@@ -103,6 +105,9 @@ describe('POST /media/upload route', () => {
         if (existsSync(fixtureFile)) {
             rmSync(fixtureFile, { force: true });
         }
+        if (existsSync(fixtureThumbnailFile)) {
+            rmSync(fixtureThumbnailFile, { force: true });
+        }
 
         if (!fixtureDirExistedBeforeAll && existsSync(fixtureDir) && readdirSync(fixtureDir).length === 0) {
             rmdirSync(fixtureDir);
@@ -118,13 +123,14 @@ describe('POST /media/upload route', () => {
             .post('/media/upload')
             .set('Cookie', `kawaz-token=${adminToken}`)
             .field('title', 'My Upload')
-            .attach('file', fixtureFile);
+            .attach('file', fixtureFile)
+            .attach('thumbnail', fixtureThumbnailFile);
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({ message: 'Media Started Uploading' });
 
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
-        expect(mediaDal.createMedia).toHaveBeenCalledWith('My Upload', [], 'sample-upload.mp4', expect.any(Number), undefined);
+        expect(mediaDal.createMedia).toHaveBeenCalledWith('My Upload', [], 'sample-upload.mp4', expect.any(Number), { x: 0.5, y: 0.5 }, undefined);
 
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
         expect(amqpClient.publish).toHaveBeenCalledWith(
@@ -137,6 +143,7 @@ describe('POST /media/upload route', () => {
                     size: 19,
                 }),
                 mediaPath: expect.stringContaining('tmp'),
+                thumbnailPath: expect.stringContaining('tmp'),
             }),
         );
     });
@@ -160,7 +167,8 @@ describe('POST /media/upload route', () => {
             .post('/media/upload')
             .set('Cookie', `kawaz-token=${adminToken}`)
             .field('title', 'My Upload')
-            .attach('file', fixtureFile);
+            .attach('file', fixtureFile)
+            .attach('thumbnail', fixtureThumbnailFile);
 
         expect(response.status).toBe(500);
         expect(response.body.message).toContain('db failure');

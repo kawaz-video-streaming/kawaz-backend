@@ -1,6 +1,6 @@
 import { BadRequestError, Request, RequestFile } from "@ido_kawaz/server-framework";
 import z from "zod";
-import { MEDIA_TAGS, MediaTag } from "../../dal/media/model";
+import { Coordinates, MEDIA_TAGS, MediaTag } from "../../dal/media/model";
 import { Types } from "@ido_kawaz/mongo-client";
 
 export interface MediaConfig {
@@ -13,6 +13,7 @@ export interface MediaUpdateRequestBody {
     title: string;
     description?: string;
     tags: MediaTag[];
+    thumbnailFocalPoint: Coordinates;
 }
 
 export interface MediaUpdateRequest {
@@ -22,7 +23,11 @@ export interface MediaUpdateRequest {
 const mediaUpdateBodySchema = z.object({
     title: z.string().min(1, { message: "Title is required" }),
     description: z.string().optional(),
-    tags: z.array(z.enum(MEDIA_TAGS)).default([])
+    tags: z.array(z.enum(MEDIA_TAGS)).default([]),
+    thumbnailFocalPoint: z.object({
+        x: z.coerce.number(),
+        y: z.coerce.number()
+    }).default({ x: 0.5, y: 0.5 })
 });
 
 const mediaUpdateRequestSchema = z.object({
@@ -45,7 +50,7 @@ export type UploadedFile = Pick<RequestFile, 'path' | 'originalname' | 'mimetype
 
 export interface ValidatedMediaUploadRequest extends MediaUpdateRequest {
     file: UploadedFile;
-    thumbnail?: UploadedFile;
+    thumbnail: UploadedFile;
 }
 
 const uploadedFileSchema = (mimePrefix: string, errorMessage: string) => z.object({
@@ -61,13 +66,13 @@ const uploadedFileSchema = (mimePrefix: string, errorMessage: string) => z.objec
 export const mediaUploadRequestSchema = z.object({
     files: z.object({
         file: z.array(uploadedFileSchema('video/', 'Only video files are allowed')).length(1),
-        thumbnail: z.array(uploadedFileSchema('image/', 'Only image files are allowed')).length(1).optional(),
+        thumbnail: z.array(uploadedFileSchema('image/', 'Only image files are allowed')).length(1),
     }),
     body: mediaUpdateBodySchema,
 }).transform(({ files, body }) => ({
     body,
     file: files.file[0],
-    thumbnail: files.thumbnail?.[0],
+    thumbnail: files.thumbnail[0],
 })) satisfies z.ZodType<ValidatedMediaUploadRequest>;
 
 interface mediaUpdateRequestWithId extends RequestWithIdParam, MediaUpdateRequest { }

@@ -11,7 +11,7 @@ import { Upload, validateUploadPayload } from "./types";
 export const createUploadConsumer = (storageClient: StorageClient, amqpClient: AmqpClient, mediaDal: MediaDal, config: UploadConfig) =>
     new Consumer<Upload, UploadConsumerBinding>('upload', createUploadConsumerBinding())
         .on('validateMessage', validateUploadPayload)
-        .on('handleMessage', uploadMediaHandler(storageClient, mediaDal, config))
+        .on('handleMessage', uploadMediaHandler(storageClient, config))
         .on('handleSuccess', uploadSuccessHandler(amqpClient, mediaDal, config))
         .on('handleFatalError', async (_, payload) => {
             if (validateUploadPayload(payload)) {

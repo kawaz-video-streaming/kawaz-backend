@@ -14,8 +14,16 @@ describe('validateMediaUploadRequest', () => {
         ...overrides,
     });
 
+    const makeThumbnailEntry = (overrides: Record<string, unknown> = {}) => ({
+        path: '/tmp/thumb.jpg',
+        originalname: 'thumb.jpg',
+        mimetype: 'image/jpeg',
+        size: 8,
+        ...overrides,
+    });
+
     const makeReq = (overrides: Record<string, unknown> = {}) => ({
-        files: { file: [makeFileEntry()] },
+        files: { file: [makeFileEntry()], thumbnail: [makeThumbnailEntry()] },
         body: makeBody(),
         ...overrides,
     });
@@ -34,12 +42,12 @@ describe('validateMediaUploadRequest', () => {
     });
 
     it('throws when mimetype is not a video', () => {
-        const req = makeReq({ files: { file: [makeFileEntry({ mimetype: 'application/pdf' })] } });
+        const req = makeReq({ files: { file: [makeFileEntry({ mimetype: 'application/pdf' })], thumbnail: [makeThumbnailEntry()] } });
         expect(() => validateMediaUploadRequest(req as any)).toThrow('Only video files are allowed');
     });
 
     it('throws when file size is not a number', () => {
-        const req = makeReq({ files: { file: [makeFileEntry({ size: '111' })] } });
+        const req = makeReq({ files: { file: [makeFileEntry({ size: '111' })], thumbnail: [makeThumbnailEntry()] } });
         expect(() => validateMediaUploadRequest(req as any)).toThrow('Invalid request');
     });
 
@@ -48,14 +56,18 @@ describe('validateMediaUploadRequest', () => {
         expect(() => validateMediaUploadRequest(req as any)).toThrow('Title is required');
     });
 
-    it('accepts optional thumbnail', () => {
-        const req = makeReq({
-            files: {
-                file: [makeFileEntry()],
-                thumbnail: [makeFileEntry({ mimetype: 'image/jpeg', originalname: 'thumb.jpg' })],
-            },
-        });
-        const result = validateMediaUploadRequest(req as any);
+    it('returns thumbnail in result', () => {
+        const result = validateMediaUploadRequest(makeReq() as any);
         expect(result.thumbnail).toMatchObject({ originalname: 'thumb.jpg', mimetype: 'image/jpeg' });
+    });
+
+    it('throws when thumbnail is missing', () => {
+        const req = makeReq({ files: { file: [makeFileEntry()] } });
+        expect(() => validateMediaUploadRequest(req as any)).toThrow('Invalid request');
+    });
+
+    it('throws when thumbnail mimetype is not an image', () => {
+        const req = makeReq({ files: { file: [makeFileEntry()], thumbnail: [makeThumbnailEntry({ mimetype: 'video/mp4' })] } });
+        expect(() => validateMediaUploadRequest(req as any)).toThrow('Only image files are allowed');
     });
 });

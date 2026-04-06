@@ -1,12 +1,12 @@
 import { Dal, DeleteResult, Types, UpdateWriteOpResult } from "@ido_kawaz/mongo-client";
-import { COMPLETED, Media, MediaModel, MediaTag, PENDING } from "./model";
+import { COMPLETED, Coordinates, Media, MediaModel, MediaTag, PENDING } from "./model";
 
 export class MediaDal extends Dal<Media> {
   constructor(mediaModel: MediaModel) {
     super(mediaModel);
   }
 
-  createMedia = async (title: string, tags: MediaTag[], fileName: string, size: number, description?: string): Promise<Media> => {
+  createMedia = async (title: string, tags: MediaTag[], fileName: string, size: number, thumbnailFocalPoint: Coordinates, description?: string): Promise<Media> => {
     const media: Media = {
       _id: new Types.ObjectId().toString(),
       fileName,
@@ -15,6 +15,7 @@ export class MediaDal extends Dal<Media> {
       tags,
       size,
       status: PENDING,
+      thumbnailFocalPoint
     };
     await this.model.insertOne(media);
     return media;

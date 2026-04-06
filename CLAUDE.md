@@ -42,20 +42,23 @@ This is a **media upload microservice** with two main processing paths:
 ### Request Flow
 
 ```
-POST /media/upload
-  → Multer (temp file saved to ./tmp)
-  → Validate request (Zod)
-  → Save media record to MongoDB (status: "pending")
-  → Publish to AMQP exchange "upload", topic "upload.media" (includes temp file path)
+POST /media/upload  (multipart: fields file + thumbnail, both required)
+  → Multer (temp files saved to ./tmp)
+  → Validate request (Zod) — requires video file + image thumbnail
+  → Save media record to MongoDB (status: "pending", thumbnailFocalPoint stored)
+  → Publish to AMQP exchange "upload", topic "upload.media"
+      (includes mediaPath + thumbnailPath)
   → Return 200 { message: "Media Started Uploading" }
 
 AMQP consumer (exchange: "upload", topic: "upload.media")
   → Validate payload (Zod)
-  → uploadMediaHandler: Upload file to storage (S3) from temp path
+  → uploadMediaHandler(storageClient, config): Upload media + thumbnail to S3
+      → media → <uploadKeyPrefix>/<fileName>  (multipart if size > partSize)
+      → thumbnail → <uploadKeyPrefix>/thumbnails/<mediaId>.jpg
       → On StorageError: throw UploadError (retriable, max 3 retries)
-  → uploadSuccessHandler (handleSuccess):
+  → uploadSuccessHandler(amqpClient, mediaDal, config):
       → Always: publish to "convert" exchange, update media status → "processing"
-      → Delete temp file
+      → Delete temp media file
   → On fatal error: Delete temp file
 ```
 
@@ -84,16 +87,18 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 ```ts
 interface Media {
   _id: string;
-  fileName: string;         // original filename
-  title: string;            // user-provided display title
+  fileName: string;              // original filename
+  title: string;                 // user-provided display title
   description?: string;
-  tags: MediaTag[];         // e.g. "Action", "Comedy", etc.
-  size: number;             // file size in bytes
-  status: MediaStatus;      // "pending" | "processing" | "completed" | "failed"
-  thumbnailUrl?: string;    // storage key of the uploaded thumbnail
-  metadata?: MediaMetadata; // populated by progress consumer on completion
+  tags: MediaTag[];              // e.g. "Action", "Comedy", etc.
+  size: number;                  // file size in bytes
+  status: MediaStatus;           // "pending" | "processing" | "completed" | "failed"
+  thumbnailFocalPoint: Coordinates; // { x, y } crop anchor, defaults to { x: 0.5, y: 0.5 }
+  metadata?: MediaMetadata;      // populated by progress consumer on completion
 }
 ```
+
+Thumbnail is uploaded to storage at key `<uploadKeyPrefix>/thumbnails/<mediaId>.jpg` by the upload consumer. The `thumbnailFocalPoint` is stored in the DB and used downstream for cropping.
 
 `MediaMetadata` contains name, durationInMs, playUrl, chaptersUrl, chapters, videoStreams, audioStreams, and subtitleStreams — populated when the progress consumer receives a completed event from the media processor.
 

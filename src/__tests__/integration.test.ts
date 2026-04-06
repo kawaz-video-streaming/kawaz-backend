@@ -53,11 +53,14 @@ describe('Media upload integration', () => {
 
     let fixtureDir: string;
     let fixtureFile: string;
+    let fixtureThumbnailFile: string;
 
     beforeAll(() => {
         fixtureDir = actualFs.mkdtempSync(path.join(os.tmpdir(), 'integration-test-'));
         fixtureFile = path.join(fixtureDir, 'sample.mp4');
+        fixtureThumbnailFile = path.join(fixtureDir, 'thumbnail.jpg');
         actualFs.writeFileSync(fixtureFile, 'test video content');
+        actualFs.writeFileSync(fixtureThumbnailFile, 'fake jpg content');
     });
 
     afterAll(() => {
@@ -130,14 +133,15 @@ describe('Media upload integration', () => {
             .post('/media/upload')
             .set('Cookie', `kawaz-token=${adminToken}`)
             .field('title', 'My Sample')
-            .attach('file', fixtureFile);
+            .attach('file', fixtureFile)
+            .attach('thumbnail', fixtureThumbnailFile);
 
         expect(uploadResponse.status).toBe(200);
         expect(uploadResponse.body).toEqual({ message: 'Media Started Uploading' });
 
         // Verify media was persisted
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
-        expect(mediaDal.createMedia).toHaveBeenCalledWith('My Sample', [], 'sample.mp4', expect.any(Number), undefined);
+        expect(mediaDal.createMedia).toHaveBeenCalledWith('My Sample', [], 'sample.mp4', expect.any(Number), { x: 0.5, y: 0.5 }, undefined);
 
         // Verify upload event was published to AMQP
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
@@ -151,6 +155,7 @@ describe('Media upload integration', () => {
                 status: 'pending',
             }),
             mediaPath: expect.any(String),
+            thumbnailPath: expect.any(String),
         });
 
         // Step 2: Simulate background consumer processing the upload event
@@ -163,10 +168,10 @@ describe('Media upload integration', () => {
 
         mediaDal.updateMedia.mockClear();
         amqpClient.publish.mockClear();
+        storageClient.uploadObject.mockClear();
 
         const uploadHandler = uploadMediaHandler(
             storageClient as unknown as StorageClient,
-            mediaDal as unknown as MediaDal,
             uploadConfig
         );
         const successHandler = uploadSuccessHandler(
@@ -175,15 +180,20 @@ describe('Media upload integration', () => {
             uploadConfig
         );
 
-        await uploadHandler({ media: uploadedMedia, mediaPath: uploadPayload.mediaPath });
-        await successHandler({ media: uploadedMedia, mediaPath: uploadPayload.mediaPath });
+        await uploadHandler({ media: uploadedMedia, mediaPath: uploadPayload.mediaPath, thumbnailPath: uploadPayload.thumbnailPath });
+        await successHandler({ media: uploadedMedia, mediaPath: uploadPayload.mediaPath, thumbnailPath: uploadPayload.thumbnailPath });
 
-        // Verify file was uploaded to storage
-        expect(storageClient.uploadObject).toHaveBeenCalledTimes(1);
+        // Verify both media and thumbnail were uploaded to storage
+        expect(storageClient.uploadObject).toHaveBeenCalledTimes(2);
         expect(storageClient.uploadObject).toHaveBeenCalledWith(
             'media-bucket',
             expect.objectContaining({ key: 'raw/sample.mp4', data: expect.anything() }),
             expect.objectContaining({ ensureBucket: true, multipartUpload: false }),
+        );
+        expect(storageClient.uploadObject).toHaveBeenCalledWith(
+            'media-bucket',
+            expect.objectContaining({ key: `raw/thumbnails/${uploadedMedia._id}.jpg`, data: expect.anything() }),
+            undefined,
         );
 
         // Verify convert event was published for video
@@ -208,7 +218,8 @@ describe('Media upload integration', () => {
             .post('/media/upload')
             .set('Cookie', `kawaz-token=${adminToken}`)
             .field('title', 'My Sample')
-            .attach('file', fixtureFile);
+            .attach('file', fixtureFile)
+            .attach('thumbnail', fixtureThumbnailFile);
 
         expect(uploadResponse.status).toBe(200);
 
@@ -230,7 +241,7 @@ describe('Media upload integration', () => {
             uploadConfig
         );
 
-        await successHandler({ media: uploadedMedia, mediaPath: uploadPayload.mediaPath });
+        await successHandler({ media: uploadedMedia, mediaPath: uploadPayload.mediaPath, thumbnailPath: uploadPayload.thumbnailPath });
 
         expect(amqpClient.publish).toHaveBeenCalledWith('convert', 'convert.media', expect.objectContaining({
             mediaId: uploadedMedia._id,
@@ -246,7 +257,8 @@ describe('Media upload integration', () => {
             .post('/media/upload')
             .set('Cookie', `kawaz-token=${adminToken}`)
             .field('title', 'My Sample')
-            .attach('file', fixtureFile);
+            .attach('file', fixtureFile)
+            .attach('thumbnail', fixtureThumbnailFile);
 
         expect(uploadResponse.status).toBe(500);
         expect(uploadResponse.body.message).toContain('database connection lost');
@@ -294,7 +306,8 @@ describe('Media upload integration', () => {
             .post('/media/upload')
             .set('Cookie', `kawaz-token=${loginToken}`)
             .field('title', 'My Sample')
-            .attach('file', fixtureFile);
+            .attach('file', fixtureFile)
+            .attach('thumbnail', fixtureThumbnailFile);
 
         expect(uploadRes.status).toBe(200);
         expect(uploadRes.body).toEqual({ message: 'Media Started Uploading' });

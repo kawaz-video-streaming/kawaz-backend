@@ -13,12 +13,11 @@ export const createMediaLogic = (
   amqpClient: AmqpClient,
   storageClient: StorageClient,
 ) => ({
-  uploadMedia: async (body: MediaUpdateRequestBody, mediaFile: UploadedFile, thumbnail?: UploadedFile) => {
+  uploadMedia: async (body: MediaUpdateRequestBody, mediaFile: UploadedFile, thumbnail: UploadedFile) => {
     const { originalname, size, path } = mediaFile;
-    const { title, description, tags } = body;
-    const thumbnailPath = thumbnail?.path;
-    const media = await mediaDal.createMedia(title, tags, originalname, size, description);
-    amqpClient.publish<Upload>(UPLOAD_CONSUMER_EXCHANGE, UPLOAD_CONSUMER_TOPIC, { media, mediaPath: path, ...(thumbnailPath && { thumbnailPath }) });
+    const { title, description, tags, thumbnailFocalPoint } = body;
+    const media = await mediaDal.createMedia(title, tags, originalname, size, thumbnailFocalPoint, description);
+    amqpClient.publish<Upload>(UPLOAD_CONSUMER_EXCHANGE, UPLOAD_CONSUMER_TOPIC, { media, mediaPath: path, thumbnailPath: thumbnail.path });
   },
   deleteMedia: async (mediaId: string) => {
     await mediaDal.deleteMedia(mediaId);

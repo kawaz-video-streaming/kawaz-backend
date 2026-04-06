@@ -119,6 +119,11 @@ const audioStreamSchema = new Schema<AudioStream>(languageStreamSchemaObject, { 
 
 const subtitleStreamSchema = new Schema<SubtitleStream>(languageStreamSchemaObject, { _id: false });
 
+const CoordinatesSchema = new Schema<Coordinates>({
+  x: { type: Number, required: true },
+  y: { type: Number, required: true }
+}, { _id: false });
+
 const mediaMetadataSchema = new Schema<MediaMetadata>({
   name: { type: String, required: true },
   durationInMs: { type: Number, required: true },
@@ -130,6 +135,11 @@ const mediaMetadataSchema = new Schema<MediaMetadata>({
   subtitleStreams: { type: [subtitleStreamSchema], required: true }
 }, { _id: false });
 
+export interface Coordinates {
+  x: number;
+  y: number;
+}
+
 export interface Media {
   _id: string;
   fileName: string;
@@ -138,7 +148,7 @@ export interface Media {
   tags: MediaTag[];
   size: number;
   status: MediaStatus;
-  thumbnailUrl?: string;
+  thumbnailFocalPoint: Coordinates;
   metadata?: MediaMetadata;
 }
 
@@ -150,7 +160,10 @@ export const mediaZodSchema = z.object({
   tags: z.array(z.enum(MEDIA_TAGS)).default([]),
   size: z.coerce.number(),
   status: z.enum(mediaStatuses).default(PENDING),
-  thumbnailUrl: z.string().optional(),
+  thumbnailFocalPoint: z.object({
+    x: z.number(),
+    y: z.number()
+  }),
   metadata: mediaMetadataZodSchema.optional()
 }) satisfies z.ZodType<Media>;
 
@@ -163,6 +176,7 @@ const mediaSchema = new Schema<Media>(
     tags: { type: [String], enum: MEDIA_TAGS, default: [] },
     size: { type: Number, required: true },
     status: { type: String, enum: mediaStatuses, default: PENDING },
+    thumbnailFocalPoint: { type: CoordinatesSchema, required: true },
     metadata: { type: mediaMetadataSchema, required: false },
   },
   { versionKey: false },
