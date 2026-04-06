@@ -65,6 +65,15 @@ export const createMediaHandlers = (mediaConfig: MediaConfig, mediaDal: MediaDal
                     res.setHeader("Content-Type", "image/jpeg");
                     res.redirect(thumbnailPresignedUrl);
                 }),
+        getTiles:
+            requestHandlerDecorator(
+                'get media tiles',
+                async (req: Request, res: Response) => {
+                    const videoId = req.params[0];
+                    const tilesStream = await logic.getTiles(videoId);
+                    res.setHeader("Content-Type", "image/jpeg");
+                    tilesStream.pipe(res);
+                }),
         getManifest:
             requestHandlerDecorator(
                 'get video manifest',

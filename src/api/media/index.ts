@@ -288,6 +288,40 @@ export const createMediaRouter = (mediaConfig: MediaConfig, mediaDal: MediaDal, 
 
   /**
    * @openapi
+   * /media/stream/{id}/thumbnails.jpg:
+   *   get:
+   *     summary: Get video tiles
+   *     description: Redirects to the URL for the video tiles (.jpg files only)
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Video ID
+   *       - in: path
+   *         name: filename
+   *         required: true
+   *         schema:
+   *           type: string
+   *           pattern: '^.+\.jpg$'
+   *         description: Tile filename (must end in .jpg)
+   *     responses:
+   *       302:
+   *         description: Redirects to the tile URL
+   *       401:
+   *         description: Unauthorized
+   *       500:
+   *         description: Internal server error - tiles not found or VOD service error
+   */
+  router.get(/^\/stream\/([^/]+)\/thumbnails\.jpg$/, mediaHandlers.getTiles);
+
+  /**
+   * @openapi
    * /media/stream/{id}/{filename}.vtt:
    *   get:
    *     summary: Get VTT subtitle file

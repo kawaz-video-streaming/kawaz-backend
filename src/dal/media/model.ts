@@ -59,6 +59,7 @@ export interface MediaMetadata {
   durationInMs: number;
   playUrl: string;
   chaptersUrl?: string;
+  thumbnailsUrl?: string;
   chapters?: VideoChapter[];
   videoStreams: VideoStream[];
   audioStreams: AudioStream[];
@@ -91,6 +92,7 @@ export const mediaMetadataZodSchema = z.object({
   durationInMs: z.coerce.number(),
   playUrl: z.string(),
   chaptersUrl: z.string().optional(),
+  thumbnailsUrl: z.string().optional(),
   chapters: z.array(videoChapterZodSchema).optional(),
   videoStreams: z.array(videoStreamZodSchema),
   audioStreams: z.array(audioStreamZodSchema),
@@ -129,6 +131,7 @@ const mediaMetadataSchema = new Schema<MediaMetadata>({
   durationInMs: { type: Number, required: true },
   playUrl: { type: String, required: true },
   chaptersUrl: { type: String, required: false },
+  thumbnailsUrl: { type: String, required: false },
   chapters: { type: [videoChapterSchema], required: false },
   videoStreams: { type: [videoStreamSchema], required: true },
   audioStreams: { type: [audioStreamSchema], required: true },

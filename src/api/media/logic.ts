@@ -21,11 +21,13 @@ export const createMediaLogic = (
   },
   deleteMedia: async (mediaId: string) => {
     await mediaDal.deleteMedia(mediaId);
-    await storageClient.clearPrefix(vodStorageBucket, `${mediaId}`);
+    await storageClient.clearPrefix(vodStorageBucket, mediaId);
+    await storageClient.deleteObject(uploadStorageBucket, `${uploadKeyPrefix}/thumbnails/${mediaId}.jpg`);
   },
   updateMedia: async (mediaId: string, update: MediaUpdateRequestBody) => mediaDal.updateMedia(mediaId, update),
   getAllMedia: () => mediaDal.getAllMedia(),
   getMedia: (mediaId: string) => mediaDal.getMedia(mediaId),
+  getTiles: (mediaId: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/thumbnails.jpg`),
   getThumbnail: (mediaId: string) => storageClient.getPresignedUrl(uploadStorageBucket, `${uploadKeyPrefix}/thumbnails/${mediaId}.jpg`, PRESIGNED_URL_EXPIRY_SECONDS),
   getManifest: (mediaId: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/output.mpd`),
   getSegmentUrl: (mediaId: string, filename: string) => storageClient.getPresignedUrl(vodStorageBucket, `${mediaId}/${filename}`, PRESIGNED_URL_EXPIRY_SECONDS),
