@@ -5,6 +5,7 @@
             "node",
             "jest"
         ],
+        "isolatedModules": true,
         "noEmit": true,
         "rootDir": "."
     },

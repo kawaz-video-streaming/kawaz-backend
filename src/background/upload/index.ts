@@ -16,7 +16,7 @@ export const createUploadConsumer = (storageClient: StorageClient, amqpClient: A
         .on('handleFatalError', async (_, payload) => {
             if (validateUploadPayload(payload)) {
                 const mediaId = payload.media._id;
-                await mediaDal.updateMediaStatus(mediaId, "failed");
-                await cleanupPath(payload.path);
+                await mediaDal.updateMedia(mediaId, { status: "failed" });
+                await cleanupPath(payload.mediaPath);
             }
         });

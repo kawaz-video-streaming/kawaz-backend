@@ -25,6 +25,7 @@ describe('POST /media/upload route', () => {
     const AUTH_CONFIG = { jwtSecret: 'media-test-secret', adminPromotionSecret: 'admin-secret' };
     const fixtureDir = path.join(process.cwd(), 'src', 'api', 'media', '__tests__', 'fixtures');
     const fixtureFile = path.join(fixtureDir, 'sample-upload.mp4');
+    const fixtureThumbnailFile = path.join(fixtureDir, 'sample-thumbnail.jpg');
     const tmpDir = path.join(process.cwd(), 'tmp');
 
     let tmpDirExistedBeforeAll = false;
@@ -35,6 +36,7 @@ describe('POST /media/upload route', () => {
     let mediaDal: { createMedia: jest.Mock };
     let userDal: { findUser: jest.Mock };
     let amqpClient: { publish: jest.Mock };
+    let storageClient: jest.Mock;
     let adminToken: string;
 
     beforeAll(() => {
@@ -43,6 +45,7 @@ describe('POST /media/upload route', () => {
 
         mkdirSync(fixtureDir, { recursive: true });
         writeFileSync(fixtureFile, 'test upload content');
+        writeFileSync(fixtureThumbnailFile, 'fake jpg content');
         mkdirSync(tmpDir, { recursive: true });
     });
 
@@ -50,9 +53,11 @@ describe('POST /media/upload route', () => {
         mediaDal = {
             createMedia: jest.fn().mockResolvedValue({
                 _id: 'media-1',
-                name: 'sample-upload.mp4',
-                type: 'video/mp4',
+                fileName: 'sample-upload.mp4',
+                title: 'My Upload',
+                tags: [],
                 size: 19,
+                status: 'pending',
             }),
         };
 
@@ -64,6 +69,8 @@ describe('POST /media/upload route', () => {
             publish: jest.fn(),
         };
 
+        storageClient = jest.fn();
+
         tmpEntriesBeforeEach = new Set(existsSync(tmpDir) ? readdirSync(tmpDir) : []);
 
         adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
@@ -71,7 +78,7 @@ describe('POST /media/upload route', () => {
         app = express();
         app.use(parseCookies);
         app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use('/media', createMediaRouter(mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient, {} as any));
+        app.use('/media', createMediaRouter({ vodStorageBucket: 'vod-bucket', uploadStorageBucket: 'upload-bucket', uploadKeyPrefix: 'raw' }, mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient, storageClient as any));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -98,6 +105,9 @@ describe('POST /media/upload route', () => {
         if (existsSync(fixtureFile)) {
             rmSync(fixtureFile, { force: true });
         }
+        if (existsSync(fixtureThumbnailFile)) {
+            rmSync(fixtureThumbnailFile, { force: true });
+        }
 
         if (!fixtureDirExistedBeforeAll && existsSync(fixtureDir) && readdirSync(fixtureDir).length === 0) {
             rmdirSync(fixtureDir);
@@ -112,13 +122,15 @@ describe('POST /media/upload route', () => {
         const response = await request(app)
             .post('/media/upload')
             .set('Cookie', `kawaz-token=${adminToken}`)
-            .attach('file', fixtureFile);
+            .field('title', 'My Upload')
+            .attach('file', fixtureFile)
+            .attach('thumbnail', fixtureThumbnailFile);
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({ message: 'Media Started Uploading' });
 
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
-        expect(mediaDal.createMedia).toHaveBeenCalledWith('sample-upload.mp4', 'video/mp4', 19);
+        expect(mediaDal.createMedia).toHaveBeenCalledWith('My Upload', [], 'sample-upload.mp4', expect.any(Number), { x: 0.5, y: 0.5 }, undefined);
 
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
         expect(amqpClient.publish).toHaveBeenCalledWith(
@@ -127,11 +139,11 @@ describe('POST /media/upload route', () => {
             expect.objectContaining({
                 media: expect.objectContaining({
                     _id: 'media-1',
-                    name: 'sample-upload.mp4',
-                    type: 'video/mp4',
+                    fileName: 'sample-upload.mp4',
                     size: 19,
                 }),
-                path: expect.stringContaining('tmp'),
+                mediaPath: expect.stringContaining('tmp'),
+                thumbnailPath: expect.stringContaining('tmp'),
             }),
         );
     });
@@ -154,7 +166,9 @@ describe('POST /media/upload route', () => {
         const response = await request(app)
             .post('/media/upload')
             .set('Cookie', `kawaz-token=${adminToken}`)
-            .attach('file', fixtureFile);
+            .field('title', 'My Upload')
+            .attach('file', fixtureFile)
+            .attach('thumbnail', fixtureThumbnailFile);
 
         expect(response.status).toBe(500);
         expect(response.body.message).toContain('db failure');

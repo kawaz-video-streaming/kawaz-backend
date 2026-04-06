@@ -40,6 +40,6 @@
     "supertest": "^7.1.4",
     "ts-jest": "^29.0.0",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.2.2"
+    "typescript": "^6.0.0"
   }
 }

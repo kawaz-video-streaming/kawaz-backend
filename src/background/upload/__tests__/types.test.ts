@@ -2,76 +2,69 @@ import { Types } from '@ido_kawaz/mongo-client';
 import { validateUploadPayload } from '../types';
 
 describe('validateUploadPayload', () => {
-    const makeValidPayload = (overrides: Record<string, unknown> = {}) => ({
+    const makeValidPayload = (mediaOverrides: Record<string, unknown> = {}, payloadOverrides: Record<string, unknown> = {}) => ({
         media: {
             _id: new Types.ObjectId().toHexString(),
-            name: 'video.mp4',
-            type: 'video/mp4',
+            fileName: 'video.mp4',
+            title: 'My Video',
+            tags: [],
             size: 1024,
             status: 'pending',
-            ...((overrides.media as Record<string, unknown>) ?? {}),
+            thumbnailFocalPoint: { x: 0.5, y: 0.5 },
+            ...mediaOverrides,
         },
-        path: '/tmp/video.mp4',
-        ...(overrides.path !== undefined ? { path: overrides.path } : {}),
+        mediaPath: '/tmp/video.mp4',
+        thumbnailPath: '/tmp/thumb.jpg',
+        ...payloadOverrides,
     });
 
     it('returns true for valid upload payload', () => {
-        const payload = makeValidPayload();
-
-        expect(validateUploadPayload(payload)).toBe(true);
+        expect(validateUploadPayload(makeValidPayload())).toBe(true);
     });
 
     it('returns true when size is provided as string (coerced to number)', () => {
-        const payload = makeValidPayload({ media: { size: '2048' } });
-
-        expect(validateUploadPayload(payload)).toBe(true);
+        expect(validateUploadPayload(makeValidPayload({ size: '2048' }))).toBe(true);
     });
 
     it('returns false when media._id is not a valid ObjectId', () => {
-        const payload = makeValidPayload({ media: { _id: 'invalid-id' } });
+        expect(validateUploadPayload(makeValidPayload({ _id: 'invalid-id' }))).toBe(false);
+    });
 
+    it('returns false when media.fileName is missing', () => {
+        const payload = makeValidPayload();
+        delete (payload.media as Record<string, unknown>).fileName;
         expect(validateUploadPayload(payload)).toBe(false);
     });
 
-    it('returns false when media.name is missing', () => {
+    it('returns false when media.title is missing', () => {
         const payload = makeValidPayload();
-        delete (payload.media as Record<string, unknown>).name;
-
-        expect(validateUploadPayload(payload)).toBe(false);
-    });
-
-    it('returns false when media.type is missing', () => {
-        const payload = makeValidPayload();
-        delete (payload.media as Record<string, unknown>).type;
-
+        delete (payload.media as Record<string, unknown>).title;
         expect(validateUploadPayload(payload)).toBe(false);
     });
 
     it('returns false when media.status is not a valid enum value', () => {
-        const payload = makeValidPayload({ media: { status: 'invalid-status' } });
-
-        expect(validateUploadPayload(payload)).toBe(false);
+        expect(validateUploadPayload(makeValidPayload({ status: 'invalid-status' }))).toBe(false);
     });
 
-    it('returns false when path is missing', () => {
+    it('returns false when mediaPath is missing', () => {
         const payload = makeValidPayload();
-        delete (payload as Record<string, unknown>).path;
-
+        delete (payload as Record<string, unknown>).mediaPath;
         expect(validateUploadPayload(payload)).toBe(false);
     });
 
     it('returns false when media object is missing entirely', () => {
-        const payload = { path: '/tmp/video.mp4' };
-
-        expect(validateUploadPayload(payload)).toBe(false);
+        expect(validateUploadPayload({ mediaPath: '/tmp/video.mp4' })).toBe(false);
     });
 
     it('returns true for all valid media status values', () => {
-        const statuses = ['pending', 'processing', 'completed', 'failed'] as const;
-
-        for (const status of statuses) {
-            const payload = makeValidPayload({ media: { status } });
-            expect(validateUploadPayload(payload)).toBe(true);
+        for (const status of ['pending', 'processing', 'completed', 'failed'] as const) {
+            expect(validateUploadPayload(makeValidPayload({ status }))).toBe(true);
         }
+    });
+
+    it('returns false when thumbnailPath is missing', () => {
+        const payload = makeValidPayload();
+        delete (payload as Record<string, unknown>).thumbnailPath;
+        expect(validateUploadPayload(payload)).toBe(false);
     });
 });

@@ -1,37 +1,28 @@
 import { AmqpClient } from "@ido_kawaz/amqp-client";
-import { StorageClient, StorageError, StorageObject } from "@ido_kawaz/storage-client";
-import { createReadStream } from "fs";
+import { StorageClient } from "@ido_kawaz/storage-client";
 import { MediaDal } from "../../dal/media";
 import { cleanupPath } from "../../utils/files";
 import { UploadConfig } from "./config";
-import { UploadError } from "./errors";
 import { ConvertMessage, Upload } from "./types";
+import { createUploadFile } from "./utils";
 
-export const uploadMediaHandler = (storageClient: StorageClient, { uploadBucket, uploadKeyPrefix, partSize }: UploadConfig) =>
+export const uploadMediaHandler = (storageClient: StorageClient, { uploadStorageBucket, uploadKeyPrefix, partSize }: UploadConfig) =>
     async (payload: Upload) => {
-        const { media, path } = payload;
-        const fileData = createReadStream(path);
-        const storageObject: StorageObject = { key: `${uploadKeyPrefix}/${media.name}`, data: fileData };
-        await storageClient.uploadObject(uploadBucket, storageObject, { ensureBucket: true, multipartUpload: media.size > partSize }).catch(error => {
-            if (error instanceof StorageError) {
-                throw new UploadError(payload, error);
-            }
-            throw error;
-        });
+        const { media, mediaPath, thumbnailPath } = payload;
+        const uploadFile = createUploadFile(storageClient, payload, uploadStorageBucket);
+        await uploadFile(mediaPath, `${uploadKeyPrefix}/${media.fileName}`, { ensureBucket: true, multipartUpload: media.size > partSize });
+        const thumbnailUploadKey = `${uploadKeyPrefix}/thumbnails/${media._id}.jpg`;
+        await uploadFile(thumbnailPath, thumbnailUploadKey);
     };
 
-export const uploadSuccessHandler = (amqpClient: AmqpClient, mediaDal: MediaDal, { uploadBucket, uploadKeyPrefix }: UploadConfig) => async ({ media, path }: Upload) => {
-    if (media.type.includes("video")) {
-        const message: ConvertMessage = {
-            mediaId: media._id,
-            mediaName: media.name,
-            mediaStorageBucket: uploadBucket,
-            mediaRoutingKey: `${uploadKeyPrefix}/${media.name}`
-        };
-        amqpClient.publish("convert", "convert.media", message);
-        await mediaDal.updateMediaStatus(media._id, "processing");
-    } else if (media.type.includes("image")) {
-        await mediaDal.updateMediaStatus(media._id, "completed");
-    }
-    await cleanupPath(path);
+export const uploadSuccessHandler = (amqpClient: AmqpClient, mediaDal: MediaDal, { uploadStorageBucket, uploadKeyPrefix }: UploadConfig) => async ({ media, mediaPath }: Upload) => {
+    const message: ConvertMessage = {
+        mediaId: media._id,
+        mediaFileName: media.fileName,
+        mediaStorageBucket: uploadStorageBucket,
+        mediaRoutingKey: `${uploadKeyPrefix}/${media.fileName}`
+    };
+    amqpClient.publish("convert", "convert.media", message);
+    await mediaDal.updateMedia(media._id, { status: "processing" });
+    await cleanupPath(mediaPath);
 };

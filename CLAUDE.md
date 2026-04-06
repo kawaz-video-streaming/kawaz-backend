@@ -37,26 +37,28 @@ This is a **media upload microservice** with two main processing paths:
 1. **HTTP API** (`src/api/`) — Accepts file uploads, saves metadata to MongoDB (status: "pending"), publishes AMQP message (with temp file path) to trigger background processing.
 2. **AMQP Consumer** (`src/background/`) — Two consumers:
    - **Upload** (`src/background/upload/`) — Listens for upload events, uploads file to S3 (`uploadMediaHandler`), then on success triggers video conversion / updates status and cleans up the temp file (`uploadSuccessHandler`). Storage errors are wrapped as `UploadError` (retriable via `AmqpRetriableError`).
-   - **Progress** (`src/background/progress/`) — Listens for progress events and updates media status to `"completed"` or `"failed"`.
+   - **Progress** (`src/background/progress/`) — Listens for progress events, updates media status to `"completed"` or `"failed"`, and saves video metadata on completion.
 
 ### Request Flow
 
 ```
-POST /media/upload
-  → Multer (temp file saved to ./tmp)
-  → Validate request (Zod)
-  → Save media record to MongoDB (status: "pending")
-  → Publish to AMQP exchange "upload", topic "upload.media" (includes temp file path)
+POST /media/upload  (multipart: fields file + thumbnail, both required)
+  → Multer (temp files saved to ./tmp)
+  → Validate request (Zod) — requires video file + image thumbnail
+  → Save media record to MongoDB (status: "pending", thumbnailFocalPoint stored)
+  → Publish to AMQP exchange "upload", topic "upload.media"
+      (includes mediaPath + thumbnailPath)
   → Return 200 { message: "Media Started Uploading" }
 
 AMQP consumer (exchange: "upload", topic: "upload.media")
   → Validate payload (Zod)
-  → uploadMediaHandler: Upload file to storage (S3) from temp path
+  → uploadMediaHandler(storageClient, config): Upload media + thumbnail to S3
+      → media → <uploadKeyPrefix>/<fileName>  (multipart if size > partSize)
+      → thumbnail → <uploadKeyPrefix>/thumbnails/<mediaId>.jpg
       → On StorageError: throw UploadError (retriable, max 3 retries)
-  → uploadSuccessHandler (handleSuccess):
-      → For video: Update media status → "processing", publish to "convert" exchange
-      → For image: Update media status → "completed"
-      → Delete temp file
+  → uploadSuccessHandler(amqpClient, mediaDal, config):
+      → Always: publish to "convert" exchange, update media status → "processing"
+      → Delete temp media file
   → On fatal error: Delete temp file
 ```
 
@@ -68,12 +70,15 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 | `POST` | `/auth/login` | No | Login, sets `kawaz-token` HttpOnly cookie |
 | `POST` | `/auth/promote` | No (x-admin-secret header) | Promote a user to admin role |
 | `GET` | `/auth/me` | Yes | Returns the authenticated user's info (`username`, `role`) |
-| `POST` | `/media/upload` | Yes (admin only, via `kawaz-token` cookie) | Upload a video file (multipart/form-data); video mimetype only |
-| `GET` | `/media/videos` | Yes | List all videos metadata (via VOD service) |
-| `GET` | `/media/videos/:id` | Yes | Get a single video's metadata (via VOD service) |
-| `GET` | `/media/videos/:id/manifest` | Yes | Get HLS manifest for a video |
-| `GET` | `/media/videos/:id/segments/:filename` | Yes | Get URL for a specific video segment |
-| `GET` | `/media/videos/:id/vtt/:filename` | Yes | Get VTT subtitle content for a video |
+| `POST` | `/media/upload` | Yes (admin only) | Upload video + optional thumbnail (multipart/form-data); requires `title` field |
+| `GET` | `/media` | Yes | List all completed media from MongoDB |
+| `GET` | `/media/:id` | Yes | Get a single media's metadata from MongoDB |
+| `PUT` | `/media/:id` | Yes (admin only) | Update media title, description, or tags |
+| `DELETE` | `/media/:id` | Yes (admin only) | Delete media from DB and VOD storage |
+| `GET` | `/media/:id/thumbnail` | Yes | Redirect to presigned thumbnail URL |
+| `GET` | `/media/stream/:id/output.mpd` | Yes | Stream MPEG-DASH manifest from VOD storage bucket |
+| `GET` | `/media/stream/:id/:filename.m4s` | Yes | Redirect to presigned URL for a video segment |
+| `GET` | `/media/stream/:id/:filename.vtt` | Yes | Stream VTT subtitle file from VOD storage bucket |
 | `GET` | `/health` | No | Health check — returns 200 OK |
 | `GET` | `/api-docs` | No | Swagger UI (OpenAPI documentation) |
 
@@ -81,21 +86,26 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 
 ```ts
 interface Media {
-  name: string;           // original filename
-  type: string;           // MIME type
-  size: number;           // file size in bytes
-  status: MediaStatus;    // "pending" | "processing" | "completed" | "failed"
-  includesSubtitles?: boolean;
+  _id: string;
+  fileName: string;              // original filename
+  title: string;                 // user-provided display title
+  description?: string;
+  tags: MediaTag[];              // e.g. "Action", "Comedy", etc.
+  size: number;                  // file size in bytes
+  status: MediaStatus;           // "pending" | "processing" | "completed" | "failed"
+  thumbnailFocalPoint: Coordinates; // { x, y } crop anchor, defaults to { x: 0.5, y: 0.5 }
+  metadata?: MediaMetadata;      // populated by progress consumer on completion
 }
 ```
 
-The upload request accepts an optional `includeSubtitles` field which is stored on the media record.
+Thumbnail is uploaded to storage at key `<uploadKeyPrefix>/thumbnails/<mediaId>.jpg` by the upload consumer. The `thumbnailFocalPoint` is stored in the DB and used downstream for cropping.
+
+`MediaMetadata` contains name, durationInMs, playUrl, chaptersUrl, chapters, videoStreams, audioStreams, and subtitleStreams — populated when the progress consumer receives a completed event from the media processor.
 
 ### System Initialization (`src/services/system.ts`)
 
 Wires everything together:
-- `StorageClient` (S3-compatible)
-- `VodClient` (VOD service, config via `createVodClientConfig()`)
+- `StorageClient` (S3-compatible, shared between upload consumer and media API)
 - Two `AmqpClient` instances — one for publishing (API), one for consuming (background)
 - MongoDB connection + DALs
 - AMQP consumers
@@ -111,13 +121,13 @@ All `@ido_kawaz/*` packages are listed as **devDependencies** (resolved locally 
 | `@ido_kawaz/mongo-client` | MongoDB/Mongoose wrapper with base `Dal` class |
 | `@ido_kawaz/amqp-client` | RabbitMQ client (publish/consume) |
 | `@ido_kawaz/storage-client` | S3-compatible storage client |
-| `@ido_kawaz/vod-client` | VOD service client (`getVideos`, `getVideoById`, `getManifest`, `getSegmentUrl`, `getVtt`) |
+| `@ido_kawaz/vod-client` | VOD service client (streaming routes only — manifest, segment, VTT) |
 
 ### Patterns
 
 - **Factory functions** for all modules: `createMediaHandlers(deps)`, `createUploadConsumer(deps)`, etc.
 - **Zod validation** at every boundary: HTTP requests (`validateMediaUploadRequest`), AMQP payloads (`validateUploadPayload`), and env config (`src/config.ts`).
-- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia()`, `updateMediaStatus()`. User: `createUser()`, `findUser()`, `verifyUser()`.
+- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia()`, `updateMedia()`, `deleteMedia()`, `getAllMedia()`, `getMedia()`. User: `createUser()`, `findUser()`, `verifyUser()`.
 - **Colocated tests**: `__tests__/` directories next to the source they test.
 - **Handler decorator** from server-framework wraps route handlers for logging and error propagation.
 
@@ -132,6 +142,7 @@ Service-specific env vars validated in `src/config.ts`:
 | `NODE_ENV` | No (default: `"development"`) | `"development"` \| `"local"` \| `"test"` |
 | `UPLOAD_STORAGE_BUCKET` | Yes | S3 bucket name for uploads |
 | `UPLOAD_STORAGE_KEY_PREFIX` | Yes | Key prefix for uploaded objects |
+| `VOD_STORAGE_BUCKET` | Yes | S3 bucket name for VOD content (manifests, segments, VTT) |
 | `JWT_SECRET` | Yes | Secret for signing/verifying JWT tokens |
 
 Additional env vars are consumed by the internal packages (`createServerConfig()`, `createMongoConfig()`, `createAmqpConfig()`, `createStorageConfig()`) — refer to each package's documentation for their required variables.

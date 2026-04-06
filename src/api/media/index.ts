@@ -1,81 +1,94 @@
 import { AmqpClient } from "@ido_kawaz/amqp-client";
 import { Router } from "@ido_kawaz/server-framework";
-import { VodClient } from "@ido_kawaz/vod-client";
+import { StorageClient } from "@ido_kawaz/storage-client";
 import multer from "multer";
 import { MediaDal } from "../../dal/media";
-import { createMediaHandlers } from "./handlers";
 import { requireAdmin } from "../middleware";
+import { createMediaHandlers } from "./handlers";
+import { MediaConfig } from "./types";
 
-export const createMediaRouter = (mediaDal: MediaDal, amqpClient: AmqpClient, vodClient: VodClient) => {
-  const mediaHandlers = createMediaHandlers(mediaDal, amqpClient, vodClient);
+export const createMediaRouter = (mediaConfig: MediaConfig, mediaDal: MediaDal, amqpClient: AmqpClient, storageClient: StorageClient) => {
+  const mediaHandlers = createMediaHandlers(mediaConfig, mediaDal, amqpClient, storageClient);
   const router = Router();
   const upload = multer({ storage: multer.diskStorage({ destination: './tmp' }) });
 
   /**
    * @openapi
-   * /media/upload:
-   *   post:
-   *     summary: Upload a media file
-   *     description: Upload a media file to storage and save metadata to database
-   *     tags:
-   *       - Media
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         multipart/form-data:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - file
-   *             properties:
-   *               file:
-   *                 type: string
-   *                 format: binary
-   *                 description: The file to upload
-   *     responses:
-   *       200:
-   *         description: Media upload started
-   *       400:
-   *         description: Bad request - file is required or invalid file type
-   *       401:
-   *         description: Unauthorized
-   *       403:
-   *         description: Forbidden - admin only
-   */
-  router.post("/upload", requireAdmin, upload.single("file"), mediaHandlers.uploadMedia);
-
-  /**
-   * @openapi
-   * /media/videos:
+   * /media:
    *   get:
-   *     summary: Get all videos metadata
-   *     description: Returns metadata for all videos from the VOD service
+   *     summary: Get all media
+   *     description: Returns all ready media from the database 
    *     tags:
    *       - Media
    *     security:
    *       - cookieAuth: []
    *     responses:
    *       200:
-   *         description: List of videos
+   *         description: List of media metadata
    *         content:
    *           application/json:
    *             schema:
    *               type: array
    *               items:
-   *                 $ref: '#/components/schemas/Video'
+   *                 $ref: '#/components/schemas/Media'
    *       401:
    *         description: Unauthorized
    *       404:
-   *         description: Videos not found
+   *         description: Media not found
    */
-  router.get("/videos", mediaHandlers.getVideos);
+  router.get("/", mediaHandlers.getAllMedia);
 
   /**
    * @openapi
-   * /media/videos/{id}:
-   *   get:
-   *     summary: Get a specific video metadata
-   *     description: Returns metadata for a single video from the VOD service
+   * /media/upload:
+   *   post:
+   *     summary: Upload a media file
+   *     description: Uploads a media file along with its metadata. The media will be processed asynchronously after upload.
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         multipart/form-data:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               title:
+   *                 type: string
+   *               description:
+   *                 type: string
+   *               tags:
+   *                 type: array
+   *                 items:
+   *                   type: string
+   *               file:
+   *                 type: string
+   *                 format: binary
+   *               thumbnail:
+   *                 type: string
+   *                 format: binary
+   *     responses:
+   *       200:
+   *         description: Media upload started successfully
+   *       400:
+   *         description: Bad request - invalid input data
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       500:
+   *         description: Internal server error
+   */
+  router.post("/upload", requireAdmin, upload.fields([{ name: "file", maxCount: 1 }, { name: "thumbnail", maxCount: 1 }]), mediaHandlers.uploadMedia);
+
+  /**
+   * @openapi
+   * /media/{id}:
+   *   put:
+   *     summary: Update media metadata
+   *     description: Update the title, description, or tags of a media
    *     tags:
    *       - Media
    *     security:
@@ -86,24 +99,131 @@ export const createMediaRouter = (mediaDal: MediaDal, amqpClient: AmqpClient, vo
    *         required: true
    *         schema:
    *           type: string
-   *         description: Video ID
+   *         description: Media ID
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               title:
+   *                 type: string
+   *               description:
+   *                 type: string
+   *               tags:
+   *                 type: array
+   *                 items:
+   *                   type: string
    *     responses:
    *       200:
-   *         description: Video metadata
-   *         content:
-   *           application/json:
-   *             schema:
-   *               $ref: '#/components/schemas/Video'
+   *         description: Media updated successfully
+   *       400:
+   *         description: Bad request - invalid media ID or invalid request body
    *       401:
    *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
    *       404:
-   *         description: Video not found
+   *         description: Media not found
    */
-  router.get("/videos/:id", mediaHandlers.getVideoById);
+  router.put("/:id", requireAdmin, mediaHandlers.updateMedia);
 
   /**
    * @openapi
-   * /media/videos/{id}/output.mpd:
+   * /media/{id}:
+   *   delete:
+   *     summary: Delete a media
+   *     description: Deletes a media from the database and storage
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Media ID
+   *     responses:
+   *       200:
+   *         description: Media deleted successfully
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       404:
+   *         description: Media not found
+   *       500:
+   *         description: Internal server error
+   */
+  router.delete("/:id", requireAdmin, mediaHandlers.deleteMedia);
+
+  /**
+  * @openapi
+  * /media/{id}:
+  *   get:
+  *     summary: Get a specific media metadata
+  *     description: Returns metadata for a single ready media from the database
+  *     tags:
+  *       - Media
+  *     security:
+  *       - cookieAuth: []
+  *     parameters:
+  *       - in: path
+  *         name: id
+  *         required: true
+  *         schema:
+  *           type: string
+  *         description: Media ID
+  *     responses:
+  *       200:
+  *         description: Media metadata
+  *         content:
+  *           application/json:
+  *             schema:
+  *               $ref: '#/components/schemas/Media'
+  *       401:
+  *         description: Unauthorized
+  *       404:
+  *         description: Media not found
+  */
+  router.get("/:id", mediaHandlers.getMedia);
+
+  /**
+   * @openapi
+   * /media/{id}/thumbnail:
+   *   get:
+   *     summary: Get media thumbnail
+   *     description: Redirects to the thumbnail image URL for a media
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Media ID
+   *     responses:
+   *       302:
+   *         description: Redirects to the thumbnail URL
+   *       401:
+   *         description: Unauthorized
+   *       404:
+   *         description: Media not found
+   *       500:
+   *         description: Internal server error - thumbnail not found or storage service error
+   */
+  router.get("/:id/thumbnail", mediaHandlers.getThumbnail);
+
+
+  /**
+   * @openapi
+   * /media/stream/{id}/output.mpd:
    *   get:
    *     summary: Get video manifest
    *     description: Returns the MPEG-DASH manifest for a video as a stream
@@ -130,11 +250,11 @@ export const createMediaRouter = (mediaDal: MediaDal, amqpClient: AmqpClient, vo
    *       500:
    *         description: Internal server error - manifest not found or VOD service error
    */
-  router.get(/^\/videos\/([^/]+)\/output\.mpd$/, mediaHandlers.getManifest);
+  router.get(/^\/stream\/([^/]+)\/output\.mpd$/, mediaHandlers.getManifest);
 
   /**
    * @openapi
-   * /media/videos/{id}/{filename}.m4s:
+   * /media/stream/{id}/{filename}.m4s:
    *   get:
    *     summary: Get video segment
    *     description: Redirects to the URL for a specific video segment (.m4s files only)
@@ -164,11 +284,11 @@ export const createMediaRouter = (mediaDal: MediaDal, amqpClient: AmqpClient, vo
    *       500:
    *         description: Internal server error - segment not found or VOD service error
    */
-  router.get(/^\/videos\/([^/]+)\/([^/]+\.m4s)$/, mediaHandlers.getSegmentUrl);
+  router.get(/^\/stream\/([^/]+)\/([^/]+\.m4s)$/, mediaHandlers.getSegment);
 
   /**
    * @openapi
-   * /media/videos/{id}/{filename}.vtt:
+   * /media/stream/{id}/{filename}.vtt:
    *   get:
    *     summary: Get VTT subtitle file
    *     description: Returns the VTT subtitle content for a video (.vtt files only)
@@ -202,7 +322,7 @@ export const createMediaRouter = (mediaDal: MediaDal, amqpClient: AmqpClient, vo
    *       500:
    *         description: Internal server error - VTT not found or VOD service error
    */
-  router.get(/^\/videos\/([^/]+)\/([^/]+\.vtt)$/, mediaHandlers.getVtt);
+  router.get(/^\/stream\/([^/]+)\/([^/]+\.vtt)$/, mediaHandlers.getVtt);
 
   return router;
 };
