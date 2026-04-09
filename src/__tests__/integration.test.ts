@@ -141,7 +141,15 @@ describe('Media upload integration', () => {
 
         // Verify media was persisted
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
-        expect(mediaDal.createMedia).toHaveBeenCalledWith('My Sample', [], 'sample.mp4', expect.any(Number), { x: 0.5, y: 0.5 }, undefined);
+        expect(mediaDal.createMedia).toHaveBeenCalledWith({
+            title: 'My Sample',
+            tags: [],
+            thumbnailFocalPoint: { x: 0.5, y: 0.5 },
+            fileName: 'sample.mp4',
+            size: expect.any(Number),
+            path: expect.any(String),
+            mimetype: expect.any(String),
+        });
 
         // Verify upload event was published to AMQP
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);

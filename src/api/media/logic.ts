@@ -1,9 +1,11 @@
 import { AmqpClient } from "@ido_kawaz/amqp-client";
-import { StorageClient } from "@ido_kawaz/storage-client";
+import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
+import { createReadStream } from "fs";
 import { UPLOAD_CONSUMER_EXCHANGE, UPLOAD_CONSUMER_TOPIC } from "../../background/upload/binding";
 import { Upload } from "../../background/upload/types";
 import { MediaDal } from "../../dal/media";
-import { MediaConfig, MediaUpdateRequestBody, UploadedFile } from "./types";
+import { MediaConfig, MediaUpdateRequestBody } from "./types";
+import { UploadedFile } from "../../utils/types";
 
 const PRESIGNED_URL_EXPIRY_SECONDS = 3600;
 
@@ -14,17 +16,22 @@ export const createMediaLogic = (
   storageClient: StorageClient,
 ) => ({
   uploadMedia: async (body: MediaUpdateRequestBody, mediaFile: UploadedFile, thumbnail: UploadedFile) => {
-    const { originalname, size, path } = mediaFile;
-    const { title, description, tags, thumbnailFocalPoint } = body;
-    const media = await mediaDal.createMedia(title, tags, originalname, size, thumbnailFocalPoint, description);
-    amqpClient.publish<Upload>(UPLOAD_CONSUMER_EXCHANGE, UPLOAD_CONSUMER_TOPIC, { media, mediaPath: path, thumbnailPath: thumbnail.path });
+    const media = await mediaDal.createMedia({ ...body, ...mediaFile });
+    amqpClient.publish<Upload>(UPLOAD_CONSUMER_EXCHANGE, UPLOAD_CONSUMER_TOPIC, { media, mediaPath: mediaFile.path, thumbnailPath: thumbnail.path });
   },
   deleteMedia: async (mediaId: string) => {
     await mediaDal.deleteMedia(mediaId);
     await storageClient.clearPrefix(vodStorageBucket, mediaId);
     await storageClient.deleteObject(uploadStorageBucket, `${uploadKeyPrefix}/thumbnails/${mediaId}.jpg`);
   },
-  updateMedia: async (mediaId: string, update: MediaUpdateRequestBody) => mediaDal.updateMedia(mediaId, update),
+  updateMedia: async (mediaId: string, update: MediaUpdateRequestBody, thumbnail?: UploadedFile) => {
+    await mediaDal.updateMedia(mediaId, update);
+    if (thumbnail) {
+      const thumbnailData = createReadStream(thumbnail.path);
+      const thumbnailObject: StorageObject = { key: `${uploadKeyPrefix}/thumbnails/${mediaId}.jpg`, data: thumbnailData };
+      await storageClient.uploadObject(uploadStorageBucket, thumbnailObject);
+    }
+  },
   getAllMedia: () => mediaDal.getAllMedia(),
   getMedia: (mediaId: string) => mediaDal.getMedia(mediaId),
   getTiles: (mediaId: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/thumbnails.jpg`),

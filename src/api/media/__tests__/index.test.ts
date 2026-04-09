@@ -130,7 +130,15 @@ describe('POST /media/upload route', () => {
         expect(response.body).toEqual({ message: 'Media Started Uploading' });
 
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
-        expect(mediaDal.createMedia).toHaveBeenCalledWith('My Upload', [], 'sample-upload.mp4', expect.any(Number), { x: 0.5, y: 0.5 }, undefined);
+        expect(mediaDal.createMedia).toHaveBeenCalledWith({
+            title: 'My Upload',
+            tags: [],
+            thumbnailFocalPoint: { x: 0.5, y: 0.5 },
+            fileName: 'sample-upload.mp4',
+            size: expect.any(Number),
+            path: expect.any(String),
+            mimetype: expect.any(String),
+        });
 
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
         expect(amqpClient.publish).toHaveBeenCalledWith(

@@ -9,6 +9,7 @@ import { createAuthRouter } from "./auth";
 import { createMediaRouter } from "./media";
 import { createAuthMiddleware } from "./middleware";
 import { swaggerSpec } from "./swagger";
+import { createMediaCollectionRouter } from "./mediaCollection";
 
 
 export const registerRoutes = (config: BackendServerConfig, storageClient: StorageClient, amqpClient: AmqpClient, dals: Dals) =>
@@ -45,6 +46,7 @@ export const registerRoutes = (config: BackendServerConfig, storageClient: Stora
 
         // API routes
         app.use("/media", createMediaRouter(config.mediaConfig, mediaDal, amqpClient, storageClient));
+        app.use("/mediaCollection", createMediaCollectionRouter(config.mediaCollectionConfig, dals, storageClient));
 
         return app;
     };

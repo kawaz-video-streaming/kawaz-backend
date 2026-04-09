@@ -1,25 +1,6 @@
 import { Model, MongoClient, Schema, Types } from "@ido_kawaz/mongo-client";
 import z from "zod";
-
-export const MEDIA_TAGS = [
-  'Action',
-  'Animation',
-  'Comedy',
-  'Crime',
-  'Documentary',
-  'Drama',
-  'Education',
-  'Horror',
-  'Kids',
-  'Music',
-  'News',
-  'Romance',
-  'Sci-Fi',
-  'Sport',
-  'Thriller',
-] as const
-
-export type MediaTag = (typeof MEDIA_TAGS)[number]
+import { Coordinates, coordinatesSchema, MEDIA_TAGS, MediaTag } from "../../utils/types";
 
 export const mediaResultStatuses = ["completed", "failed"] as const;
 
@@ -121,11 +102,6 @@ const audioStreamSchema = new Schema<AudioStream>(languageStreamSchemaObject, { 
 
 const subtitleStreamSchema = new Schema<SubtitleStream>(languageStreamSchemaObject, { _id: false });
 
-const CoordinatesSchema = new Schema<Coordinates>({
-  x: { type: Number, required: true },
-  y: { type: Number, required: true }
-}, { _id: false });
-
 const mediaMetadataSchema = new Schema<MediaMetadata>({
   name: { type: String, required: true },
   durationInMs: { type: Number, required: true },
@@ -138,11 +114,6 @@ const mediaMetadataSchema = new Schema<MediaMetadata>({
   subtitleStreams: { type: [subtitleStreamSchema], required: true }
 }, { _id: false });
 
-export interface Coordinates {
-  x: number;
-  y: number;
-}
-
 export interface Media {
   _id: string;
   fileName: string;
@@ -152,7 +123,13 @@ export interface Media {
   size: number;
   status: MediaStatus;
   thumbnailFocalPoint: Coordinates;
+  collectionId?: string; // Optional field if media is part of a collection in the future
   metadata?: MediaMetadata;
+}
+
+export interface MediaInfo extends Omit<Media, "_id" | "description" | "collectionId"> {
+  description?: string | null;
+  collectionId?: string | null;
 }
 
 export const mediaZodSchema = z.object({
@@ -179,12 +156,13 @@ const mediaSchema = new Schema<Media>(
     tags: { type: [String], enum: MEDIA_TAGS, default: [] },
     size: { type: Number, required: true },
     status: { type: String, enum: mediaStatuses, default: PENDING },
-    thumbnailFocalPoint: { type: CoordinatesSchema, required: true },
+    thumbnailFocalPoint: { type: coordinatesSchema, required: true },
     metadata: { type: mediaMetadataSchema, required: false },
   },
   { versionKey: false },
 );
 
-export const createMediaModel = (client: MongoClient) => client.createModel("media", mediaSchema);
+export const createMediaModel = (client: MongoClient) =>
+  client.createModel<Media>("media", mediaSchema);
 
 export type MediaModel = Model<Media>;

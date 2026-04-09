@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { ConsumersConfig } from "./background/config";
 import { AuthConfig } from "./api/auth/types";
 import { MediaConfig } from "./api/media/types";
+import { MediaCollectionConfig } from "./api/mediaCollection/types";
 
 class InvalidConfigError extends Error {
   constructor(error: z.ZodError) {
@@ -33,6 +34,7 @@ const environmentVariablesSchema = z.object({
 export interface BackendServerConfig extends ServerConfig {
   authConfig: AuthConfig;
   mediaConfig: MediaConfig;
+  mediaCollectionConfig: MediaCollectionConfig;
 }
 
 export interface SystemConfig {
@@ -66,7 +68,8 @@ export const getConfig = (env: {} = {}): SystemConfig => {
       mediaConfig: {
         vodStorageBucket: envVars.VOD_STORAGE_BUCKET,
         ...uploadBucketConfig,
-      }
+      },
+      mediaCollectionConfig: uploadBucketConfig
     },
     dbConfig: createMongoConfig(),
     storageConfig: storageConfig,

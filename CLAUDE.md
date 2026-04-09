@@ -58,7 +58,7 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
       → On StorageError: throw UploadError (retriable, max 3 retries)
   → uploadSuccessHandler(amqpClient, mediaDal, config):
       → Always: publish to "convert" exchange, update media status → "processing"
-      → Delete temp media file
+      → Delete temp media file and temp thumbnail file
   → On fatal error: Delete temp file
 ```
 
@@ -70,15 +70,21 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 | `POST` | `/auth/login` | No | Login, sets `kawaz-token` HttpOnly cookie |
 | `POST` | `/auth/promote` | No (x-admin-secret header) | Promote a user to admin role |
 | `GET` | `/auth/me` | Yes | Returns the authenticated user's info (`username`, `role`) |
-| `POST` | `/media/upload` | Yes (admin only) | Upload video + optional thumbnail (multipart/form-data); requires `title` field |
+| `POST` | `/media/upload` | Yes (admin only) | Upload video + thumbnail (multipart/form-data); requires `title` field |
 | `GET` | `/media` | Yes | List all completed media from MongoDB |
 | `GET` | `/media/:id` | Yes | Get a single media's metadata from MongoDB |
-| `PUT` | `/media/:id` | Yes (admin only) | Update media title, description, or tags |
+| `PUT` | `/media/:id` | Yes (admin only) | Update media title, description, tags, thumbnail image, or thumbnail focal point |
 | `DELETE` | `/media/:id` | Yes (admin only) | Delete media from DB and VOD storage |
 | `GET` | `/media/:id/thumbnail` | Yes | Redirect to presigned thumbnail URL |
 | `GET` | `/media/stream/:id/output.mpd` | Yes | Stream MPEG-DASH manifest from VOD storage bucket |
 | `GET` | `/media/stream/:id/:filename.m4s` | Yes | Redirect to presigned URL for a video segment |
 | `GET` | `/media/stream/:id/:filename.vtt` | Yes | Stream VTT subtitle file from VOD storage bucket |
+| `POST` | `/media-collection` | Yes (admin only) | Create a collection with a required thumbnail |
+| `GET` | `/media-collection` | Yes | List all media collections |
+| `GET` | `/media-collection/:id` | Yes | Get a single collection's metadata |
+| `PUT` | `/media-collection/:id` | Yes (admin only) | Update collection title, description, tags, thumbnail image, or thumbnail focal point |
+| `DELETE` | `/media-collection/:id` | Yes (admin only) | Delete a collection (must be empty) |
+| `GET` | `/media-collection/:id/thumbnail` | Yes | Redirect to presigned thumbnail URL |
 | `GET` | `/health` | No | Health check — returns 200 OK |
 | `GET` | `/api-docs` | No | Swagger UI (OpenAPI documentation) |
 
@@ -94,9 +100,25 @@ interface Media {
   size: number;                  // file size in bytes
   status: MediaStatus;           // "pending" | "processing" | "completed" | "failed"
   thumbnailFocalPoint: Coordinates; // { x, y } crop anchor, defaults to { x: 0.5, y: 0.5 }
+  collectionId?: string;         // optional parent collection
   metadata?: MediaMetadata;      // populated by progress consumer on completion
 }
 ```
+
+### MediaCollection Model (`src/dal/mediaCollection/model.ts`)
+
+```ts
+interface MediaCollection {
+  _id: string;
+  title: string;
+  description?: string;
+  tags: MediaTag[];
+  thumbnailFocalPoint: Coordinates;
+  collectionId?: string;         // optional parent collection (nesting)
+}
+```
+
+Deletion is blocked if the collection still contains media or subcollections (`CollectionNotEmptyError`).
 
 Thumbnail is uploaded to storage at key `<uploadKeyPrefix>/thumbnails/<mediaId>.jpg` by the upload consumer. The `thumbnailFocalPoint` is stored in the DB and used downstream for cropping.
 
@@ -126,8 +148,10 @@ All `@ido_kawaz/*` packages are listed as **devDependencies** (resolved locally 
 ### Patterns
 
 - **Factory functions** for all modules: `createMediaHandlers(deps)`, `createUploadConsumer(deps)`, etc.
-- **Zod validation** at every boundary: HTTP requests (`validateMediaUploadRequest`), AMQP payloads (`validateUploadPayload`), and env config (`src/config.ts`).
-- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia()`, `updateMedia()`, `deleteMedia()`, `getAllMedia()`, `getMedia()`. User: `createUser()`, `findUser()`, `verifyUser()`.
+- **Zod validation** at every boundary: HTTP requests (`validateMediaUploadRequest`), AMQP payloads (`validateUploadPayload`), and env config (`src/config.ts`). The `validateRequest(schema)` factory in `src/utils/zod.ts` parses the full `req` object (not `req.body`) — schemas must match the Express request shape (`{ body, files, params, ... }`).
+- **Nullable update fields**: `description` and `collectionId` use `z.string().nullish()` — sending `null` triggers a MongoDB `$unset`, omitting the field leaves the DB value unchanged.
+- **Shared types**: `MEDIA_TAGS`, `MediaTag`, `Coordinates`, `UploadedFile`, `RequestWithIdParam` are defined in `src/utils/types.ts` and shared across `media` and `mediaCollection` modules.
+- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia(MediaInfo)`, `updateMedia()`, `deleteMedia()`, `getAllMedia()`, `getMedia()`, `isCollectionEmpty()`. MediaCollection: `createCollection()`, `updateCollection()`, `deleteCollection()`, `getAllCollections()`, `getCollection()`, `isCollectionEmpty()`. User: `createUser()`, `findUser()`, `verifyUser()`.
 - **Colocated tests**: `__tests__/` directories next to the source they test.
 - **Handler decorator** from server-framework wraps route handlers for logging and error propagation.
 

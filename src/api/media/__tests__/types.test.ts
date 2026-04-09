@@ -32,7 +32,7 @@ describe('validateMediaUploadRequest', () => {
         const result = validateMediaUploadRequest(makeReq() as any);
 
         expect(result).toMatchObject({
-            file: { path: '/tmp/video.mp4', originalname: 'video.mp4', mimetype: 'video/mp4', size: 111 },
+            file: { path: '/tmp/video.mp4', fileName: 'video.mp4', mimetype: 'video/mp4', size: 111 },
             body: { title: 'My Video', tags: [] },
         });
     });
@@ -58,7 +58,7 @@ describe('validateMediaUploadRequest', () => {
 
     it('returns thumbnail in result', () => {
         const result = validateMediaUploadRequest(makeReq() as any);
-        expect(result.thumbnail).toMatchObject({ originalname: 'thumb.jpg', mimetype: 'image/jpeg' });
+        expect(result.thumbnail).toMatchObject({ fileName: 'thumb.jpg', mimetype: 'image/jpeg' });
     });
 
     it('throws when thumbnail is missing', () => {

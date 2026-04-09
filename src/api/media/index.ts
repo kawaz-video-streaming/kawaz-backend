@@ -69,6 +69,13 @@ export const createMediaRouter = (mediaConfig: MediaConfig, mediaDal: MediaDal, 
    *               thumbnail:
    *                 type: string
    *                 format: binary
+   *               thumbnailFocalPoint:
+   *                 type: object
+   *                 properties:
+   *                   x:
+   *                     type: number
+   *                   y:
+   *                     type: number
    *     responses:
    *       200:
    *         description: Media upload started successfully
@@ -115,6 +122,13 @@ export const createMediaRouter = (mediaConfig: MediaConfig, mediaDal: MediaDal, 
    *                 type: array
    *                 items:
    *                   type: string
+   *               thumbnailFocalPoint:
+   *                 type: object
+   *                 properties:
+   *                   x:
+   *                     type: number
+   *                   y:
+   *                     type: number
    *     responses:
    *       200:
    *         description: Media updated successfully
@@ -127,7 +141,7 @@ export const createMediaRouter = (mediaConfig: MediaConfig, mediaDal: MediaDal, 
    *       404:
    *         description: Media not found
    */
-  router.put("/:id", requireAdmin, mediaHandlers.updateMedia);
+  router.put("/:id", requireAdmin, upload.fields([{ name: "thumbnail", maxCount: 1 }]), mediaHandlers.updateMedia);
 
   /**
    * @openapi

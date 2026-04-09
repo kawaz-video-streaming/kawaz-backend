@@ -15,7 +15,7 @@ export const uploadMediaHandler = (storageClient: StorageClient, { uploadStorage
         await uploadFile(thumbnailPath, thumbnailUploadKey);
     };
 
-export const uploadSuccessHandler = (amqpClient: AmqpClient, mediaDal: MediaDal, { uploadStorageBucket, uploadKeyPrefix }: UploadConfig) => async ({ media, mediaPath }: Upload) => {
+export const uploadSuccessHandler = (amqpClient: AmqpClient, mediaDal: MediaDal, { uploadStorageBucket, uploadKeyPrefix }: UploadConfig) => async ({ media, mediaPath, thumbnailPath }: Upload) => {
     const message: ConvertMessage = {
         mediaId: media._id,
         mediaFileName: media.fileName,
@@ -25,4 +25,5 @@ export const uploadSuccessHandler = (amqpClient: AmqpClient, mediaDal: MediaDal,
     amqpClient.publish("convert", "convert.media", message);
     await mediaDal.updateMedia(media._id, { status: "processing" });
     await cleanupPath(mediaPath);
+    await cleanupPath(thumbnailPath);
 };

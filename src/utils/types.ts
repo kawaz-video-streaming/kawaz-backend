@@ -1,4 +1,6 @@
-import { Request } from "@ido_kawaz/server-framework";
+import { Schema, Types } from "@ido_kawaz/mongo-client";
+import { Request, RequestFile } from "@ido_kawaz/server-framework";
+import z from "zod";
 
 export const ADMIN_ROLE = "admin";
 export const USER_ROLE = "user";
@@ -13,3 +15,59 @@ export interface AuthenticatedRequest extends Request {
         role: Role;
     }
 }
+
+export const MEDIA_TAGS = [
+    'Action',
+    'Animation',
+    'Comedy',
+    'Crime',
+    'Documentary',
+    'Drama',
+    'Education',
+    'Horror',
+    'Kids',
+    'Music',
+    'News',
+    'Romance',
+    'Sci-Fi',
+    'Sport',
+    'Thriller',
+] as const
+
+export type MediaTag = (typeof MEDIA_TAGS)[number]
+
+export interface Coordinates {
+    x: number;
+    y: number;
+}
+
+export const coordinatesSchema = new Schema<Coordinates>({
+    x: { type: Number, required: true },
+    y: { type: Number, required: true }
+}, { _id: false });
+
+export interface UploadedFile extends Pick<RequestFile, 'path' | 'mimetype' | 'size'> {
+    fileName: string
+};
+
+export const uploadedFileZodSchema = (mimePrefix: string, errorMessage: string) => z.object({
+    path: z.string(),
+    originalname: z.string(),
+    mimetype: z.string().refine(
+        mime => mime.startsWith(mimePrefix),
+        { message: errorMessage }
+    ),
+    size: z.number()
+}).transform(({ originalname, ...rest }) => ({ fileName: originalname, ...rest })) satisfies z.ZodType<UploadedFile>;
+
+export interface RequestWithIdParam {
+    params: {
+        id: string;
+    };
+}
+
+export const requestWithIdParamZodSchema = z.object({
+    params: z.object({
+        id: z.string().refine((v) => Types.ObjectId.isValid(v), { message: 'Invalid media ID' })
+    })
+}) satisfies z.ZodType<RequestWithIdParam>;

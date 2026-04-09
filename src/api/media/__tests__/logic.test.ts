@@ -2,7 +2,8 @@ import { AmqpClient } from '@ido_kawaz/amqp-client';
 import { MediaDal } from '../../../dal/media';
 import { UPLOAD_CONSUMER_EXCHANGE, UPLOAD_CONSUMER_TOPIC } from '../../../background/upload/binding';
 import { createMediaLogic } from '../logic';
-import { MediaUpdateRequestBody, UploadedFile } from '../types';
+import { MediaUpdateRequestBody } from '../types';
+import { UploadedFile } from '../../../utils/types';
 
 const makeMediaConfig = () => ({
     vodStorageBucket: 'vod-bucket',
@@ -12,7 +13,7 @@ const makeMediaConfig = () => ({
 
 const makeFile = (overrides: Partial<UploadedFile> = {}): UploadedFile => ({
     path: '/tmp/video.mp4',
-    originalname: 'video.mp4',
+    fileName: 'video.mp4',
     mimetype: 'video/mp4',
     size: 64,
     ...overrides,
@@ -20,7 +21,7 @@ const makeFile = (overrides: Partial<UploadedFile> = {}): UploadedFile => ({
 
 const makeThumbnail = (overrides: Partial<UploadedFile> = {}): UploadedFile => ({
     path: '/tmp/thumb.jpg',
-    originalname: 'thumb.jpg',
+    fileName: 'thumb.jpg',
     mimetype: 'image/jpeg',
     size: 8,
     ...overrides,
@@ -53,7 +54,15 @@ describe('createMediaLogic.uploadMedia', () => {
         await logic.uploadMedia(body, file, thumbnail);
 
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
-        expect(mediaDal.createMedia).toHaveBeenCalledWith('My Video', [], 'video.mp4', 64, { x: 0.5, y: 0.5 }, undefined);
+        expect(mediaDal.createMedia).toHaveBeenCalledWith({
+            title: 'My Video',
+            tags: [],
+            thumbnailFocalPoint: { x: 0.5, y: 0.5 },
+            path: '/tmp/video.mp4',
+            fileName: 'video.mp4',
+            mimetype: 'video/mp4',
+            size: 64,
+        });
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
         expect(amqpClient.publish).toHaveBeenCalledWith(UPLOAD_CONSUMER_EXCHANGE, UPLOAD_CONSUMER_TOPIC, {
             media,
@@ -75,7 +84,16 @@ describe('createMediaLogic.uploadMedia', () => {
 
         await logic.uploadMedia(body, file, thumbnail);
 
-        expect(mediaDal.createMedia).toHaveBeenCalledWith('My Video', [], 'video.mp4', 64, { x: 0.3, y: 0.7 }, 'A great video');
+        expect(mediaDal.createMedia).toHaveBeenCalledWith({
+            title: 'My Video',
+            description: 'A great video',
+            tags: [],
+            thumbnailFocalPoint: { x: 0.3, y: 0.7 },
+            path: '/tmp/video.mp4',
+            fileName: 'video.mp4',
+            mimetype: 'video/mp4',
+            size: 64,
+        });
     });
 
     it('always includes thumbnailPath in AMQP payload', async () => {
@@ -100,7 +118,7 @@ describe('createMediaLogic.uploadMedia', () => {
 
     it('calls publish only after media creation completes', async () => {
         const media = { _id: 'm-order', fileName: 'ordered.mp4', title: 'Ordered', tags: [], size: 99, status: 'pending' };
-        const file = makeFile({ originalname: 'ordered.mp4', size: 99 });
+        const file = makeFile({ fileName: 'ordered.mp4', size: 99 });
         const thumbnail = makeThumbnail();
         const body = makeBody({ title: 'Ordered' });
 

@@ -1,7 +1,6 @@
-import { BadRequestError, Request, RequestFile } from "@ido_kawaz/server-framework";
 import z from "zod";
-import { Coordinates, MEDIA_TAGS, MediaTag } from "../../dal/media/model";
-import { Types } from "@ido_kawaz/mongo-client";
+import { Coordinates, MEDIA_TAGS, MediaTag, RequestWithIdParam, requestWithIdParamZodSchema, UploadedFile, uploadedFileZodSchema } from "../../utils/types";
+import { validateRequest } from "../../utils/zod";
 
 export interface MediaConfig {
     vodStorageBucket: string;
@@ -11,95 +10,58 @@ export interface MediaConfig {
 
 export interface MediaUpdateRequestBody {
     title: string;
-    description?: string;
+    description?: string | null;
     tags: MediaTag[];
     thumbnailFocalPoint: Coordinates;
-}
-
-export interface MediaUpdateRequest {
-    body: MediaUpdateRequestBody;
+    collectionId?: string | null; // Optional field if media is part of a collection in the future
 }
 
 const mediaUpdateBodySchema = z.object({
     title: z.string().min(1, { message: "Title is required" }),
-    description: z.string().optional(),
+    description: z.string().nullish(),
     tags: z.array(z.enum(MEDIA_TAGS)).default([]),
     thumbnailFocalPoint: z.object({
         x: z.coerce.number(),
         y: z.coerce.number()
-    }).default({ x: 0.5, y: 0.5 })
-});
+    }).default({ x: 0.5, y: 0.5 }),
+    collectionId: z.string().nullish()
+}) satisfies z.ZodType<MediaUpdateRequestBody>;
 
-const mediaUpdateRequestSchema = z.object({
-    body: mediaUpdateBodySchema
-}) satisfies z.ZodType<MediaUpdateRequest>;
-
-interface RequestWithIdParam {
-    params: {
-        id: string;
-    };
+export interface MediaUpdateRequest {
+    thumbnail?: UploadedFile;
+    body: MediaUpdateRequestBody;
 }
 
-const requestWithIdParamSchema = z.object({
-    params: z.object({
-        id: z.string().refine((v) => Types.ObjectId.isValid(v), { message: 'Invalid media ID' })
-    })
-}) satisfies z.ZodType<RequestWithIdParam>;
-
-export type UploadedFile = Pick<RequestFile, 'path' | 'originalname' | 'mimetype' | 'size'>;
+const mediaUpdateRawSchema = z.object({
+    files: z.object({
+        thumbnail: z.array(uploadedFileZodSchema('image/', 'Only image files are allowed')).max(1),
+    }),
+    body: mediaUpdateBodySchema
+});
 
 export interface ValidatedMediaUploadRequest extends MediaUpdateRequest {
     file: UploadedFile;
     thumbnail: UploadedFile;
 }
 
-const uploadedFileSchema = (mimePrefix: string, errorMessage: string) => z.object({
-    path: z.string(),
-    originalname: z.string(),
-    mimetype: z.string().refine(
-        mime => mime.startsWith(mimePrefix),
-        { message: errorMessage }
-    ),
-    size: z.number()
-});
-
-export const mediaUploadRequestSchema = z.object({
+export const mediaUploadRequestSchema: z.ZodType<ValidatedMediaUploadRequest> = z.object({
     files: z.object({
-        file: z.array(uploadedFileSchema('video/', 'Only video files are allowed')).length(1),
-        thumbnail: z.array(uploadedFileSchema('image/', 'Only image files are allowed')).length(1),
+        file: z.array(uploadedFileZodSchema('video/', 'Only video files are allowed')).length(1),
+        thumbnail: z.array(uploadedFileZodSchema('image/', 'Only image files are allowed')).length(1),
     }),
     body: mediaUpdateBodySchema,
 }).transform(({ files, body }) => ({
-    body,
+    body: body,
     file: files.file[0],
     thumbnail: files.thumbnail[0],
-})) satisfies z.ZodType<ValidatedMediaUploadRequest>;
+}));
 
 interface mediaUpdateRequestWithId extends RequestWithIdParam, MediaUpdateRequest { }
 
-const mediaUpdateRequestWithIdSchema =
-    requestWithIdParamSchema.extend(mediaUpdateRequestSchema.shape) satisfies z.ZodType<mediaUpdateRequestWithId>;
+const mediaUpdateRequestWithIdSchema: z.ZodType<mediaUpdateRequestWithId> =
+    requestWithIdParamZodSchema.extend(mediaUpdateRawSchema.shape).transform(({ params, files, body }) => ({ params, body, thumbnail: files.thumbnail[0] }));
 
-export const validateMediaRequestWithId = (req: Request): RequestWithIdParam => {
-    const validationResult = requestWithIdParamSchema.safeParse(req);
-    if (!validationResult.success) {
-        throw new BadRequestError(`Invalid request: \n${validationResult.error.issues.map(detail => detail.message).join(',\n')}`);
-    }
-    return validationResult.data;
-}
 
-export const validateMediaUpdateRequest = (req: Request): mediaUpdateRequestWithId => {
-    const validationResult = mediaUpdateRequestWithIdSchema.safeParse(req);
-    if (!validationResult.success) {
-        throw new BadRequestError(`Invalid request: \n${validationResult.error.issues.map(detail => detail.message).join(',\n')}`);
-    }
-    return validationResult.data;
-}
+export const validateMediaUpdateRequest = validateRequest(mediaUpdateRequestWithIdSchema);
 
-export const validateMediaUploadRequest = (req: Request): ValidatedMediaUploadRequest => {
-    const validationResult = mediaUploadRequestSchema.safeParse(req);
-    if (!validationResult.success) {
-        throw new BadRequestError(`Invalid request: \n${validationResult.error.issues.map(detail => detail.message).join(',\n')}`);
-    }
-    return validationResult.data;
-}
+export const validateMediaUploadRequest = validateRequest(mediaUploadRequestSchema);

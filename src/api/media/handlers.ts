@@ -6,7 +6,8 @@ import { isEmpty, isNil } from 'ramda';
 import { MediaDal } from '../../dal/media';
 import { requestHandlerDecorator } from "../../utils/decorator";
 import { createMediaLogic } from './logic';
-import { MediaConfig, validateMediaRequestWithId, validateMediaUpdateRequest, validateMediaUploadRequest } from './types';
+import { MediaConfig, validateMediaUpdateRequest, validateMediaUploadRequest } from './types';
+import { validateRequestWithId } from '../../utils/zod';
 
 export const createMediaHandlers = (mediaConfig: MediaConfig, mediaDal: MediaDal, amqpClient: AmqpClient, storageClient: StorageClient) => {
     const logic = createMediaLogic(mediaConfig, mediaDal, amqpClient, storageClient);
@@ -33,7 +34,7 @@ export const createMediaHandlers = (mediaConfig: MediaConfig, mediaDal: MediaDal
             requestHandlerDecorator(
                 'delete media',
                 async (req: Request, res: Response) => {
-                    const { params: { id: mediaId } } = validateMediaRequestWithId(req);
+                    const { params: { id: mediaId } } = validateRequestWithId(req);
                     await logic.deleteMedia(mediaId);
                     res.status(StatusCodes.OK).json({ message: 'Media deleted' });
                 }),
@@ -41,15 +42,15 @@ export const createMediaHandlers = (mediaConfig: MediaConfig, mediaDal: MediaDal
             requestHandlerDecorator(
                 'update media',
                 async (req: Request, res: Response) => {
-                    const { params: { id: mediaId }, body } = validateMediaUpdateRequest(req);
-                    await logic.updateMedia(mediaId, body);
+                    const { params: { id: mediaId }, body, thumbnail } = validateMediaUpdateRequest(req);
+                    await logic.updateMedia(mediaId, body, thumbnail);
                     res.status(StatusCodes.OK).json({ message: 'Media updated' });
                 }),
         getMedia:
             requestHandlerDecorator(
                 'get media',
                 async (req: Request, res: Response) => {
-                    const { params: { id: mediaId } } = validateMediaRequestWithId(req);
+                    const { params: { id: mediaId } } = validateRequestWithId(req);
                     const media = await logic.getMedia(mediaId);
                     if (isNil(media)) {
                         throw new NotFoundError('Media not found');
@@ -60,7 +61,7 @@ export const createMediaHandlers = (mediaConfig: MediaConfig, mediaDal: MediaDal
             requestHandlerDecorator(
                 'get media thumbnail',
                 async (req: Request, res: Response) => {
-                    const { params: { id: mediaId } } = validateMediaRequestWithId(req);
+                    const { params: { id: mediaId } } = validateRequestWithId(req);
                     const thumbnailPresignedUrl = await logic.getThumbnail(mediaId);
                     res.setHeader("Content-Type", "image/jpeg");
                     res.redirect(thumbnailPresignedUrl);

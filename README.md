@@ -7,7 +7,8 @@ Kawaz Plus media backend service.
 - Exposes a health endpoint (`GET /health`)
 - Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`, `POST /auth/promote`, `GET /auth/me`) — JWT-based authentication with role support
 - Exposes media CRUD endpoints (`GET /media`, `GET /media/:id`, `PUT /media/:id`, `DELETE /media/:id`) — served from MongoDB
-- Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`) — video + optional thumbnail, requires admin role
+- Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`) — video + required thumbnail, requires admin role
+- Exposes media collection CRUD endpoints (`/media-collection`) — group media into nestable collections
 - Exposes MPEG-DASH streaming endpoints (`/media/stream/:id/output.mpd`, `*.m4s`, `*.vtt`) direct from VOD storage
 - Publishes upload jobs to AMQP for async processing
 - Consumes upload jobs and uploads files to object storage
@@ -164,9 +165,9 @@ Returns `200 OK` if service is running.
 
 - Requires: `kawaz-token` cookie with **admin role**
 - Content type: `multipart/form-data`
-- Fields: `title` (required string), `description` (optional), `tags` (optional array), `file` (video, required), `thumbnail` (image, optional)
+- Fields: `title` (required string), `description` (optional), `tags` (optional array), `thumbnailFocalPoint` (optional `{ x, y }`, defaults to `{ x: 0.5, y: 0.5 }`), `file` (video, required), `thumbnail` (image, required)
 - Success response: `200 { "message": "Media Started Uploading" }`
-- Error responses: `400` (missing file/title or non-video mimetype), `401` (unauthenticated), `403` (not admin)
+- Error responses: `400` (missing file/thumbnail/title or non-video/image mimetype), `401` (unauthenticated), `403` (not admin)
 
 ### `GET /media`
 
@@ -183,8 +184,8 @@ Returns `200 OK` if service is running.
 ### `PUT /media/:id`
 
 - Requires: `kawaz-token` cookie with **admin role**
-- Content type: `application/json`
-- Body: `{ "title": string, "description"?: string, "tags"?: string[] }`
+- Content type: `multipart/form-data`
+- Fields: `title` (required string), `description` (optional string, send `null` to clear), `tags` (optional array), `collectionId` (optional string, send `null` to remove from collection), `thumbnailFocalPoint` (optional `{ x, y }` to reposition crop anchor), `thumbnail` (optional image to replace the thumbnail)
 - Success response: `200 { "message": "Media updated" }`
 - Error responses: `400` (invalid id or body), `401`, `403`
 
@@ -195,6 +196,47 @@ Returns `200 OK` if service is running.
 - Error responses: `400` (invalid id), `401`, `403`
 
 ### `GET /media/:id/thumbnail`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `302` redirect to presigned thumbnail URL
+- Error responses: `401`, `404`
+
+### `POST /media-collection`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Content type: `multipart/form-data`
+- Fields: `title` (required string), `description` (optional), `tags` (optional array), `thumbnailFocalPoint` (optional `{ x, y }`, defaults to `{ x: 0.5, y: 0.5 }`), `collectionId` (optional — parent collection for nesting), `thumbnail` (image, required)
+- Success response: `200 { "message": "Media collection created" }`
+- Error responses: `400` (invalid body or parent collection not found), `401`, `403`
+
+### `GET /media-collection`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 [{ "_id", "title", "tags", "thumbnailFocalPoint", ... }]`
+- Error responses: `401`, `404` (no collections found)
+
+### `GET /media-collection/:id`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 { "_id", "title", "tags", "thumbnailFocalPoint", ... }`
+- Error responses: `401`, `404` (collection not found)
+
+### `PUT /media-collection/:id`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Content type: `multipart/form-data`
+- Fields: `title` (required string), `description` (optional string, send `null` to clear), `tags` (optional array), `collectionId` (optional string, send `null` to remove parent), `thumbnailFocalPoint` (optional `{ x, y }` to reposition crop anchor), `thumbnail` (optional image to replace the thumbnail)
+- Success response: `200 { "message": "Media collection updated" }`
+- Error responses: `400` (invalid id or body), `401`, `403`
+
+### `DELETE /media-collection/:id`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Collection must be empty (no media or subcollections) or the request is rejected
+- Success response: `200 { "message": "Media collection deleted" }`
+- Error responses: `400` (invalid id), `401`, `403`, `500` (collection not empty)
+
+### `GET /media-collection/:id/thumbnail`
 
 - Requires: `kawaz-token` cookie with valid JWT
 - Success response: `302` redirect to presigned thumbnail URL
@@ -248,9 +290,11 @@ src/
 ### Key modules:
 
 - **api/media** - Media upload handlers and request validation
+- **api/mediaCollection** - Media collection CRUD handlers
 - **background/upload** - AMQP consumer for processing upload jobs
 - **background/progress** - AMQP consumer for updating media status to `completed` or `failed`
 - **dal/media** - Media model and database operations
+- **dal/mediaCollection** - MediaCollection model and database operations
 - **services/system.ts** - Initializes API server and starts AMQP consumers
 
 ## Database schema
@@ -270,7 +314,8 @@ Stores metadata for uploaded media files.
 | `tags` | String[] | Yes | Content tags (e.g. `"Action"`, `"Comedy"`) |
 | `size` | Number | Yes | File size in bytes |
 | `status` | String | Yes | One of: `pending`, `processing`, `completed`, `failed` |
-| `thumbnailUrl` | String | No | Storage key of the uploaded thumbnail |
+| `thumbnailFocalPoint` | Object `{ x, y }` | Yes | Crop anchor for the thumbnail (0–1 range, defaults to `{ x: 0.5, y: 0.5 }`) |
+| `collectionId` | String | No | Parent collection ID |
 | `metadata` | Object | No | Populated on completion (durationInMs, playUrl, streams, etc.) |
 
 Example document:
@@ -282,9 +327,23 @@ Example document:
   "tags": ["Education"],
   "size": 52428800,
   "status": "completed",
+  "thumbnailFocalPoint": { "x": 0.5, "y": 0.3 },
   "metadata": { "name": "presentation.mp4", "durationInMs": 120000, "playUrl": "..." }
 }
 ```
+
+### `MediaCollection`
+
+Stores metadata for media collections (groups of media).
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `_id` | String (ObjectId) | Yes | Unique identifier |
+| `title` | String | Yes | Display title |
+| `description` | String | No | Optional description |
+| `tags` | String[] | Yes | Content tags |
+| `thumbnailFocalPoint` | Object `{ x, y }` | Yes | Crop anchor for the thumbnail (0–1 range, defaults to `{ x: 0.5, y: 0.5 }`) |
+| `collectionId` | String | No | Parent collection ID (for nesting) |
 
 ## Error handling
 
