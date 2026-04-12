@@ -2,11 +2,9 @@ import { InternalServerError } from "@ido_kawaz/server-framework";
 import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
 import { Dals } from "../../dal/types";
-import { BucketsConfig, UploadedFile } from "../../utils/types";
+import { BucketsConfig, PRESIGNED_URL_EXPIRY_SECONDS, UploadedFile } from "../../utils/types";
 import { MediaCollectionUpdateRequestBody } from "./types";
 import { cleanupPath } from "../../utils/files";
-
-const PRESIGNED_URL_EXPIRY_SECONDS = 3600;
 
 class CollectionNotEmptyError extends InternalServerError {
   constructor() {
@@ -31,6 +29,7 @@ export const createMediaCollectionLogic = (
       throw new CollectionNotEmptyError();
     }
     await mediaCollectionDal.deleteCollection(collectionId);
+    await storageClient.deleteObject(kawazStorageBucket, `${thumbnailPrefix}/${collectionId}.jpg`);
   },
   updateMediaCollection: async (collectionId: string, update: MediaCollectionUpdateRequestBody, thumbnail?: UploadedFile) => {
     await mediaCollectionDal.updateCollection(collectionId, update);

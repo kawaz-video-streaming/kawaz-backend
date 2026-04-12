@@ -103,7 +103,7 @@ describe('Media upload integration', () => {
         app = express();
         app.use(parseCookies);
         app.use(express.json());
-        app.use('/auth', createAuthRouter(AUTH_CONFIG, authMiddleware, userDal as unknown as UserDal));
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, userDal as unknown as UserDal));
         app.use(authMiddleware);
         app.use('/media', createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'upload-bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },

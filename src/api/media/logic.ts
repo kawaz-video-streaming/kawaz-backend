@@ -5,10 +5,8 @@ import { UPLOAD_CONSUMER_EXCHANGE, UPLOAD_CONSUMER_TOPIC } from "../../backgroun
 import { Upload } from "../../background/upload/types";
 import { MediaDal } from "../../dal/media";
 import { cleanupPath } from "../../utils/files";
-import { BucketsConfig, UploadedFile } from "../../utils/types";
+import { BucketsConfig, PRESIGNED_URL_EXPIRY_SECONDS, UploadedFile } from "../../utils/types";
 import { MediaUpdateRequestBody } from "./types";
-
-const PRESIGNED_URL_EXPIRY_SECONDS = 3600;
 
 export const createMediaLogic = (
   { vod: { vodStorageBucket }, kawazPlus: { kawazStorageBucket: kawazBucket, thumbnailPrefix } }: BucketsConfig,

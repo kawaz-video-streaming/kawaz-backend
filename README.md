@@ -5,10 +5,12 @@ Kawaz Plus media backend service.
 ## What it does
 
 - Exposes a health endpoint (`GET /health`)
-- Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`, `POST /auth/promote`, `GET /auth/me`) — JWT-based authentication with role support
+- Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`, `POST /auth/promote`) — JWT-based authentication with role support
+- Exposes user endpoints (`GET /user/me`, `POST /user/profile`, `DELETE /user/profile/:name`, `GET /user/profiles`) — per-user profile management
+- Exposes avatar endpoints (`GET /avatar`, `GET /avatar/:id`, `GET /avatar/:id/image`, `POST /avatar`, `DELETE /avatar/:id`) — avatar catalog with image storage
 - Exposes media CRUD endpoints (`GET /media`, `GET /media/:id`, `PUT /media/:id`, `DELETE /media/:id`) — served from MongoDB
 - Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`) — video + required thumbnail, requires admin role
-- Exposes media collection CRUD endpoints (`/media-collection`) — group media into nestable collections
+- Exposes media collection CRUD endpoints (`/mediaCollection`) — group media into nestable collections
 - Exposes MPEG-DASH streaming endpoints (`/media/stream/:id/output.mpd`, `*.m4s`, `*.vtt`) direct from VOD storage
 - Publishes upload jobs to AMQP for async processing
 - Consumes upload jobs and uploads files to object storage
@@ -45,8 +47,11 @@ This service validates all environment variables at startup using Zod schemas. M
 
 **Required variables:**
 
-- `UPLOAD_STORAGE_BUCKET` - Target bucket for uploaded media
-- `UPLOAD_STORAGE_KEY_PREFIX` - Prefix for uploaded object keys
+- `KAWAZ_PLUS_BUCKET` - S3 bucket for all kawaz-plus assets (media, thumbnails, avatars)
+- `UPLOAD_PREFIX` - Key prefix for raw uploaded media files within the bucket
+- `THUMBNAIL_PREFIX` - Key prefix for thumbnail images within the bucket
+- `AVATAR_PREFIX` - Key prefix for avatar images within the bucket
+- `VOD_STORAGE_BUCKET` - S3 bucket for VOD content (manifests, segments, VTT files)
 - `JWT_SECRET` - Secret key used to sign and verify JWT tokens
 - `ADMIN_PROMOTION_SECRET` - Secret required in `x-admin-secret` header to promote a user to admin
 
@@ -64,7 +69,7 @@ This service validates all environment variables at startup using Zod schemas. M
 **Troubleshooting startup:**
 
 If the app fails to start, verify:
-1. All required variables (`UPLOAD_STORAGE_BUCKET`, `UPLOAD_STORAGE_KEY_PREFIX`, `VOD_STORAGE_BUCKET`) are set
+1. All required variables (`KAWAZ_PLUS_BUCKET`, `UPLOAD_PREFIX`, `THUMBNAIL_PREFIX`, `AVATAR_PREFIX`, `VOD_STORAGE_BUCKET`) are set
 2. Shared client environment variables are valid (MongoDB, AMQP, S3 credentials)
 3. `NODE_ENV` is one of the supported values
  
@@ -88,8 +93,10 @@ AWS_SECRET_ACCESS_KEY=your-secret-key
 AWS_PART_SIZE=134217728
 AWS_MAX_CONCURRENCY=4
 
-UPLOAD_STORAGE_BUCKET=kawaz-plus
-UPLOAD_STORAGE_KEY_PREFIX=raw
+KAWAZ_PLUS_BUCKET=kawaz-plus
+UPLOAD_PREFIX=raw
+THUMBNAIL_PREFIX=raw/thumbnails
+AVATAR_PREFIX=avatars
 VOD_STORAGE_BUCKET=kawaz-plus-vod
 ```
 
@@ -155,11 +162,64 @@ Returns `200 OK` if service is running.
 - Success response: `200 { "message": "User \"<username>\" promoted to admin" }`
 - Error responses: `400` (missing header/body), `401` (wrong secret), `404` (user not found)
 
-### `GET /auth/me`
+### `GET /user/me`
 
 - Requires: `kawaz-token` cookie with valid JWT
 - Success response: `200 { "username": string, "role": "user" | "admin" }`
 - Error responses: `401` (missing or invalid token)
+
+### `POST /user/profile`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Content type: `application/json`
+- Body: `{ "profileName": string, "avatarId": string (ObjectId) }`
+- Success response: `201 { "message": "Profile created successfully" }`
+- Error responses: `400` (invalid body), `401`, `409` (profile name already exists for this user)
+
+### `DELETE /user/profile/:name`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 { "message": "Profile deleted successfully" }`
+- Error responses: `401`
+
+### `GET /user/profiles`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 { "profiles": [{ "name": string, "avatarId": string }] }`
+- Error responses: `401`
+
+### `GET /avatar`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 [{ "_id", "name", "category" }]`
+- Error responses: `401`, `404` (no avatars found)
+
+### `GET /avatar/:id`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 { "_id", "name", "category" }`
+- Error responses: `401`, `404`
+
+### `GET /avatar/:id/image`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `302` redirect to presigned avatar image URL
+- Error responses: `401`, `404`
+
+### `POST /avatar`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Content type: `multipart/form-data`
+- Fields: `name` (string), `category` (one of: `United Kingdom`, `United States`, `Israel`, `Japan`, `France`), `avatar` (image file)
+- Success response: `200 { "message": "Avatar created" }`
+- Error responses: `400` (invalid body or non-image file), `401`, `403`
+
+### `DELETE /avatar/:id`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Deletes the avatar from the database and removes its image from storage
+- Success response: `200 { "message": "Avatar deleted" }`
+- Error responses: `400` (invalid id), `401`, `403`, `404`
 
 ### `POST /media/upload`
 
@@ -289,10 +349,15 @@ src/
 
 ### Key modules:
 
+- **api/auth** - Signup, login, and admin promotion
+- **api/user** - User info (`/me`) and profile management (`/profile`, `/profiles`)
+- **api/avatar** - Avatar catalog CRUD with image storage
 - **api/media** - Media upload handlers and request validation
 - **api/mediaCollection** - Media collection CRUD handlers
 - **background/upload** - AMQP consumer for processing upload jobs
 - **background/progress** - AMQP consumer for updating media status to `completed` or `failed`
+- **dal/user** - User model with embedded profiles
+- **dal/avatar** - Avatar model and database operations
 - **dal/media** - Media model and database operations
 - **dal/mediaCollection** - MediaCollection model and database operations
 - **services/system.ts** - Initializes API server and starts AMQP consumers
@@ -344,6 +409,34 @@ Stores metadata for media collections (groups of media).
 | `tags` | String[] | Yes | Content tags |
 | `thumbnailFocalPoint` | Object `{ x, y }` | Yes | Crop anchor for the thumbnail (0–1 range, defaults to `{ x: 0.5, y: 0.5 }`) |
 | `collectionId` | String | No | Parent collection ID (for nesting) |
+
+### `User`
+
+Stores user credentials and their profiles.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | String | Yes | Unique username |
+| `password` | String | Yes | Bcrypt-hashed password |
+| `role` | String | Yes | `user` or `admin` (defaults to `user`) |
+| `profiles` | Profile[] | Yes | List of user profiles (defaults to `[]`) |
+
+Each `Profile` embedded document:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | String | Yes | Profile display name (unique per user) |
+| `avatarId` | String | Yes | Reference to an `Avatar._id` |
+
+### `Avatar`
+
+Stores avatar metadata. Avatar images are stored in object storage at `<AVATAR_PREFIX>/<_id>.jpg`.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `_id` | String (ObjectId) | Yes | Unique identifier |
+| `name` | String | Yes | Avatar display name (e.g. `"David Ben-Gurion"`) |
+| `category` | String | Yes | One of: `United Kingdom`, `United States`, `Israel`, `Japan`, `France` |
 
 ## Error handling
 
@@ -455,8 +548,11 @@ AWS_SECRET_ACCESS_KEY=your-production-secret
 AWS_PART_SIZE=134217728
 AWS_MAX_CONCURRENCY=4
 
-UPLOAD_STORAGE_BUCKET=kawaz-prod
-UPLOAD_STORAGE_KEY_PREFIX=media
+KAWAZ_PLUS_BUCKET=kawaz-prod
+UPLOAD_PREFIX=media
+THUMBNAIL_PREFIX=media/thumbnails
+AVATAR_PREFIX=avatars
+VOD_STORAGE_BUCKET=kawaz-prod-vod
 ```
 
 ### Build and start

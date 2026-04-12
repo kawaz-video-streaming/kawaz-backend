@@ -54,9 +54,10 @@ const makeDals = (overrides: Partial<Dals> = {}): Dals => ({
     ...overrides,
 });
 
-const makeStorageClient = (): jest.Mocked<Pick<StorageClient, 'uploadObject' | 'getPresignedUrl'>> => ({
+const makeStorageClient = (): jest.Mocked<Pick<StorageClient, 'uploadObject' | 'getPresignedUrl' | 'deleteObject'>> => ({
     uploadObject: jest.fn().mockResolvedValue(undefined),
     getPresignedUrl: jest.fn().mockResolvedValue('https://presigned-url'),
+    deleteObject: jest.fn().mockResolvedValue(undefined),
 });
 
 describe('createMediaCollectionLogic.createMediaCollection', () => {
@@ -89,7 +90,7 @@ describe('createMediaCollectionLogic.createMediaCollection', () => {
 });
 
 describe('createMediaCollectionLogic.deleteMediaCollection', () => {
-    it('deletes collection when both media and subcollections are empty', async () => {
+    it('deletes collection and its thumbnail when both media and subcollections are empty', async () => {
         const dals = makeDals();
         const storageClient = makeStorageClient();
 
@@ -97,6 +98,7 @@ describe('createMediaCollectionLogic.deleteMediaCollection', () => {
         await logic.deleteMediaCollection('col-1');
 
         expect(dals.mediaCollectionDal.deleteCollection).toHaveBeenCalledWith('col-1');
+        expect(storageClient.deleteObject).toHaveBeenCalledWith('upload-bucket', 'raw/thumbnails/col-1.jpg');
     });
 
     it('throws when collection still contains media', async () => {

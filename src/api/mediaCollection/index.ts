@@ -76,7 +76,7 @@ export const createMediaCollectionRouter = (bucketsConfig: BucketsConfig, dals: 
      *                 description: Optional ID of a containing collection if this collection is nested within another collection
      *     responses:
      *       200:
-     *         description: Media upload started successfully
+     *         description: Media collection created successfully
      *       400:
      *         description: Bad request - invalid input data
      *       401:

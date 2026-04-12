@@ -53,8 +53,8 @@ POST /media/upload  (multipart: fields file + thumbnail, both required)
 AMQP consumer (exchange: "upload", topic: "upload.media")
   → Validate payload (Zod)
   → uploadMediaHandler(storageClient, config): Upload media + thumbnail to S3
-      → media → <uploadKeyPrefix>/<fileName>  (multipart if size > partSize)
-      → thumbnail → <uploadKeyPrefix>/thumbnails/<mediaId>.jpg
+      → media → <uploadPrefix>/<fileName>  (multipart if size > partSize)
+      → thumbnail → <thumbnailPrefix>/<mediaId>.jpg
       → On StorageError: throw UploadError (retriable, max 3 retries)
   → uploadSuccessHandler(amqpClient, mediaDal, config):
       → Always: publish to "convert" exchange, update media status → "processing"
@@ -69,7 +69,15 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 | `POST` | `/auth/signup` | No | Register a new user, sets `kawaz-token` HttpOnly cookie |
 | `POST` | `/auth/login` | No | Login, sets `kawaz-token` HttpOnly cookie |
 | `POST` | `/auth/promote` | No (x-admin-secret header) | Promote a user to admin role |
-| `GET` | `/auth/me` | Yes | Returns the authenticated user's info (`username`, `role`) |
+| `GET` | `/user/me` | Yes | Returns the authenticated user's info (`username`, `role`) |
+| `POST` | `/user/profile` | Yes | Create a profile for the authenticated user |
+| `DELETE` | `/user/profile/:name` | Yes | Delete one of the authenticated user's profiles |
+| `GET` | `/user/profiles` | Yes | List all profiles for the authenticated user |
+| `GET` | `/avatar` | Yes | List all avatars |
+| `GET` | `/avatar/:id` | Yes | Get a single avatar's metadata |
+| `GET` | `/avatar/:id/image` | Yes | Redirect to presigned avatar image URL |
+| `POST` | `/avatar` | Yes (admin only) | Create an avatar with image upload |
+| `DELETE` | `/avatar/:id` | Yes (admin only) | Delete an avatar from DB and storage |
 | `POST` | `/media/upload` | Yes (admin only) | Upload video + thumbnail (multipart/form-data); requires `title` field |
 | `GET` | `/media` | Yes | List all completed media from MongoDB |
 | `GET` | `/media/:id` | Yes | Get a single media's metadata from MongoDB |

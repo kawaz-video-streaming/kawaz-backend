@@ -1,14 +1,13 @@
 import { Dal } from "@ido_kawaz/mongo-client";
 import { Avatar, AvatarModel } from "./model";
-import { AvatarCategory } from "../../utils/types";
 
 export class AvatarDal extends Dal<Avatar> {
     constructor(avatarModel: AvatarModel) {
         super(avatarModel);
     }
 
-    createAvatar = (name: string, category: AvatarCategory) =>
-        this.model.insertOne({ name, category });
+    createAvatar = (avatar: Avatar) =>
+        this.model.insertOne(avatar);
 
     deleteAvatar = (id: string) =>
         this.model.findByIdAndDelete(id).exec();

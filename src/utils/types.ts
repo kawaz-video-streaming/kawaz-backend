@@ -97,3 +97,5 @@ export interface BucketsConfig {
         vodStorageBucket: string;
     }
 }
+
+export const PRESIGNED_URL_EXPIRY_SECONDS = 3600;

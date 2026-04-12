@@ -1,9 +1,9 @@
-import { RequestHandler, Router } from "@ido_kawaz/server-framework";
+import { Router } from "@ido_kawaz/server-framework";
 import { UserDal } from "../../dal/user";
 import { createAuthHandlers } from "./handlers";
 import { AuthConfig } from "./types";
 
-export const createAuthRouter = (authConfig: AuthConfig, authMiddleware: RequestHandler, userDal: UserDal) => {
+export const createAuthRouter = (authConfig: AuthConfig, userDal: UserDal) => {
   const authHandlers = createAuthHandlers(authConfig, userDal);
   const router = Router();
 
@@ -129,37 +129,6 @@ export const createAuthRouter = (authConfig: AuthConfig, authMiddleware: Request
    *         description: User not found
    */
   router.post("/promote", authHandlers.promoteAdmin);
-
-
-  /**
-   * @openapi
-   * /auth/me:
-   *   get:
-   *     summary: Get current user info
-   *     description: Returns the authenticated user's username and role. Requires a valid JWT cookie.
-   *     tags:
-   *       - Auth
-   *     security:
-   *       - cookieAuth: []
-   *     responses:
-   *       200:
-   *         description: Authenticated user info
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 username:
-   *                   type: string
-   *                 role:
-   *                   type: string
-   *                   enum:
-   *                     - user
-   *                     - admin
-   *       401:
-   *         description: Missing or invalid token
-   */
-  router.get("/me", authMiddleware, authHandlers.me);
 
   return router;
 };

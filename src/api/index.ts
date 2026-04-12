@@ -10,11 +10,13 @@ import { createMediaRouter } from "./media";
 import { createAuthMiddleware } from "./middleware";
 import { swaggerSpec } from "./swagger";
 import { createMediaCollectionRouter } from "./mediaCollection";
+import { createAvatarRouter } from "./avatar";
+import { createUserRouter } from "./user";
 
 
 export const registerRoutes = (config: BackendServerConfig, storageClient: StorageClient, amqpClient: AmqpClient, dals: Dals) =>
     (app: Application) => {
-        const { mediaDal, userDal } = dals;
+        const { mediaDal, userDal, avatarDal } = dals;
         const { authConfig } = config;
 
         /**
@@ -36,17 +38,16 @@ export const registerRoutes = (config: BackendServerConfig, storageClient: Stora
         // Swagger documentation
         app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-        const authMiddleware = createAuthMiddleware(authConfig, userDal);
-
         // Authentication routes
-        app.use('/auth', createAuthRouter(authConfig, authMiddleware, userDal));
+        app.use('/auth', createAuthRouter(authConfig, userDal));
 
         // Apply authentication middleware to all API routes
-        app.use(authMiddleware);
+        app.use(createAuthMiddleware(authConfig, userDal));
 
         // API routes
+        app.use('/user', createUserRouter(userDal));
+        app.use("/avatar", createAvatarRouter(config.bucketsConfig, avatarDal, storageClient));
         app.use("/media", createMediaRouter(config.bucketsConfig, mediaDal, amqpClient, storageClient));
         app.use("/mediaCollection", createMediaCollectionRouter(config.bucketsConfig, dals, storageClient));
-
         return app;
     };
