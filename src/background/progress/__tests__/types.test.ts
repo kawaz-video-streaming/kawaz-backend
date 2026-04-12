@@ -21,7 +21,7 @@ describe('validateProgressPayload', () => {
     });
 
     it('returns false when status is invalid', () => {
-        const payload = { mediaId: new Types.ObjectId().toHexString(), status: 'processing', percentage: 50 };
+        const payload = { mediaId: new Types.ObjectId().toHexString(), status: 'invalid-status', percentage: 50 };
 
         expect(validateProgressPayload(payload)).toBe(false);
     });
