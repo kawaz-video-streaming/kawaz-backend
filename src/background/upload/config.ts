@@ -1,5 +1,6 @@
+import { BucketsConfig } from "../../utils/types";
+
 export interface UploadConfig {
-    uploadStorageBucket: string;
-    uploadKeyPrefix: string;
+    bucketsConfig: BucketsConfig;
     partSize: number;
 }

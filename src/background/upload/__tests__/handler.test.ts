@@ -39,8 +39,15 @@ describe('uploadMediaHandler', () => {
         };
 
         config = {
-            uploadStorageBucket: 'test-bucket',
-            uploadKeyPrefix: 'raw',
+            bucketsConfig: {
+                kawazPlus: {
+                    kawazStorageBucket: 'test-bucket',
+                    uploadPrefix: 'raw',
+                    thumbnailPrefix: 'raw/thumbnails',
+                    avatarPrefix: 'avatars',
+                },
+                vod: { vodStorageBucket: 'vod-bucket' },
+            },
             partSize: 128 * 1024 * 1024,
         };
     });
@@ -163,8 +170,15 @@ describe('uploadSuccessHandler', () => {
         };
 
         config = {
-            uploadStorageBucket: 'test-bucket',
-            uploadKeyPrefix: 'raw',
+            bucketsConfig: {
+                kawazPlus: {
+                    kawazStorageBucket: 'test-bucket',
+                    uploadPrefix: 'raw',
+                    thumbnailPrefix: 'raw/thumbnails',
+                    avatarPrefix: 'avatars',
+                },
+                vod: { vodStorageBucket: 'vod-bucket' },
+            },
             partSize: 128 * 1024 * 1024,
         };
     });

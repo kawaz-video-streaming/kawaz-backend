@@ -4,13 +4,14 @@ import { createReadStream } from "fs";
 import { UPLOAD_CONSUMER_EXCHANGE, UPLOAD_CONSUMER_TOPIC } from "../../background/upload/binding";
 import { Upload } from "../../background/upload/types";
 import { MediaDal } from "../../dal/media";
-import { MediaConfig, MediaUpdateRequestBody } from "./types";
-import { UploadedFile } from "../../utils/types";
+import { cleanupPath } from "../../utils/files";
+import { BucketsConfig, UploadedFile } from "../../utils/types";
+import { MediaUpdateRequestBody } from "./types";
 
 const PRESIGNED_URL_EXPIRY_SECONDS = 3600;
 
 export const createMediaLogic = (
-  { vodStorageBucket, uploadStorageBucket, uploadKeyPrefix }: MediaConfig,
+  { vod: { vodStorageBucket }, kawazPlus: { kawazStorageBucket: kawazBucket, thumbnailPrefix } }: BucketsConfig,
   mediaDal: MediaDal,
   amqpClient: AmqpClient,
   storageClient: StorageClient,
@@ -22,20 +23,21 @@ export const createMediaLogic = (
   deleteMedia: async (mediaId: string) => {
     await mediaDal.deleteMedia(mediaId);
     await storageClient.clearPrefix(vodStorageBucket, mediaId);
-    await storageClient.deleteObject(uploadStorageBucket, `${uploadKeyPrefix}/thumbnails/${mediaId}.jpg`);
+    await storageClient.deleteObject(kawazBucket, `${thumbnailPrefix}/${mediaId}.jpg`);
   },
   updateMedia: async (mediaId: string, update: MediaUpdateRequestBody, thumbnail?: UploadedFile) => {
     await mediaDal.updateMedia(mediaId, update);
     if (thumbnail) {
       const thumbnailData = createReadStream(thumbnail.path);
-      const thumbnailObject: StorageObject = { key: `${uploadKeyPrefix}/thumbnails/${mediaId}.jpg`, data: thumbnailData };
-      await storageClient.uploadObject(uploadStorageBucket, thumbnailObject);
+      const thumbnailObject: StorageObject = { key: `${thumbnailPrefix}/${mediaId}.jpg`, data: thumbnailData };
+      await storageClient.uploadObject(kawazBucket, thumbnailObject);
+      await cleanupPath(thumbnail.path);
     }
   },
   getAllMedia: () => mediaDal.getAllMedia(),
   getMedia: (mediaId: string) => mediaDal.getMedia(mediaId),
   getTiles: (mediaId: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/thumbnails.jpg`),
-  getThumbnail: (mediaId: string) => storageClient.getPresignedUrl(uploadStorageBucket, `${uploadKeyPrefix}/thumbnails/${mediaId}.jpg`, PRESIGNED_URL_EXPIRY_SECONDS),
+  getThumbnail: (mediaId: string) => storageClient.getPresignedUrl(kawazBucket, `${thumbnailPrefix}/${mediaId}.jpg`, PRESIGNED_URL_EXPIRY_SECONDS),
   getManifest: (mediaId: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/output.mpd`),
   getSegmentUrl: (mediaId: string, filename: string) => storageClient.getPresignedUrl(vodStorageBucket, `${mediaId}/${filename}`, PRESIGNED_URL_EXPIRY_SECONDS),
   getVtt: (mediaId: string, filename: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/${filename}`),

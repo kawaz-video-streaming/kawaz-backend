@@ -4,9 +4,8 @@ import { MediaDal } from "../../dal/media";
 import { cleanupPath } from "../../utils/files";
 import { createUploadConsumerBinding, UploadConsumerBinding } from "./binding";
 import { UploadConfig } from "./config";
-import { uploadSuccessHandler, uploadMediaHandler } from "./handler";
+import { uploadMediaHandler, uploadSuccessHandler } from "./handler";
 import { Upload, validateUploadPayload } from "./types";
-
 
 export const createUploadConsumer = (storageClient: StorageClient, amqpClient: AmqpClient, mediaDal: MediaDal, config: UploadConfig) =>
     new Consumer<Upload, UploadConsumerBinding>('upload', createUploadConsumerBinding())
@@ -18,5 +17,6 @@ export const createUploadConsumer = (storageClient: StorageClient, amqpClient: A
                 const mediaId = payload.media._id;
                 await mediaDal.updateMedia(mediaId, { status: "failed" });
                 await cleanupPath(payload.mediaPath);
+                await cleanupPath(payload.thumbnailPath);
             }
         });

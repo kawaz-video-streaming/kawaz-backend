@@ -3,12 +3,12 @@ import { Router } from "@ido_kawaz/server-framework";
 import { StorageClient } from "@ido_kawaz/storage-client";
 import multer from "multer";
 import { MediaDal } from "../../dal/media";
+import { BucketsConfig } from "../../utils/types";
 import { requireAdmin } from "../middleware";
 import { createMediaHandlers } from "./handlers";
-import { MediaConfig } from "./types";
 
-export const createMediaRouter = (mediaConfig: MediaConfig, mediaDal: MediaDal, amqpClient: AmqpClient, storageClient: StorageClient) => {
-  const mediaHandlers = createMediaHandlers(mediaConfig, mediaDal, amqpClient, storageClient);
+export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaDal, amqpClient: AmqpClient, storageClient: StorageClient) => {
+  const mediaHandlers = createMediaHandlers(bucketsConfig, mediaDal, amqpClient, storageClient);
   const router = Router();
   const upload = multer({ storage: multer.diskStorage({ destination: './tmp' }) });
 

@@ -105,7 +105,10 @@ describe('Media upload integration', () => {
         app.use(express.json());
         app.use('/auth', createAuthRouter(AUTH_CONFIG, authMiddleware, userDal as unknown as UserDal));
         app.use(authMiddleware);
-        app.use('/media', createMediaRouter({ vodStorageBucket: 'vod-bucket', uploadStorageBucket: 'upload-bucket', uploadKeyPrefix: 'raw' }, mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient, storageClient as unknown as StorageClient));
+        app.use('/media', createMediaRouter({
+            kawazPlus: { kawazStorageBucket: 'upload-bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
+            vod: { vodStorageBucket: 'vod-bucket' },
+        }, mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient, storageClient as unknown as StorageClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -169,8 +172,10 @@ describe('Media upload integration', () => {
         // Step 2: Simulate background consumer processing the upload event
         const uploadedMedia = uploadPayload.media;
         const uploadConfig: UploadConfig = {
-            uploadStorageBucket: 'media-bucket',
-            uploadKeyPrefix: 'raw',
+            bucketsConfig: {
+                kawazPlus: { kawazStorageBucket: 'media-bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
+                vod: { vodStorageBucket: 'vod-bucket' },
+            },
             partSize: 128 * 1024 * 1024,
         };
 
@@ -238,8 +243,10 @@ describe('Media upload integration', () => {
         amqpClient.publish.mockClear();
 
         const uploadConfig: UploadConfig = {
-            uploadStorageBucket: 'media-bucket',
-            uploadKeyPrefix: 'raw',
+            bucketsConfig: {
+                kawazPlus: { kawazStorageBucket: 'media-bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
+                vod: { vodStorageBucket: 'vod-bucket' },
+            },
             partSize: 128 * 1024 * 1024,
         };
 

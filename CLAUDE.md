@@ -120,7 +120,7 @@ interface MediaCollection {
 
 Deletion is blocked if the collection still contains media or subcollections (`CollectionNotEmptyError`).
 
-Thumbnail is uploaded to storage at key `<uploadKeyPrefix>/thumbnails/<mediaId>.jpg` by the upload consumer. The `thumbnailFocalPoint` is stored in the DB and used downstream for cropping.
+Thumbnail is uploaded to storage at key `<thumbnailPrefix>/<mediaId>.jpg` by the upload consumer. The `thumbnailFocalPoint` is stored in the DB and used downstream for cropping.
 
 `MediaMetadata` contains name, durationInMs, playUrl, chaptersUrl, chapters, videoStreams, audioStreams, and subtitleStreams — populated when the progress consumer receives a completed event from the media processor.
 
@@ -150,8 +150,9 @@ All `@ido_kawaz/*` packages are listed as **devDependencies** (resolved locally 
 - **Factory functions** for all modules: `createMediaHandlers(deps)`, `createUploadConsumer(deps)`, etc.
 - **Zod validation** at every boundary: HTTP requests (`validateMediaUploadRequest`), AMQP payloads (`validateUploadPayload`), and env config (`src/config.ts`). The `validateRequest(schema)` factory in `src/utils/zod.ts` parses the full `req` object (not `req.body`) — schemas must match the Express request shape (`{ body, files, params, ... }`).
 - **Nullable update fields**: `description` and `collectionId` use `z.string().nullish()` — sending `null` triggers a MongoDB `$unset`, omitting the field leaves the DB value unchanged.
-- **Shared types**: `MEDIA_TAGS`, `MediaTag`, `Coordinates`, `UploadedFile`, `RequestWithIdParam` are defined in `src/utils/types.ts` and shared across `media` and `mediaCollection` modules.
-- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia(MediaInfo)`, `updateMedia()`, `deleteMedia()`, `getAllMedia()`, `getMedia()`, `isCollectionEmpty()`. MediaCollection: `createCollection()`, `updateCollection()`, `deleteCollection()`, `getAllCollections()`, `getCollection()`, `isCollectionEmpty()`. User: `createUser()`, `findUser()`, `verifyUser()`.
+- **Shared types**: `MEDIA_TAGS`, `MediaTag`, `AVATAR_CATEGORIES`, `AvatarCategory`, `BucketsConfig`, `Coordinates`, `UploadedFile`, `RequestWithIdParam` are defined in `src/utils/types.ts` and shared across modules.
+- **BucketsConfig**: All storage bucket names and key prefixes are consolidated into a single `BucketsConfig` object (see `src/utils/types.ts`) passed down to media, mediaCollection, and upload consumer — no per-feature config interfaces for storage.
+- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia(MediaInfo)`, `updateMedia()`, `deleteMedia()`, `getAllMedia()`, `getMedia()`, `isCollectionEmpty()`. MediaCollection: `createCollection()`, `updateCollection()`, `deleteCollection()`, `getAllCollections()`, `getCollection()`, `isCollectionEmpty()`. User: `createUser()`, `findUser()`, `verifyUser()`. Avatar: `createAvatar()`, `deleteAvatar()`, `getAllAvatars()`, `getAvatarById()`.
 - **Colocated tests**: `__tests__/` directories next to the source they test.
 - **Handler decorator** from server-framework wraps route handlers for logging and error propagation.
 
@@ -164,8 +165,10 @@ Service-specific env vars validated in `src/config.ts`:
 | Variable | Required | Description |
 |---|---|---|
 | `NODE_ENV` | No (default: `"development"`) | `"development"` \| `"local"` \| `"test"` |
-| `UPLOAD_STORAGE_BUCKET` | Yes | S3 bucket name for uploads |
-| `UPLOAD_STORAGE_KEY_PREFIX` | Yes | Key prefix for uploaded objects |
+| `KAWAZ_PLUS_BUCKET` | Yes | S3 bucket name for kawaz-plus uploads (media, thumbnails, avatars) |
+| `UPLOAD_PREFIX` | Yes | Key prefix for raw media uploads within kawaz-plus bucket |
+| `THUMBNAIL_PREFIX` | Yes | Key prefix for thumbnails within kawaz-plus bucket |
+| `AVATAR_PREFIX` | Yes | Key prefix for avatar images within kawaz-plus bucket |
 | `VOD_STORAGE_BUCKET` | Yes | S3 bucket name for VOD content (manifests, segments, VTT) |
 | `JWT_SECRET` | Yes | Secret for signing/verifying JWT tokens |
 

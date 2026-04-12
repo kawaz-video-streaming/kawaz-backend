@@ -18,8 +18,12 @@ export interface AuthenticatedRequest extends Request {
 
 export const MEDIA_TAGS = [
     'Action',
+    'Fantasy',
+    'Adventure',
+    'Superhero',
     'Animation',
     'Comedy',
+    'Parody',
     'Crime',
     'Documentary',
     'Drama',
@@ -32,9 +36,19 @@ export const MEDIA_TAGS = [
     'Sci-Fi',
     'Sport',
     'Thriller',
-] as const
+] as const;
 
-export type MediaTag = (typeof MEDIA_TAGS)[number]
+export type MediaTag = (typeof MEDIA_TAGS)[number];
+
+export const AVATAR_CATEGORIES = [
+    'United Kingdom',
+    'United States',
+    'Israel',
+    'Japan',
+    'France'
+] as const;
+
+export type AvatarCategory = (typeof AVATAR_CATEGORIES)[number];
 
 export interface Coordinates {
     x: number;
@@ -47,7 +61,7 @@ export const coordinatesSchema = new Schema<Coordinates>({
 }, { _id: false });
 
 export interface UploadedFile extends Pick<RequestFile, 'path' | 'mimetype' | 'size'> {
-    fileName: string
+    fileName: string;
 };
 
 export const uploadedFileZodSchema = (mimePrefix: string, errorMessage: string) => z.object({
@@ -71,3 +85,15 @@ export const requestWithIdParamZodSchema = z.object({
         id: z.string().refine((v) => Types.ObjectId.isValid(v), { message: 'Invalid media ID' })
     })
 }) satisfies z.ZodType<RequestWithIdParam>;
+
+export interface BucketsConfig {
+    kawazPlus: {
+        kawazStorageBucket: string;
+        uploadPrefix: string;
+        thumbnailPrefix: string;
+        avatarPrefix: string;
+    }
+    vod: {
+        vodStorageBucket: string;
+    }
+}

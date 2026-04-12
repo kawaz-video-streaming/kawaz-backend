@@ -2,6 +2,8 @@ import { StorageClient } from '@ido_kawaz/storage-client';
 import { InternalServerError } from '@ido_kawaz/server-framework';
 
 jest.mock('fs', () => ({ createReadStream: jest.fn().mockReturnValue({}) }));
+jest.mock('fs/promises', () => ({ unlink: jest.fn().mockResolvedValue(undefined) }));
+import { AvatarDal } from '../../../dal/avatar';
 import { MediaCollectionDal } from '../../../dal/mediaCollection';
 import { MediaDal } from '../../../dal/media';
 import { UserDal } from '../../../dal/user';
@@ -11,8 +13,13 @@ import { MediaCollectionUpdateRequestBody } from '../types';
 import { UploadedFile } from '../../../utils/types';
 
 const makeConfig = () => ({
-    uploadStorageBucket: 'upload-bucket',
-    uploadKeyPrefix: 'raw',
+    kawazPlus: {
+        kawazStorageBucket: 'upload-bucket',
+        uploadPrefix: 'raw',
+        thumbnailPrefix: 'raw/thumbnails',
+        avatarPrefix: 'avatars',
+    },
+    vod: { vodStorageBucket: 'vod-bucket' },
 });
 
 const makeThumbnail = (overrides: Partial<UploadedFile> = {}): UploadedFile => ({
@@ -43,6 +50,7 @@ const makeDals = (overrides: Partial<Dals> = {}): Dals => ({
         isCollectionEmpty: jest.fn().mockResolvedValue(true),
     } as unknown as MediaDal,
     userDal: {} as unknown as UserDal,
+    avatarDal: {} as unknown as AvatarDal,
     ...overrides,
 });
 

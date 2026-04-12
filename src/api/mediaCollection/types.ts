@@ -3,11 +3,6 @@ import { Coordinates, MEDIA_TAGS, MediaTag, RequestWithIdParam, requestWithIdPar
 import { validateRequest } from "../../utils/zod";
 import { Types } from "@ido_kawaz/mongo-client";
 
-export interface MediaCollectionConfig {
-    uploadStorageBucket: string;
-    uploadKeyPrefix: string;
-}
-
 export interface MediaCollectionUpdateRequestBody {
     title: string;
     description?: string | null;
@@ -34,8 +29,8 @@ export interface MediaCollectionUpdateRequest {
 
 const mediaCollectionUpdateRawSchema = z.object({
     files: z.object({
-        thumbnail: z.array(uploadedFileZodSchema('image/', 'Only image files are allowed')).max(1),
-    }),
+        thumbnail: z.array(uploadedFileZodSchema('image/', 'Only image files are allowed')).max(1).default([]),
+    }).default({ thumbnail: [] }),
     body: mediaCollectionUpdateBodySchema
 });
 
@@ -43,9 +38,9 @@ const mediaCollectionUpdateRawSchema = z.object({
 export interface ValidatedMediaCollectionCreationRequest extends Required<MediaCollectionUpdateRequest> { }
 
 export const mediaCollectionCreationRequestSchema: z.ZodType<ValidatedMediaCollectionCreationRequest> = z.object({
-    thumbnail: uploadedFileZodSchema('image/', 'Only image files are allowed'),
+    file: uploadedFileZodSchema('image/', 'Only image files are allowed'),
     body: mediaCollectionUpdateBodySchema,
-}) satisfies z.ZodType<ValidatedMediaCollectionCreationRequest>;
+}).transform(({ file, body }) => ({ thumbnail: file, body }));
 
 interface mediaCollectionUpdateRequestWithId extends RequestWithIdParam, MediaCollectionUpdateRequest { }
 

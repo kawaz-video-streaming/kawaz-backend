@@ -1,13 +1,12 @@
-import { createServerConfig, ServerConfig } from "@ido_kawaz/server-framework";
-import { createMongoConfig, MongoConfig } from "@ido_kawaz/mongo-client";
 import { AmqpConfig, createAmqpConfig } from "@ido_kawaz/amqp-client";
+import { createMongoConfig, MongoConfig } from "@ido_kawaz/mongo-client";
+import { createServerConfig, ServerConfig } from "@ido_kawaz/server-framework";
 import { createStorageConfig, StorageConfig } from "@ido_kawaz/storage-client";
 import { mergeDeepRight } from "ramda";
 import { z } from 'zod';
-import { ConsumersConfig } from "./background/config";
 import { AuthConfig } from "./api/auth/types";
-import { MediaConfig } from "./api/media/types";
-import { MediaCollectionConfig } from "./api/mediaCollection/types";
+import { ConsumersConfig } from "./background/config";
+import { BucketsConfig } from "./utils/types";
 
 class InvalidConfigError extends Error {
   constructor(error: z.ZodError) {
@@ -24,17 +23,18 @@ export type Environment = typeof environments[number];
 
 const environmentVariablesSchema = z.object({
   NODE_ENV: z.enum(environments).default("development"),
-  UPLOAD_STORAGE_BUCKET: z.string(),
-  UPLOAD_STORAGE_KEY_PREFIX: z.string(),
+  KAWAZ_PLUS_BUCKET: z.string(),
+  UPLOAD_PREFIX: z.string(),
   VOD_STORAGE_BUCKET: z.string(),
+  THUMBNAIL_PREFIX: z.string(),
+  AVATAR_PREFIX: z.string(),
   JWT_SECRET: z.string(),
   ADMIN_PROMOTION_SECRET: z.string()
 });
 
 export interface BackendServerConfig extends ServerConfig {
   authConfig: AuthConfig;
-  mediaConfig: MediaConfig;
-  mediaCollectionConfig: MediaCollectionConfig;
+  bucketsConfig: BucketsConfig;
 }
 
 export interface SystemConfig {
@@ -53,10 +53,17 @@ export const getConfig = (env: {} = {}): SystemConfig => {
   }
   const envVars = parseResult.data;
   const storageConfig = createStorageConfig();
-  const uploadBucketConfig = {
-    uploadStorageBucket: envVars.UPLOAD_STORAGE_BUCKET,
-    uploadKeyPrefix: envVars.UPLOAD_STORAGE_KEY_PREFIX,
-  }
+  const bucketsConfig: BucketsConfig = {
+    kawazPlus: {
+      kawazStorageBucket: envVars.KAWAZ_PLUS_BUCKET,
+      uploadPrefix: envVars.UPLOAD_PREFIX,
+      thumbnailPrefix: envVars.THUMBNAIL_PREFIX,
+      avatarPrefix: envVars.AVATAR_PREFIX,
+    },
+    vod: {
+      vodStorageBucket: envVars.VOD_STORAGE_BUCKET,
+    }
+  };
   return {
     nodeEnv: envVars.NODE_ENV,
     serverConfig: {
@@ -65,18 +72,14 @@ export const getConfig = (env: {} = {}): SystemConfig => {
         jwtSecret: envVars.JWT_SECRET,
         adminPromotionSecret: envVars.ADMIN_PROMOTION_SECRET,
       },
-      mediaConfig: {
-        vodStorageBucket: envVars.VOD_STORAGE_BUCKET,
-        ...uploadBucketConfig,
-      },
-      mediaCollectionConfig: uploadBucketConfig
+      bucketsConfig
     },
     dbConfig: createMongoConfig(),
     storageConfig: storageConfig,
     amqpConfig: createAmqpConfig(),
     consumersConfig: {
       upload: {
-        ...uploadBucketConfig,
+        bucketsConfig,
         partSize: storageConfig.partSize,
       }
     }

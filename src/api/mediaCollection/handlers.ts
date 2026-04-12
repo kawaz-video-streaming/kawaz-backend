@@ -4,12 +4,13 @@ import { StatusCodes } from "http-status-codes";
 import { isEmpty, isNil } from 'ramda';
 import { Dals } from "../../dal/types";
 import { requestHandlerDecorator } from "../../utils/decorator";
+import { BucketsConfig } from "../../utils/types";
 import { validateRequestWithId } from "../../utils/zod";
 import { createMediaCollectionLogic } from "./logic";
-import { MediaCollectionConfig, validateMediaCollectionCreationRequest, validateMediaCollectionUpdateRequest } from './types';
+import { validateMediaCollectionCreationRequest, validateMediaCollectionUpdateRequest } from './types';
 
-export const createMediaCollectionHandlers = (config: MediaCollectionConfig, dals: Dals, storageClient: StorageClient) => {
-    const logic = createMediaCollectionLogic(config, dals, storageClient);
+export const createMediaCollectionHandlers = (bucketsConfig: BucketsConfig, dals: Dals, storageClient: StorageClient) => {
+    const logic = createMediaCollectionLogic(bucketsConfig, dals, storageClient);
     return {
         getAllMediaCollections:
             requestHandlerDecorator(

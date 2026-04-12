@@ -78,7 +78,10 @@ describe('POST /media/upload route', () => {
         app = express();
         app.use(parseCookies);
         app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use('/media', createMediaRouter({ vodStorageBucket: 'vod-bucket', uploadStorageBucket: 'upload-bucket', uploadKeyPrefix: 'raw' }, mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient, storageClient as any));
+        app.use('/media', createMediaRouter({
+            kawazPlus: { kawazStorageBucket: 'upload-bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
+            vod: { vodStorageBucket: 'vod-bucket' },
+        }, mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient, storageClient as any));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });

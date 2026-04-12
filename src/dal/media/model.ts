@@ -157,6 +157,7 @@ const mediaSchema = new Schema<Media>(
     size: { type: Number, required: true },
     status: { type: String, enum: mediaStatuses, default: PENDING },
     thumbnailFocalPoint: { type: coordinatesSchema, required: true },
+    collectionId: { type: String, required: false },
     metadata: { type: mediaMetadataSchema, required: false },
   },
   { versionKey: false },

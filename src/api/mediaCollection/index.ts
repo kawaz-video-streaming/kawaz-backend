@@ -1,13 +1,13 @@
 import { Router } from "@ido_kawaz/server-framework";
+import { StorageClient } from "@ido_kawaz/storage-client";
 import multer from "multer";
 import { Dals } from "../../dal/types";
+import { BucketsConfig } from "../../utils/types";
 import { requireAdmin } from "../middleware";
 import { createMediaCollectionHandlers } from "./handlers";
-import { MediaCollectionConfig } from "./types";
-import { StorageClient } from "@ido_kawaz/storage-client";
 
-export const createMediaCollectionRouter = (config: MediaCollectionConfig, dals: Dals, storageClient: StorageClient) => {
-    const mediaCollectionHandlers = createMediaCollectionHandlers(config, dals, storageClient);
+export const createMediaCollectionRouter = (bucketsConfig: BucketsConfig, dals: Dals, storageClient: StorageClient) => {
+    const mediaCollectionHandlers = createMediaCollectionHandlers(bucketsConfig, dals, storageClient);
     const router = Router();
     const upload = multer({ storage: multer.diskStorage({ destination: './tmp' }) });
 

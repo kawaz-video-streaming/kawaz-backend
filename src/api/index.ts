@@ -45,8 +45,8 @@ export const registerRoutes = (config: BackendServerConfig, storageClient: Stora
         app.use(authMiddleware);
 
         // API routes
-        app.use("/media", createMediaRouter(config.mediaConfig, mediaDal, amqpClient, storageClient));
-        app.use("/mediaCollection", createMediaCollectionRouter(config.mediaCollectionConfig, dals, storageClient));
+        app.use("/media", createMediaRouter(config.bucketsConfig, mediaDal, amqpClient, storageClient));
+        app.use("/mediaCollection", createMediaCollectionRouter(config.bucketsConfig, dals, storageClient));
 
         return app;
     };

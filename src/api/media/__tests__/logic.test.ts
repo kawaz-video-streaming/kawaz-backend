@@ -6,9 +6,13 @@ import { MediaUpdateRequestBody } from '../types';
 import { UploadedFile } from '../../../utils/types';
 
 const makeMediaConfig = () => ({
-    vodStorageBucket: 'vod-bucket',
-    uploadStorageBucket: 'upload-bucket',
-    uploadKeyPrefix: 'raw',
+    kawazPlus: {
+        kawazStorageBucket: 'upload-bucket',
+        uploadPrefix: 'raw',
+        thumbnailPrefix: 'raw/thumbnails',
+        avatarPrefix: 'avatars',
+    },
+    vod: { vodStorageBucket: 'vod-bucket' },
 });
 
 const makeFile = (overrides: Partial<UploadedFile> = {}): UploadedFile => ({

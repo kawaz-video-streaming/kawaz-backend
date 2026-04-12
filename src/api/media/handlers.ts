@@ -5,12 +5,13 @@ import { StatusCodes } from "http-status-codes";
 import { isEmpty, isNil } from 'ramda';
 import { MediaDal } from '../../dal/media';
 import { requestHandlerDecorator } from "../../utils/decorator";
-import { createMediaLogic } from './logic';
-import { MediaConfig, validateMediaUpdateRequest, validateMediaUploadRequest } from './types';
+import { BucketsConfig } from '../../utils/types';
 import { validateRequestWithId } from '../../utils/zod';
+import { createMediaLogic } from './logic';
+import { validateMediaUpdateRequest, validateMediaUploadRequest } from './types';
 
-export const createMediaHandlers = (mediaConfig: MediaConfig, mediaDal: MediaDal, amqpClient: AmqpClient, storageClient: StorageClient) => {
-    const logic = createMediaLogic(mediaConfig, mediaDal, amqpClient, storageClient);
+export const createMediaHandlers = (bucketsConfig: BucketsConfig, mediaDal: MediaDal, amqpClient: AmqpClient, storageClient: StorageClient) => {
+    const logic = createMediaLogic(bucketsConfig, mediaDal, amqpClient, storageClient);
     return {
         getAllMedia:
             requestHandlerDecorator(

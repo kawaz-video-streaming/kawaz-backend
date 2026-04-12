@@ -2,12 +2,6 @@ import z from "zod";
 import { Coordinates, MEDIA_TAGS, MediaTag, RequestWithIdParam, requestWithIdParamZodSchema, UploadedFile, uploadedFileZodSchema } from "../../utils/types";
 import { validateRequest } from "../../utils/zod";
 
-export interface MediaConfig {
-    vodStorageBucket: string;
-    uploadStorageBucket: string;
-    uploadKeyPrefix: string;
-}
-
 export interface MediaUpdateRequestBody {
     title: string;
     description?: string | null;
@@ -34,8 +28,8 @@ export interface MediaUpdateRequest {
 
 const mediaUpdateRawSchema = z.object({
     files: z.object({
-        thumbnail: z.array(uploadedFileZodSchema('image/', 'Only image files are allowed')).max(1),
-    }),
+        thumbnail: z.array(uploadedFileZodSchema('image/', 'Only image files are allowed')).max(1).default([]),
+    }).default({ thumbnail: [] }),
     body: mediaUpdateBodySchema
 });
 

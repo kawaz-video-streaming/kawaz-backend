@@ -11,8 +11,15 @@ describe('createUploadConsumer', () => {
         const amqpClient = {} as AmqpClient;
         const mediaDal = {} as MediaDal;
         const config: UploadConfig = {
-            uploadStorageBucket: 'bucket',
-            uploadKeyPrefix: 'prefix',
+            bucketsConfig: {
+                kawazPlus: {
+                    kawazStorageBucket: 'bucket',
+                    uploadPrefix: 'prefix',
+                    thumbnailPrefix: 'prefix/thumbnails',
+                    avatarPrefix: 'avatars',
+                },
+                vod: { vodStorageBucket: 'vod-bucket' },
+            },
             partSize: 128 * 1024 * 1024,
         };
 

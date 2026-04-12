@@ -6,21 +6,27 @@ import { UploadConfig } from "./config";
 import { ConvertMessage, Upload } from "./types";
 import { createUploadFile } from "./utils";
 
-export const uploadMediaHandler = (storageClient: StorageClient, { uploadStorageBucket, uploadKeyPrefix, partSize }: UploadConfig) =>
+export const uploadMediaHandler = (
+    storageClient: StorageClient,
+    { bucketsConfig: { kawazPlus: { kawazStorageBucket, uploadPrefix, thumbnailPrefix } }, partSize }: UploadConfig) =>
     async (payload: Upload) => {
         const { media, mediaPath, thumbnailPath } = payload;
-        const uploadFile = createUploadFile(storageClient, payload, uploadStorageBucket);
-        await uploadFile(mediaPath, `${uploadKeyPrefix}/${media.fileName}`, { ensureBucket: true, multipartUpload: media.size > partSize });
-        const thumbnailUploadKey = `${uploadKeyPrefix}/thumbnails/${media._id}.jpg`;
+        const uploadFile = createUploadFile(storageClient, payload, kawazStorageBucket);
+        await uploadFile(mediaPath, `${uploadPrefix}/${media.fileName}`, { ensureBucket: true, multipartUpload: media.size > partSize });
+        const thumbnailUploadKey = `${thumbnailPrefix}/${media._id}.jpg`;
         await uploadFile(thumbnailPath, thumbnailUploadKey);
     };
 
-export const uploadSuccessHandler = (amqpClient: AmqpClient, mediaDal: MediaDal, { uploadStorageBucket, uploadKeyPrefix }: UploadConfig) => async ({ media, mediaPath, thumbnailPath }: Upload) => {
+export const uploadSuccessHandler = (
+    amqpClient: AmqpClient,
+    mediaDal: MediaDal,
+    { bucketsConfig: { kawazPlus: { kawazStorageBucket, uploadPrefix } } }: UploadConfig
+) => async ({ media, mediaPath, thumbnailPath }: Upload) => {
     const message: ConvertMessage = {
         mediaId: media._id,
         mediaFileName: media.fileName,
-        mediaStorageBucket: uploadStorageBucket,
-        mediaRoutingKey: `${uploadKeyPrefix}/${media.fileName}`
+        mediaStorageBucket: kawazStorageBucket,
+        mediaRoutingKey: `${uploadPrefix}/${media.fileName}`
     };
     amqpClient.publish("convert", "convert.media", message);
     await mediaDal.updateMedia(media._id, { status: "processing" });
