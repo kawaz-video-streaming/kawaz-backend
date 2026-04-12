@@ -3,6 +3,7 @@ import { createReadStream } from "fs";
 import { AvatarDal } from "../../dal/avatar";
 import { BucketsConfig, PRESIGNED_URL_EXPIRY_SECONDS, UploadedFile } from "../../utils/types";
 import { Avatar } from "../../dal/avatar/model";
+import { cleanupPath } from "../../utils/files";
 
 export const createAvatarLogic = (
     { kawazPlus: { kawazStorageBucket, avatarPrefix } }: BucketsConfig,
@@ -13,6 +14,7 @@ export const createAvatarLogic = (
         const avatar = await avatarDal.createAvatar(avatarMetadata);
         const avatarObject: StorageObject = { key: `${avatarPrefix}/${avatar._id}.jpg`, data: createReadStream(avatarImage.path) };
         await storageClient.uploadObject(kawazStorageBucket, avatarObject);
+        await cleanupPath(avatarImage.path);
     },
     deleteAvatar: async (avatarId: string) => {
         await avatarDal.deleteAvatar(avatarId);

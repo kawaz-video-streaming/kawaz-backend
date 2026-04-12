@@ -71,6 +71,7 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 | `POST` | `/auth/promote` | No (x-admin-secret header) | Promote a user to admin role |
 | `GET` | `/user/me` | Yes | Returns the authenticated user's info (`username`, `role`) |
 | `POST` | `/user/profile` | Yes | Create a profile for the authenticated user |
+| `PUT` | `/user/profile` | Yes | Update the avatar of an existing profile (matched by `profileName`) |
 | `DELETE` | `/user/profile/:name` | Yes | Delete one of the authenticated user's profiles |
 | `GET` | `/user/profiles` | Yes | List all profiles for the authenticated user |
 | `GET` | `/avatar` | Yes | List all avatars |

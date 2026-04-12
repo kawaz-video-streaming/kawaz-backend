@@ -6,7 +6,7 @@ Kawaz Plus media backend service.
 
 - Exposes a health endpoint (`GET /health`)
 - Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`, `POST /auth/promote`) — JWT-based authentication with role support
-- Exposes user endpoints (`GET /user/me`, `POST /user/profile`, `DELETE /user/profile/:name`, `GET /user/profiles`) — per-user profile management
+- Exposes user endpoints (`GET /user/me`, `POST /user/profile`, `PUT /user/profile`, `DELETE /user/profile/:name`, `GET /user/profiles`) — per-user profile management
 - Exposes avatar endpoints (`GET /avatar`, `GET /avatar/:id`, `GET /avatar/:id/image`, `POST /avatar`, `DELETE /avatar/:id`) — avatar catalog with image storage
 - Exposes media CRUD endpoints (`GET /media`, `GET /media/:id`, `PUT /media/:id`, `DELETE /media/:id`) — served from MongoDB
 - Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`) — video + required thumbnail, requires admin role
@@ -175,6 +175,14 @@ Returns `200 OK` if service is running.
 - Body: `{ "profileName": string, "avatarId": string (ObjectId) }`
 - Success response: `201 { "message": "Profile created successfully" }`
 - Error responses: `400` (invalid body), `401`, `409` (profile name already exists for this user)
+
+### `PUT /user/profile`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Content type: `application/json`
+- Body: `{ "profileName": string, "avatarId": string (ObjectId) }`
+- Success response: `200 { "message": "Profile avatar updated successfully" }`
+- Error responses: `400` (invalid body), `401`, `404` (profile not found for this user)
 
 ### `DELETE /user/profile/:name`
 

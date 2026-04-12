@@ -82,6 +82,43 @@ describe('POST /user/profile', () => {
     });
 });
 
+describe('PUT /user/profile', () => {
+    it('returns 200 when avatar is updated successfully', async () => {
+        const userDal = { updateProfileAvatar: jest.fn().mockResolvedValue(true) };
+        const app = makeApp(userDal);
+
+        const response = await request(app)
+            .put('/user/profile')
+            .send({ profileName: 'Kids', avatarId: '507f1f77bcf86cd799439011' });
+
+        expect(response.status).toBe(200);
+        expect(userDal.updateProfileAvatar).toHaveBeenCalledWith('alice', 'Kids', '507f1f77bcf86cd799439011');
+    });
+
+    it('returns 404 when profile does not exist for the user', async () => {
+        const userDal = { updateProfileAvatar: jest.fn().mockResolvedValue(false) };
+        const app = makeApp(userDal);
+
+        const response = await request(app)
+            .put('/user/profile')
+            .send({ profileName: 'NonExistent', avatarId: '507f1f77bcf86cd799439011' });
+
+        expect(response.status).toBe(404);
+    });
+
+    it('returns 400 when avatarId is not a valid ObjectId', async () => {
+        const userDal = { updateProfileAvatar: jest.fn() };
+        const app = makeApp(userDal);
+
+        const response = await request(app)
+            .put('/user/profile')
+            .send({ profileName: 'Kids', avatarId: 'bad-id' });
+
+        expect(response.status).toBe(400);
+        expect(userDal.updateProfileAvatar).not.toHaveBeenCalled();
+    });
+});
+
 describe('DELETE /user/profile/:name', () => {
     it('returns 200 and deletes the profile', async () => {
         const userDal = { deleteProfile: jest.fn().mockResolvedValue(undefined) };

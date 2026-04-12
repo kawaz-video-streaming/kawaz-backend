@@ -31,6 +31,20 @@ export class UserDal extends Dal<User> {
     return true;
   }
 
+  updateProfileAvatar = async (username: string, profileName: string, avatarId: string): Promise<boolean> => {
+    const user = await this.findUser(username);
+    if (isNil(user)) {
+      return false;
+    }
+    const profileIndex = user.profiles.findIndex(p => p.name === profileName);
+    if (profileIndex === -1) {
+      return false;
+    }
+    user.profiles[profileIndex].avatarId = avatarId;
+    await this.model.findOneAndUpdate({ name: username }, { profiles: user.profiles }).exec();
+    return true;
+  }
+
   deleteProfile = async (name: string, profileName: string): Promise<void> => {
     await this.model.findOneAndUpdate({ name }, { $pull: { profiles: { name: profileName } } }).exec();
   }

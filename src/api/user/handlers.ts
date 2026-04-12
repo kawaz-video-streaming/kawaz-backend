@@ -1,4 +1,4 @@
-import { ConflictError, Request, Response } from "@ido_kawaz/server-framework";
+import { ConflictError, NotFoundError, Request, Response } from "@ido_kawaz/server-framework";
 import { UserDal } from '../../dal/user';
 import { requestHandlerDecorator } from "../../utils/decorator";
 import { AuthenticatedRequest } from "../../utils/types";
@@ -23,6 +23,19 @@ export const createUserHandlers = (userDal: UserDal) => {
                     res.status(201).json({ message: "Profile created successfully" });
                 } else {
                     throw new ConflictError("Profile with the same name already exists for this user");
+                }
+            }
+        ),
+        updateProfileAvatar: requestHandlerDecorator(
+            'update user profile avatar',
+            async (req: Request, res: Response) => {
+                const { user: { username } } = req as AuthenticatedRequest;
+                const { body: { avatarId, profileName } } = validateUserProfileRequest(req);
+                const success = await userDal.updateProfileAvatar(username, profileName, avatarId);
+                if (success) {
+                    res.status(200).json({ message: "Profile avatar updated successfully" });
+                } else {
+                    throw new NotFoundError("Profile not found for this user");
                 }
             }
         ),

@@ -2,9 +2,9 @@ import { InternalServerError } from "@ido_kawaz/server-framework";
 import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
 import { Dals } from "../../dal/types";
+import { cleanupPath } from "../../utils/files";
 import { BucketsConfig, PRESIGNED_URL_EXPIRY_SECONDS, UploadedFile } from "../../utils/types";
 import { MediaCollectionUpdateRequestBody } from "./types";
-import { cleanupPath } from "../../utils/files";
 
 class CollectionNotEmptyError extends InternalServerError {
   constructor() {

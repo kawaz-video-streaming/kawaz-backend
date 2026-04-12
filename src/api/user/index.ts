@@ -71,6 +71,39 @@ export const createUserRouter = (userDal: UserDal) => {
     /**
      * @openapi
      * /user/profile:
+     *   put:
+     *     summary: update the profile avatar
+     *     description: Updates the avatar of an existing profile for the user.
+     *     tags:
+     *       - Auth
+     *     security:
+     *       - cookieAuth: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             properties:
+     *               profileName:
+     *                 type: string
+     *               avatarId:
+     *                 type: string
+     *     responses:
+     *       200: 
+     *         description: Profile avatar updated successfully
+     *       400:   
+     *         description: Invalid request body
+     *       401:
+     *         description: Missing or invalid token
+     *       500:
+     *         description: Internal server error
+     */
+    router.put("/profile", userHandlers.updateProfileAvatar);
+
+    /**
+     * @openapi
+     * /user/profile:
      *   delete:
      *     summary: Delete a user profile
      *     description: Deletes a user profile.
@@ -110,13 +143,13 @@ export const createUserRouter = (userDal: UserDal) => {
      *              properties:
      *                profiles:
      *                 type: array
-     *                items:
-     *                  type: object
-     *                 properties:
-     *                   name:
-     *                    type: string
-     *                  avatarId:
-     *                   type: string
+     *                 items:
+     *                   type: object
+     *                   properties:
+     *                     name:
+     *                       type: string
+     *                     avatarId:
+     *                       type: string
      *       400:   
      *         description: Invalid request body
      *       401:
