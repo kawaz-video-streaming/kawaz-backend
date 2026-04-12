@@ -130,7 +130,7 @@ describe('POST /media/upload route', () => {
             .attach('thumbnail', fixtureThumbnailFile);
 
         expect(response.status).toBe(200);
-        expect(response.body).toEqual({ message: 'Media Started Uploading' });
+        expect(response.body).toEqual({ message: 'Media Started Uploading', mediaId: 'media-1' });
 
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
         expect(mediaDal.createMedia).toHaveBeenCalledWith({
@@ -186,5 +186,159 @@ describe('POST /media/upload route', () => {
 
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
         expect(amqpClient.publish).not.toHaveBeenCalled();
+    });
+});
+
+describe('GET /media/uploading', () => {
+    const AUTH_CONFIG = { jwtSecret: 'uploading-test-secret', adminPromotionSecret: 'admin-secret' };
+
+    let app: Application;
+    let mediaDal: { getAllNoneCompletedMedia: jest.Mock };
+    let userDal: { findUser: jest.Mock };
+    let userToken: string;
+
+    const makeApp = () => {
+        app = express();
+        app.use(parseCookies);
+        app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use('/media', createMediaRouter({
+            kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
+            vod: { vodStorageBucket: 'vod-bucket' },
+        }, mediaDal as unknown as MediaDal, {} as unknown as AmqpClient, {} as any));
+        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+            if (error instanceof ApiError) {
+                res.status(error.statusCode).json({ message: error.message });
+                return;
+            }
+            const message = error instanceof Error ? error.message : 'Internal server error';
+            res.status(500).json({ message });
+        });
+    };
+
+    beforeEach(() => {
+        mediaDal = {
+            getAllNoneCompletedMedia: jest.fn().mockResolvedValue([
+                { _id: 'media-1', status: 'pending', percentage: 10 },
+                { _id: 'media-2', status: 'processing', percentage: 20 },
+            ]),
+        };
+
+        userDal = {
+            findUser: jest.fn().mockResolvedValue({ name: 'user', password: 'hash', role: 'user' }),
+        };
+
+        userToken = jwt.sign({ username: 'user', role: 'user' }, AUTH_CONFIG.jwtSecret);
+        makeApp();
+    });
+
+    it('returns 200 with all non-completed media', async () => {
+        const response = await request(app)
+            .get('/media/uploading')
+            .set('Cookie', `kawaz-token=${userToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toHaveLength(2);
+        expect(mediaDal.getAllNoneCompletedMedia).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 404 when there are no non-completed media', async () => {
+        mediaDal.getAllNoneCompletedMedia.mockResolvedValueOnce([]);
+
+        const response = await request(app)
+            .get('/media/uploading')
+            .set('Cookie', `kawaz-token=${userToken}`);
+
+        expect(response.status).toBe(404);
+    });
+
+    it('returns 401 when not authenticated', async () => {
+        const response = await request(app).get('/media/uploading');
+
+        expect(response.status).toBe(401);
+    });
+});
+
+describe('GET /media/:id/progress', () => {
+    const AUTH_CONFIG = { jwtSecret: 'progress-test-secret', adminPromotionSecret: 'admin-secret' };
+    const mediaId = '507f1f77bcf86cd799439011';
+
+    let app: Application;
+    let mediaDal: { getMediaUploadProgress: jest.Mock };
+    let userDal: { findUser: jest.Mock };
+    let userToken: string;
+
+    beforeEach(() => {
+        mediaDal = {
+            getMediaUploadProgress: jest.fn().mockResolvedValue({ status: 'processing', percentage: 50 }),
+        };
+
+        userDal = {
+            findUser: jest.fn().mockResolvedValue({ name: 'user', password: 'hash', role: 'user' }),
+        };
+
+        userToken = jwt.sign({ username: 'user', role: 'user' }, AUTH_CONFIG.jwtSecret);
+
+        app = express();
+        app.use(parseCookies);
+        app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use('/media', createMediaRouter({
+            kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
+            vod: { vodStorageBucket: 'vod-bucket' },
+        }, mediaDal as unknown as MediaDal, {} as unknown as AmqpClient, {} as any));
+        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+            if (error instanceof ApiError) {
+                res.status(error.statusCode).json({ message: error.message });
+                return;
+            }
+            const message = error instanceof Error ? error.message : 'Internal server error';
+            res.status(500).json({ message });
+        });
+    });
+
+    it('returns 200 with status and percentage for an in-progress media', async () => {
+        const response = await request(app)
+            .get(`/media/${mediaId}/progress`)
+            .set('Cookie', `kawaz-token=${userToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ status: 'processing', percentage: 50 });
+        expect(mediaDal.getMediaUploadProgress).toHaveBeenCalledWith(mediaId);
+    });
+
+    it('returns 200 with percentage 100 for completed media', async () => {
+        mediaDal.getMediaUploadProgress.mockResolvedValueOnce({ status: 'completed', percentage: 100 });
+
+        const response = await request(app)
+            .get(`/media/${mediaId}/progress`)
+            .set('Cookie', `kawaz-token=${userToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ status: 'completed', percentage: 100 });
+    });
+
+    it('returns 200 with pending/0 when media is not yet found (DAL fallback)', async () => {
+        mediaDal.getMediaUploadProgress.mockResolvedValueOnce({ status: 'pending', percentage: 0 });
+
+        const response = await request(app)
+            .get(`/media/${mediaId}/progress`)
+            .set('Cookie', `kawaz-token=${userToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ status: 'pending', percentage: 0 });
+    });
+
+    it('returns 400 for an invalid media ID', async () => {
+        const response = await request(app)
+            .get('/media/not-a-valid-id/progress')
+            .set('Cookie', `kawaz-token=${userToken}`);
+
+        expect(response.status).toBe(400);
+        expect(mediaDal.getMediaUploadProgress).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 when not authenticated', async () => {
+        const response = await request(app).get(`/media/${mediaId}/progress`);
+
+        expect(response.status).toBe(401);
     });
 });

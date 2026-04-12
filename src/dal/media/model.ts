@@ -122,6 +122,7 @@ export interface Media {
   tags: MediaTag[];
   size: number;
   status: MediaStatus;
+  percentage: number;
   thumbnailFocalPoint: Coordinates;
   collectionId?: string; // Optional field if media is part of a collection in the future
   metadata?: MediaMetadata;
@@ -140,6 +141,7 @@ export const mediaZodSchema = z.object({
   tags: z.array(z.enum(MEDIA_TAGS)).default([]),
   size: z.coerce.number(),
   status: z.enum(mediaStatuses).default(PENDING),
+  percentage: z.coerce.number().default(0),
   thumbnailFocalPoint: z.object({
     x: z.number(),
     y: z.number()
@@ -156,6 +158,7 @@ const mediaSchema = new Schema<Media>(
     tags: { type: [String], enum: MEDIA_TAGS, default: [] },
     size: { type: Number, required: true },
     status: { type: String, enum: mediaStatuses, default: PENDING },
+    percentage: { type: Number, required: true, default: 0 },
     thumbnailFocalPoint: { type: coordinatesSchema, required: true },
     collectionId: { type: String, required: false },
     metadata: { type: mediaMetadataSchema, required: false },

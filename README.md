@@ -8,7 +8,7 @@ Kawaz Plus media backend service.
 - Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`, `POST /auth/promote`) — JWT-based authentication with role support
 - Exposes user endpoints (`GET /user/me`, `POST /user/profile`, `PUT /user/profile`, `DELETE /user/profile/:name`, `GET /user/profiles`) — per-user profile management
 - Exposes avatar endpoints (`GET /avatar`, `GET /avatar/:id`, `GET /avatar/:id/image`, `POST /avatar`, `DELETE /avatar/:id`) — avatar catalog with image storage
-- Exposes media CRUD endpoints (`GET /media`, `GET /media/:id`, `PUT /media/:id`, `DELETE /media/:id`) — served from MongoDB
+- Exposes media CRUD endpoints (`GET /media`, `GET /media/uploading`, `GET /media/:id`, `PUT /media/:id`, `DELETE /media/:id`) — served from MongoDB; `/uploading` returns all non-completed media
 - Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`) — video + required thumbnail, requires admin role
 - Exposes media collection CRUD endpoints (`/mediaCollection`) — group media into nestable collections
 - Exposes MPEG-DASH streaming endpoints (`/media/stream/:id/output.mpd`, `*.m4s`, `*.vtt`) direct from VOD storage
@@ -234,7 +234,7 @@ Returns `200 OK` if service is running.
 - Requires: `kawaz-token` cookie with **admin role**
 - Content type: `multipart/form-data`
 - Fields: `title` (required string), `description` (optional), `tags` (optional array), `thumbnailFocalPoint` (optional `{ x, y }`, defaults to `{ x: 0.5, y: 0.5 }`), `file` (video, required), `thumbnail` (image, required)
-- Success response: `200 { "message": "Media Started Uploading" }`
+- Success response: `200 { "message": "Media Started Uploading", "mediaId": string }`
 - Error responses: `400` (missing file/thumbnail/title or non-video/image mimetype), `401` (unauthenticated), `403` (not admin)
 
 ### `GET /media`
@@ -242,6 +242,21 @@ Returns `200 OK` if service is running.
 - Requires: `kawaz-token` cookie with valid JWT
 - Success response: `200 [{ "_id", "fileName", "title", "tags", "size", "status", "metadata", ... }]`
 - Error responses: `401`, `404` (no media found)
+
+### `GET /media/uploading`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Returns all media not yet in `completed` status (i.e. `pending`, `processing`, `failed`)
+- Success response: `200 [{ "_id", "status", "percentage", ... }]`
+- Error responses: `401`, `404` (no non-completed media found)
+
+### `GET /media/:id/progress`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Returns the upload `percentage` (0–100) and current `status` for a specific media item
+- If the media ID is not found, returns `{ status: "pending", percentage: 0 }` as a fallback
+- Success response: `200 { "status": string, "percentage": number }`
+- Error responses: `400` (invalid ID), `401`
 
 ### `GET /media/:id`
 

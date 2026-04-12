@@ -29,6 +29,7 @@ describe('uploadMediaHandler', () => {
         tags: [],
         size: 1024,
         status: 'pending',
+        percentage: 0,
         thumbnailFocalPoint: { x: 0.5, y: 0.5 },
         ...overrides,
     });
@@ -156,6 +157,7 @@ describe('uploadSuccessHandler', () => {
         tags: [],
         size: 1024,
         status: 'pending',
+        percentage: 0,
         thumbnailFocalPoint: { x: 0.5, y: 0.5 },
         ...overrides,
     });
@@ -205,7 +207,7 @@ describe('uploadSuccessHandler', () => {
         });
 
         expect(mediaDal.updateMedia).toHaveBeenCalledTimes(1);
-        expect(mediaDal.updateMedia).toHaveBeenCalledWith(media._id, { status: 'processing' });
+        expect(mediaDal.updateMedia).toHaveBeenCalledWith(media._id, { status: 'processing', percentage: 20 });
     });
 
     it('cleans up temp media file after publishing', async () => {

@@ -1,13 +1,13 @@
 import { Dal, DeleteResult, Types } from "@ido_kawaz/mongo-client";
 import { isNil, isNotEmpty, isNotNil } from "ramda";
-import { COMPLETED, Media, MediaInfo, MediaModel, PENDING } from "./model";
+import { COMPLETED, Media, MediaInfo, MediaModel, MediaStatus, PENDING } from "./model";
 
 export class MediaDal extends Dal<Media> {
   constructor(mediaModel: MediaModel) {
     super(mediaModel);
   }
 
-  createMedia = async (mediaInfo: Omit<MediaInfo, "status">): Promise<Media> => {
+  createMedia = async (mediaInfo: Omit<MediaInfo, "status" | "percentage">): Promise<Media> => {
     const { fileName, title, description, tags, size, thumbnailFocalPoint, collectionId } = mediaInfo;
     const media: Media = {
       _id: new Types.ObjectId().toString(),
@@ -18,6 +18,7 @@ export class MediaDal extends Dal<Media> {
       tags,
       size,
       status: PENDING,
+      percentage: 10,
       thumbnailFocalPoint
     };
     await this.model.insertOne(media);
@@ -41,10 +42,17 @@ export class MediaDal extends Dal<Media> {
     await this.model.findByIdAndUpdate(mediaId, { ...isNotEmpty(Object.keys($set)) && { $set }, ...isNotEmpty(Object.keys($unset)) && { $unset } }).lean().exec();
   }
 
+  getAllNoneCompletedMedia = async (): Promise<Media[]> => this.model.find({ status: { $ne: COMPLETED } }).lean<Media[]>().exec();
 
   getAllMedia = async (): Promise<Media[]> => this.model.find({ status: COMPLETED }).lean<Media[]>().exec();
 
   getMedia = async (mediaId: string): Promise<Media | null> => this.model.findOne({ _id: mediaId, status: COMPLETED }).lean<Media>().exec();
+
+  getMediaUploadProgress = async (mediaId: string): Promise<{ status: MediaStatus, percentage: number }> => this.model
+    .findOne({ _id: mediaId }, { status: 1, percentage: 1 })
+    .lean<{ status: MediaStatus, percentage: number }>()
+    .exec()
+    .then(result => result ?? { status: PENDING, percentage: 0 });
 
   isCollectionEmpty = async (collectionId: string): Promise<boolean> =>
     isNil(await this.model.exists({ collectionId, status: COMPLETED }).lean().exec());

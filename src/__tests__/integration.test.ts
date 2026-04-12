@@ -140,7 +140,8 @@ describe('Media upload integration', () => {
             .attach('thumbnail', fixtureThumbnailFile);
 
         expect(uploadResponse.status).toBe(200);
-        expect(uploadResponse.body).toEqual({ message: 'Media Started Uploading' });
+        expect(uploadResponse.body).toMatchObject({ message: 'Media Started Uploading' });
+        expect(uploadResponse.body.mediaId).toBeDefined();
 
         // Verify media was persisted
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
@@ -223,7 +224,7 @@ describe('Media upload integration', () => {
 
         // Verify status was updated to processing
         expect(mediaDal.updateMedia).toHaveBeenCalledTimes(1);
-        expect(mediaDal.updateMedia).toHaveBeenCalledWith(uploadedMedia._id, { status: 'processing' });
+        expect(mediaDal.updateMedia).toHaveBeenCalledWith(uploadedMedia._id, { status: 'processing', percentage: 20 });
     });
 
     it('background consumer always publishes convert event and sets processing status', async () => {
@@ -262,7 +263,7 @@ describe('Media upload integration', () => {
             mediaId: uploadedMedia._id,
             mediaStorageBucket: 'media-bucket',
         }));
-        expect(mediaDal.updateMedia).toHaveBeenCalledWith(uploadedMedia._id, { status: 'processing' });
+        expect(mediaDal.updateMedia).toHaveBeenCalledWith(uploadedMedia._id, { status: 'processing', percentage: 20 });
     });
 
     it('handles upload failure gracefully with proper error responses', async () => {
@@ -325,7 +326,8 @@ describe('Media upload integration', () => {
             .attach('thumbnail', fixtureThumbnailFile);
 
         expect(uploadRes.status).toBe(200);
-        expect(uploadRes.body).toEqual({ message: 'Media Started Uploading' });
+        expect(uploadRes.body).toMatchObject({ message: 'Media Started Uploading' });
+        expect(uploadRes.body.mediaId).toBeDefined();
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
         expect(amqpClient.publish).toHaveBeenCalledTimes(1);
     });

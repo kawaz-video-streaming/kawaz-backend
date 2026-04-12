@@ -40,6 +40,32 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
 
   /**
    * @openapi
+   * /media/uploading:
+   *   get:
+   *     summary: Get all non-completed media
+   *     description: Returns all media that are not yet completed (pending, processing, or failed)
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     responses:
+   *       200:
+   *         description: List of non-completed media
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: array
+   *               items:
+   *                 $ref: '#/components/schemas/Media'
+   *       401:
+   *         description: Unauthorized
+   *       404:
+   *         description: No non-completed media found
+   */
+  router.get("/uploading", mediaHandlers.getAllNoneCompletedMedia);
+
+  /**
+   * @openapi
    * /media/upload:
    *   post:
    *     summary: Upload a media file
@@ -204,6 +230,42 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
   *         description: Media not found
   */
   router.get("/:id", mediaHandlers.getMedia);
+
+  /**
+   * @openapi
+   * /media/{id}/progress:
+   *   get:
+   *     summary: Get media upload progress
+   *     description: Returns the upload progress for a specific media
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Media ID
+   *     responses:
+   *       200:
+   *         description: Media upload progress
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 status:
+   *                   type: string
+   *                 percentage:
+   *                   type: number
+   *       401:
+   *         description: Unauthorized
+   *       404:
+   *         description: Media not found
+   */
+  router.get("/:id/progress", mediaHandlers.getMediaUploadProgress);
 
   /**
    * @openapi

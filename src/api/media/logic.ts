@@ -17,6 +17,7 @@ export const createMediaLogic = (
   uploadMedia: async (body: MediaUpdateRequestBody, mediaFile: UploadedFile, thumbnail: UploadedFile) => {
     const media = await mediaDal.createMedia({ ...body, ...mediaFile });
     amqpClient.publish<Upload>(UPLOAD_CONSUMER_EXCHANGE, UPLOAD_CONSUMER_TOPIC, { media, mediaPath: mediaFile.path, thumbnailPath: thumbnail.path });
+    return media._id;
   },
   deleteMedia: async (mediaId: string) => {
     await mediaDal.deleteMedia(mediaId);
@@ -33,7 +34,9 @@ export const createMediaLogic = (
     }
   },
   getAllMedia: () => mediaDal.getAllMedia(),
+  getAllNoneCompletedMedia: () => mediaDal.getAllNoneCompletedMedia(),
   getMedia: (mediaId: string) => mediaDal.getMedia(mediaId),
+  getMediaUploadProgress: async (mediaId: string) => mediaDal.getMediaUploadProgress(mediaId),
   getTiles: (mediaId: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/thumbnails.jpg`),
   getThumbnail: (mediaId: string) => storageClient.getPresignedUrl(kawazBucket, `${thumbnailPrefix}/${mediaId}.jpg`, PRESIGNED_URL_EXPIRY_SECONDS),
   getManifest: (mediaId: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/output.mpd`),

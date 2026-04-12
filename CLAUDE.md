@@ -79,9 +79,11 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 | `GET` | `/avatar/:id/image` | Yes | Redirect to presigned avatar image URL |
 | `POST` | `/avatar` | Yes (admin only) | Create an avatar with image upload |
 | `DELETE` | `/avatar/:id` | Yes (admin only) | Delete an avatar from DB and storage |
-| `POST` | `/media/upload` | Yes (admin only) | Upload video + thumbnail (multipart/form-data); requires `title` field |
+| `POST` | `/media/upload` | Yes (admin only) | Upload video + thumbnail (multipart/form-data); returns `{ message, mediaId }` |
 | `GET` | `/media` | Yes | List all completed media from MongoDB |
+| `GET` | `/media/uploading` | Yes | List all non-completed media (pending/processing/failed) |
 | `GET` | `/media/:id` | Yes | Get a single media's metadata from MongoDB |
+| `GET` | `/media/:id/progress` | Yes | Get upload progress `{ status, percentage }` for a media item |
 | `PUT` | `/media/:id` | Yes (admin only) | Update media title, description, tags, thumbnail image, or thumbnail focal point |
 | `DELETE` | `/media/:id` | Yes (admin only) | Delete media from DB and VOD storage |
 | `GET` | `/media/:id/thumbnail` | Yes | Redirect to presigned thumbnail URL |
@@ -108,6 +110,7 @@ interface Media {
   tags: MediaTag[];              // e.g. "Action", "Comedy", etc.
   size: number;                  // file size in bytes
   status: MediaStatus;           // "pending" | "processing" | "completed" | "failed"
+  percentage: number;            // upload progress 0–100; set by upload/progress consumers
   thumbnailFocalPoint: Coordinates; // { x, y } crop anchor, defaults to { x: 0.5, y: 0.5 }
   collectionId?: string;         // optional parent collection
   metadata?: MediaMetadata;      // populated by progress consumer on completion

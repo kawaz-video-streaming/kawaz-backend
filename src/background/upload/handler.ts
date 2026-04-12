@@ -29,7 +29,7 @@ export const uploadSuccessHandler = (
         mediaRoutingKey: `${uploadPrefix}/${media.fileName}`
     };
     amqpClient.publish("convert", "convert.media", message);
-    await mediaDal.updateMedia(media._id, { status: "processing" });
+    await mediaDal.updateMedia(media._id, { status: "processing", percentage: 20 });
     await cleanupPath(mediaPath);
     await cleanupPath(thumbnailPath);
 };

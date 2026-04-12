@@ -3,37 +3,49 @@ import { validateProgressPayload } from '../types';
 
 describe('validateProgressPayload', () => {
     it('returns true for a valid payload with completed status', () => {
-        const payload = { mediaId: new Types.ObjectId().toHexString(), status: 'completed' };
+        const payload = { mediaId: new Types.ObjectId().toHexString(), status: 'completed', percentage: 100 };
 
         expect(validateProgressPayload(payload)).toBe(true);
     });
 
     it('returns true for a valid payload with failed status', () => {
-        const payload = { mediaId: new Types.ObjectId().toHexString(), status: 'failed' };
+        const payload = { mediaId: new Types.ObjectId().toHexString(), status: 'failed', percentage: 50 };
 
         expect(validateProgressPayload(payload)).toBe(true);
     });
 
     it('returns false when mediaId is not a valid ObjectId', () => {
-        const payload = { mediaId: 'invalid-id', status: 'completed' };
+        const payload = { mediaId: 'invalid-id', status: 'completed', percentage: 100 };
 
         expect(validateProgressPayload(payload)).toBe(false);
     });
 
     it('returns false when status is invalid', () => {
-        const payload = { mediaId: new Types.ObjectId().toHexString(), status: 'processing' };
+        const payload = { mediaId: new Types.ObjectId().toHexString(), status: 'processing', percentage: 50 };
 
         expect(validateProgressPayload(payload)).toBe(false);
     });
 
     it('returns false when mediaId is missing', () => {
-        const payload = { status: 'completed' };
+        const payload = { status: 'completed', percentage: 100 };
 
         expect(validateProgressPayload(payload)).toBe(false);
     });
 
     it('returns false when status is missing', () => {
-        const payload = { mediaId: new Types.ObjectId().toHexString() };
+        const payload = { mediaId: new Types.ObjectId().toHexString(), percentage: 100 };
+
+        expect(validateProgressPayload(payload)).toBe(false);
+    });
+
+    it('returns false when percentage is missing', () => {
+        const payload = { mediaId: new Types.ObjectId().toHexString(), status: 'completed' };
+
+        expect(validateProgressPayload(payload)).toBe(false);
+    });
+
+    it('returns false when percentage is out of range', () => {
+        const payload = { mediaId: new Types.ObjectId().toHexString(), status: 'completed', percentage: 150 };
 
         expect(validateProgressPayload(payload)).toBe(false);
     });

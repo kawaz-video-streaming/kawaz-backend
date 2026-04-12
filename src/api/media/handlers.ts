@@ -23,13 +23,23 @@ export const createMediaHandlers = (bucketsConfig: BucketsConfig, mediaDal: Medi
                     }
                     res.status(StatusCodes.OK).json(medias);
                 }),
+        getAllNoneCompletedMedia:
+            requestHandlerDecorator(
+                'get all none completed media',
+                async (_req: Request, res: Response) => {
+                    const medias = await logic.getAllNoneCompletedMedia();
+                    if (isEmpty(medias)) {
+                        throw new NotFoundError('No media found');
+                    }
+                    res.status(StatusCodes.OK).json(medias);
+                }),
         uploadMedia:
             requestHandlerDecorator(
                 'upload media',
                 async (rawReq: Request, res: Response) => {
                     const { body, file, thumbnail } = validateMediaUploadRequest(rawReq);
-                    await logic.uploadMedia(body, file, thumbnail);
-                    res.status(StatusCodes.OK).json({ message: 'Media Started Uploading' });
+                    const mediaId = await logic.uploadMedia(body, file, thumbnail);
+                    res.status(StatusCodes.OK).json({ message: 'Media Started Uploading', mediaId });
                 }),
         deleteMedia:
             requestHandlerDecorator(
@@ -57,6 +67,14 @@ export const createMediaHandlers = (bucketsConfig: BucketsConfig, mediaDal: Medi
                         throw new NotFoundError('Media not found');
                     }
                     res.status(StatusCodes.OK).json(media);
+                }),
+        getMediaUploadProgress:
+            requestHandlerDecorator(
+                'get media upload progress',
+                async (req: Request, res: Response) => {
+                    const { params: { id: mediaId } } = validateRequestWithId(req);
+                    const progressStatus = await logic.getMediaUploadProgress(mediaId);
+                    res.status(StatusCodes.OK).json(progressStatus);
                 }),
         getThumbnail:
             requestHandlerDecorator(
