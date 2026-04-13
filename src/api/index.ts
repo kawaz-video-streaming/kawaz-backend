@@ -1,15 +1,24 @@
 import { AmqpClient } from "@ido_kawaz/amqp-client";
 import { Application } from "@ido_kawaz/server-framework";
+import { StorageClient } from "@ido_kawaz/storage-client";
 import { StatusCodes } from "http-status-codes";
 import swaggerUi from "swagger-ui-express";
+import { BackendServerConfig } from "../config";
 import { Dals } from "../dal/types";
+import { createAuthRouter } from "./auth";
 import { createMediaRouter } from "./media";
+import { createAuthMiddleware } from "./middleware";
 import { swaggerSpec } from "./swagger";
+import { createMediaCollectionRouter } from "./mediaCollection";
+import { createAvatarRouter } from "./avatar";
+import { createUserRouter } from "./user";
 
 
-export const registerRoutes = (amqpClient: AmqpClient, dals: Dals) =>
+export const registerRoutes = (config: BackendServerConfig, storageClient: StorageClient, amqpClient: AmqpClient, dals: Dals) =>
     (app: Application) => {
-        const { mediaDal } = dals;
+        const { mediaDal, userDal, avatarDal } = dals;
+        const { authConfig } = config;
+
         /**
          * @openapi
          * /health:
@@ -29,8 +38,16 @@ export const registerRoutes = (amqpClient: AmqpClient, dals: Dals) =>
         // Swagger documentation
         app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-        // API routes
-        app.use("/media", createMediaRouter(mediaDal, amqpClient));
+        // Authentication routes
+        app.use('/auth', createAuthRouter(authConfig, userDal));
 
+        // Apply authentication middleware to all API routes
+        app.use(createAuthMiddleware(authConfig, userDal));
+
+        // API routes
+        app.use('/user', createUserRouter(userDal));
+        app.use("/avatar", createAvatarRouter(config.bucketsConfig, avatarDal, storageClient));
+        app.use("/media", createMediaRouter(config.bucketsConfig, mediaDal, amqpClient, storageClient));
+        app.use("/mediaCollection", createMediaCollectionRouter(config.bucketsConfig, dals, storageClient));
         return app;
     };
