@@ -24,7 +24,6 @@ Kawaz Plus media backend service.
 - `@ido_kawaz/mongo-client`
 - `@ido_kawaz/amqp-client`
 - `@ido_kawaz/storage-client`
-- `@ido_kawaz/vod-client`
 - Multer
 - Swagger (`swagger-jsdoc`, `swagger-ui-express`)
 

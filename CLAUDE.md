@@ -156,7 +156,6 @@ All `@ido_kawaz/*` packages are listed as **devDependencies** (resolved locally 
 | `@ido_kawaz/mongo-client` | MongoDB/Mongoose wrapper with base `Dal` class |
 | `@ido_kawaz/amqp-client` | RabbitMQ client (publish/consume) |
 | `@ido_kawaz/storage-client` | S3-compatible storage client |
-| `@ido_kawaz/vod-client` | VOD service client (streaming routes only — manifest, segment, VTT) |
 
 ### Patterns
 
