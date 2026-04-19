@@ -26,6 +26,8 @@ jobs:
   build-and-deploy:
     needs: test
     runs-on: ubuntu-latest
+    env:
+      USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
     permissions:
       contents: read
       packages: write       # needed to push to GHCR
@@ -55,8 +57,6 @@ jobs:
           sudo apt-get update && sudo apt-get install -y google-cloud-cli-gke-gcloud-auth-plugin
 
       - name: Set up kubectl
-        env:
-          USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
         run: |
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
