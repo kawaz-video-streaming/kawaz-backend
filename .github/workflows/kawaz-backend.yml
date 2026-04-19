@@ -26,8 +26,6 @@ jobs:
   build-and-deploy:
     needs: test
     runs-on: ubuntu-latest
-    env:
-      USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
     permissions:
       contents: read
       packages: write       # needed to push to GHCR
@@ -50,16 +48,17 @@ jobs:
             ${{ env.IMAGE }}:${{ github.sha }}
             ${{ env.IMAGE }}:latest
 
-      - name: Install gke-gcloud-auth-plugin
-        run: |
-          curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
-          echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
-          sudo apt-get update && sudo apt-get install -y google-cloud-cli-gke-gcloud-auth-plugin
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Set up kubectl
-        run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: kawaz
+          location: europe-west3-a
+          project_id: kawaz-video-streaming
 
       - name: Apply ConfigMap
         run: |
