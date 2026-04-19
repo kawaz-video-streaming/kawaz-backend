@@ -90,9 +90,9 @@ export const createMediaHandlers = (bucketsConfig: BucketsConfig, mediaDal: Medi
                 'get media tiles',
                 async (req: Request, res: Response) => {
                     const videoId = req.params[0];
-                    const tilesStream = await logic.getTiles(videoId);
+                    const tilesPresignedUrl = await logic.getTiles(videoId);
                     res.setHeader("Content-Type", "image/jpeg");
-                    tilesStream.pipe(res);
+                    res.redirect(tilesPresignedUrl);
                 }),
         getManifest:
             requestHandlerDecorator(

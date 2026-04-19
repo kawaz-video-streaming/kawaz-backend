@@ -37,7 +37,7 @@ This is a **media upload microservice** with two main processing paths:
 1. **HTTP API** (`src/api/`) — Accepts file uploads, saves metadata to MongoDB (status: "pending"), publishes AMQP message (with temp file path) to trigger background processing.
 2. **AMQP Consumer** (`src/background/`) — Two consumers:
    - **Upload** (`src/background/upload/`) — Listens for upload events, uploads file to S3 (`uploadMediaHandler`), then on success triggers video conversion / updates status and cleans up the temp file (`uploadSuccessHandler`). Storage errors are wrapped as `UploadError` (retriable via `AmqpRetriableError`).
-   - **Progress** (`src/background/progress/`) — Listens for progress events, updates media status to `"completed"` or `"failed"`, and saves video metadata on completion.
+   - **Progress** (`src/background/progress/`) — Listens for progress events, updates media `status` and `percentage` for any of the four statuses (`pending`, `processing`, `completed`, `failed`); saves video `metadata` only when status is `"completed"`.
 
 ### Request Flow
 
@@ -90,6 +90,7 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 | `GET` | `/media/stream/:id/output.mpd` | Yes | Stream MPEG-DASH manifest from VOD storage bucket |
 | `GET` | `/media/stream/:id/:filename.m4s` | Yes | Redirect to presigned URL for a video segment |
 | `GET` | `/media/stream/:id/:filename.vtt` | Yes | Stream VTT subtitle file from VOD storage bucket |
+| `GET` | `/media/stream/:id/thumbnails.jpg` | Yes | Stream sprite-sheet tile thumbnails image from VOD storage bucket |
 | `POST` | `/media-collection` | Yes (admin only) | Create a collection with a required thumbnail |
 | `GET` | `/media-collection` | Yes | List all media collections |
 | `GET` | `/media-collection/:id` | Yes | Get a single collection's metadata |
@@ -113,7 +114,7 @@ interface Media {
   percentage: number;            // upload progress 0–100; set by upload/progress consumers
   thumbnailFocalPoint: Coordinates; // { x, y } crop anchor, defaults to { x: 0.5, y: 0.5 }
   collectionId?: string;         // optional parent collection
-  metadata?: MediaMetadata;      // populated by progress consumer on completion
+  metadata?: MediaMetadata;      // populated by progress consumer on completion; includes thumbnailsUrl
 }
 ```
 
@@ -155,7 +156,6 @@ All `@ido_kawaz/*` packages are listed as **devDependencies** (resolved locally 
 | `@ido_kawaz/mongo-client` | MongoDB/Mongoose wrapper with base `Dal` class |
 | `@ido_kawaz/amqp-client` | RabbitMQ client (publish/consume) |
 | `@ido_kawaz/storage-client` | S3-compatible storage client |
-| `@ido_kawaz/vod-client` | VOD service client (streaming routes only — manifest, segment, VTT) |
 
 ### Patterns
 
@@ -183,6 +183,7 @@ Service-specific env vars validated in `src/config.ts`:
 | `AVATAR_PREFIX` | Yes | Key prefix for avatar images within kawaz-plus bucket |
 | `VOD_STORAGE_BUCKET` | Yes | S3 bucket name for VOD content (manifests, segments, VTT) |
 | `JWT_SECRET` | Yes | Secret for signing/verifying JWT tokens |
+| `ADMIN_PROMOTION_SECRET` | Yes | Secret required in `x-admin-secret` header to promote a user to admin |
 
 Additional env vars are consumed by the internal packages (`createServerConfig()`, `createMongoConfig()`, `createAmqpConfig()`, `createStorageConfig()`) — refer to each package's documentation for their required variables.
 
@@ -190,4 +191,4 @@ Additional env vars are consumed by the internal packages (`createServerConfig()
 
 - Upload API publishes: exchange `upload`, topic `upload.media`
 - Upload consumer publishes (video): exchange `convert`, topic defined in `src/background/upload/binding.ts`
-- Progress consumer listens: exchange `progress`, topic `progress.media` (updates media status to `"completed"` or `"failed"`)
+- Progress consumer listens: exchange `progress`, topic `progress.media` (updates media `status` + `percentage` for all statuses; saves `metadata` only on `"completed"`)

@@ -20,6 +20,7 @@ describe('uploadMediaHandler', () => {
     const fixtureThumbnail = '/tmp/test-thumbnail.jpg';
 
     let storageClient: { uploadObject: jest.Mock };
+    let amqpClient: { publish: jest.Mock };
     let config: UploadConfig;
 
     const makeMedia = (overrides: Partial<Media> = {}): Media => ({
@@ -39,6 +40,10 @@ describe('uploadMediaHandler', () => {
             uploadObject: jest.fn().mockResolvedValue(undefined),
         };
 
+        amqpClient = {
+            publish: jest.fn().mockResolvedValue(undefined),
+        };
+
         config = {
             bucketsConfig: {
                 kawazPlus: {
@@ -56,6 +61,7 @@ describe('uploadMediaHandler', () => {
     it('uploads media file to storage with correct bucket and key prefix', async () => {
         const media = makeMedia({ fileName: 'clip.mp4' });
         const handler = uploadMediaHandler(
+            amqpClient as unknown as AmqpClient,
             storageClient as unknown as StorageClient,
             config
         );
@@ -66,12 +72,14 @@ describe('uploadMediaHandler', () => {
             'test-bucket',
             expect.objectContaining({ key: 'raw/clip.mp4', data: expect.anything() }),
             expect.objectContaining({ ensureBucket: true }),
+            expect.any(Function)
         );
     });
 
     it('uploads thumbnail to storage under thumbnails key', async () => {
         const media = makeMedia({ fileName: 'clip.mp4' });
         const handler = uploadMediaHandler(
+            amqpClient as unknown as AmqpClient,
             storageClient as unknown as StorageClient,
             config
         );
@@ -82,12 +90,14 @@ describe('uploadMediaHandler', () => {
             'test-bucket',
             expect.objectContaining({ key: `raw/thumbnails/${media._id}.jpg`, data: expect.anything() }),
             undefined,
+            expect.any(Function)
         );
     });
 
     it('uploads both media and thumbnail (two storage calls total)', async () => {
         const media = makeMedia({ fileName: 'clip.mp4' });
         const handler = uploadMediaHandler(
+            amqpClient as unknown as AmqpClient,
             storageClient as unknown as StorageClient,
             config
         );
@@ -100,6 +110,7 @@ describe('uploadMediaHandler', () => {
     it('uses multipart upload when file size exceeds partSize', async () => {
         const media = makeMedia({ fileName: 'large.mp4', size: 200 * 1024 * 1024 });
         const handler = uploadMediaHandler(
+            amqpClient as unknown as AmqpClient,
             storageClient as unknown as StorageClient,
             config
         );
@@ -110,12 +121,14 @@ describe('uploadMediaHandler', () => {
             expect.any(String),
             expect.objectContaining({ key: 'raw/large.mp4', data: expect.anything() }),
             expect.objectContaining({ multipartUpload: true }),
+            expect.any(Function)
         );
     });
 
     it('does not use multipart upload when file size is below partSize', async () => {
         const media = makeMedia({ fileName: 'small.mp4', size: 1024 });
         const handler = uploadMediaHandler(
+            amqpClient as unknown as AmqpClient,
             storageClient as unknown as StorageClient,
             config
         );
@@ -126,6 +139,7 @@ describe('uploadMediaHandler', () => {
             expect.any(String),
             expect.objectContaining({ key: 'raw/small.mp4', data: expect.anything() }),
             expect.objectContaining({ multipartUpload: false }),
+            expect.any(Function)
         );
     });
 
@@ -134,6 +148,7 @@ describe('uploadMediaHandler', () => {
 
         const media = makeMedia({ fileName: 'fail.mp4' });
         const handler = uploadMediaHandler(
+            amqpClient as unknown as AmqpClient,
             storageClient as unknown as StorageClient,
             config
         );

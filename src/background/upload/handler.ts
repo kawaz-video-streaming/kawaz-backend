@@ -7,11 +7,12 @@ import { ConvertMessage, Upload } from "./types";
 import { createUploadFile } from "./utils";
 
 export const uploadMediaHandler = (
+    amqpClient: AmqpClient,
     storageClient: StorageClient,
     { bucketsConfig: { kawazPlus: { kawazStorageBucket, uploadPrefix, thumbnailPrefix } }, partSize }: UploadConfig) =>
     async (payload: Upload) => {
         const { media, mediaPath, thumbnailPath } = payload;
-        const uploadFile = createUploadFile(storageClient, payload, kawazStorageBucket);
+        const uploadFile = createUploadFile(storageClient, amqpClient, payload, kawazStorageBucket);
         await uploadFile(mediaPath, `${uploadPrefix}/${media.fileName}`, { ensureBucket: true, multipartUpload: media.size > partSize });
         const thumbnailUploadKey = `${thumbnailPrefix}/${media._id}.jpg`;
         await uploadFile(thumbnailPath, thumbnailUploadKey);

@@ -11,7 +11,7 @@ Kawaz Plus media backend service.
 - Exposes media CRUD endpoints (`GET /media`, `GET /media/uploading`, `GET /media/:id`, `PUT /media/:id`, `DELETE /media/:id`) — served from MongoDB; `/uploading` returns all non-completed media
 - Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`) — video + required thumbnail, requires admin role
 - Exposes media collection CRUD endpoints (`/mediaCollection`) — group media into nestable collections
-- Exposes MPEG-DASH streaming endpoints (`/media/stream/:id/output.mpd`, `*.m4s`, `*.vtt`) direct from VOD storage
+- Exposes MPEG-DASH streaming endpoints (`/media/stream/:id/output.mpd`, `*.m4s`, `*.vtt`, `thumbnails.jpg`) direct from VOD storage
 - Publishes upload jobs to AMQP for async processing
 - Consumes upload jobs and uploads files to object storage
 - Persists media metadata and status in MongoDB
@@ -24,7 +24,6 @@ Kawaz Plus media backend service.
 - `@ido_kawaz/mongo-client`
 - `@ido_kawaz/amqp-client`
 - `@ido_kawaz/storage-client`
-- `@ido_kawaz/vod-client`
 - Multer
 - Swagger (`swagger-jsdoc`, `swagger-ui-express`)
 
@@ -261,8 +260,9 @@ Returns `200 OK` if service is running.
 ### `GET /media/:id`
 
 - Requires: `kawaz-token` cookie with valid JWT
+- Only returns media in `completed` status
 - Success response: `200 { "_id", "fileName", "title", "tags", "size", "status", "metadata", ... }`
-- Error responses: `401`, `404` (media not found)
+- Error responses: `401`, `404` (media not found or not completed)
 
 ### `PUT /media/:id`
 
@@ -343,6 +343,13 @@ Returns `200 OK` if service is running.
 - Success response: `200` VTT subtitle content (text/vtt)
 - Error responses: `401`, `500`
 
+### `GET /media/stream/:id/thumbnails.jpg`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Streams the sprite-sheet / tile thumbnails image for the video directly from VOD storage
+- Success response: `200` image/jpeg content
+- Error responses: `401`, `500`
+
 ### `GET /api-docs`
 
 Swagger UI for API documentation.
@@ -404,7 +411,7 @@ Stores metadata for uploaded media files.
 | `status` | String | Yes | One of: `pending`, `processing`, `completed`, `failed` |
 | `thumbnailFocalPoint` | Object `{ x, y }` | Yes | Crop anchor for the thumbnail (0–1 range, defaults to `{ x: 0.5, y: 0.5 }`) |
 | `collectionId` | String | No | Parent collection ID |
-| `metadata` | Object | No | Populated on completion (durationInMs, playUrl, streams, etc.) |
+| `metadata` | Object | No | Populated on completion (durationInMs, playUrl, thumbnailsUrl, streams, chapters, etc.) |
 
 Example document:
 ```json

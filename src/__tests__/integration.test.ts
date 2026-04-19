@@ -185,6 +185,7 @@ describe('Media upload integration', () => {
         storageClient.uploadObject.mockClear();
 
         const uploadHandler = uploadMediaHandler(
+            amqpClient as unknown as AmqpClient,
             storageClient as unknown as StorageClient,
             uploadConfig
         );
@@ -203,11 +204,13 @@ describe('Media upload integration', () => {
             'media-bucket',
             expect.objectContaining({ key: 'raw/sample.mp4', data: expect.anything() }),
             expect.objectContaining({ ensureBucket: true, multipartUpload: false }),
+            expect.any(Function)
         );
         expect(storageClient.uploadObject).toHaveBeenCalledWith(
             'media-bucket',
             expect.objectContaining({ key: `raw/thumbnails/${uploadedMedia._id}.jpg`, data: expect.anything() }),
             undefined,
+            expect.any(Function)
         );
 
         // Verify convert event was published for video

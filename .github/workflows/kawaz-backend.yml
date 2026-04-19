@@ -1,0 +1,89 @@
+name: kawaz-backend
+
+on:
+  push:
+    branches: [master]
+    paths: ['services/kawaz-backend/**']
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/kawaz-backend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/kawaz-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: services/kawaz-backend/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write       # needed to push to GHCR
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: services/kawaz-backend
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+
+      - name: Set up kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Apply ConfigMap
+        run: |
+          kubectl create configmap kawaz-backend-config \
+            --from-literal=NODE_ENV=${{ vars.NODE_ENV }} \
+            --from-literal=PORT=${{ vars.PORT }} \
+            --from-literal=AWS_ENDPOINT=${{ vars.AWS_ENDPOINT }} \
+            --from-literal=AWS_REGION=${{ vars.AWS_REGION }} \
+            --from-literal=KAWAZ_PLUS_BUCKET=${{ vars.KAWAZ_PLUS_BUCKET }} \
+            --from-literal=VOD_STORAGE_BUCKET=${{ vars.VOD_STORAGE_BUCKET }} \
+            --from-literal=UPLOAD_PREFIX=${{ vars.UPLOAD_PREFIX }} \
+            --from-literal=THUMBNAIL_PREFIX=${{ vars.THUMBNAIL_PREFIX }} \
+            --from-literal=AVATAR_PREFIX=${{ vars.AVATAR_PREFIX }} \
+            --namespace kawaz \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply Secret
+        run: |
+          kubectl create secret generic kawaz-backend-secrets \
+            --from-literal=JWT_SECRET=${{ secrets.JWT_SECRET }} \
+            --from-literal=ADMIN_PROMOTION_SECRET=${{ secrets.ADMIN_PROMOTION_SECRET }} \
+            --from-literal=MONGO_CONNECTION_STRING=${{ secrets.MONGO_CONNECTION_STRING }} \
+            --from-literal=AMQP_CONNECTION_STRING=${{ secrets.AMQP_CONNECTION_STRING }} \
+            --from-literal=AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+            --from-literal=AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+            --namespace kawaz \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy
+        run: |
+          kubectl set image deployment/kawaz-backend \
+            kawaz-backend=${{ env.IMAGE }}:${{ github.sha }} \
+            --namespace kawaz
+          kubectl rollout status deployment/kawaz-backend --namespace kawaz --timeout=120s

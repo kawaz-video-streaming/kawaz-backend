@@ -17,7 +17,7 @@ class InvalidConfigError extends Error {
 
 export const SERVICE_NAME = "kawaz-backend";
 
-const environments = ["development", "local", "test"] as const;
+const environments = ["development", "local", "test", "production"] as const;
 
 export type Environment = typeof environments[number];
 

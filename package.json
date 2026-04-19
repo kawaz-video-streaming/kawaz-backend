@@ -15,6 +15,10 @@
     "test": "npm run build && jest --runInBand --verbose --config jest.config.js"
   },
   "dependencies": {
+    "@ido_kawaz/amqp-client": "^7.0.0",
+    "@ido_kawaz/mongo-client": "^3.0.0",
+    "@ido_kawaz/server-framework": "^3.0.0",
+    "@ido_kawaz/storage-client": "^7.0.0",
     "bcrypt": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "ramda": "^0.32.0",
@@ -23,11 +27,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@ido_kawaz/amqp-client": "^7.0.0",
-    "@ido_kawaz/mongo-client": "^3.0.0",
-    "@ido_kawaz/server-framework": "^3.0.0",
-    "@ido_kawaz/storage-client": "^7.0.0",
-    "@ido_kawaz/vod-client": "^2.0.0",
     "@types/bcrypt": "^6.0.0",
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
