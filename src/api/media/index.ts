@@ -360,6 +360,13 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
    *       500:
    *         description: Internal server error - segment not found or VOD service error
    */
+  router.options(/^\/stream\/([^/]+)\/([^/]+\.m4s)$/, (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD');
+    res.setHeader('Access-Control-Allow-Headers', 'Range');
+    res.setHeader('Access-Control-Max-Age', '3600');
+    res.sendStatus(204);
+  });
   router.get(/^\/stream\/([^/]+)\/([^/]+\.m4s)$/, mediaHandlers.getSegment);
 
   /**
