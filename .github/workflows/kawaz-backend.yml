@@ -12,14 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: services/kawaz-backend
+        working-directory: .
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: services/kawaz-backend/package-lock.json
+          cache-dependency-path: package-lock.json
       - run: npm ci
       - run: npm test
 
