@@ -5,15 +5,15 @@ import { StatusCodes } from "http-status-codes";
 import swaggerUi from "swagger-ui-express";
 import { BackendServerConfig } from "../config";
 import { Dals } from "../dal/types";
+import { Mailer } from "../services/mailer";
+import { createAdminRouter } from "./admin";
 import { createAuthRouter } from "./auth";
+import { createAvatarRouter } from "./avatar";
 import { createMediaRouter } from "./media";
+import { createMediaCollectionRouter } from "./mediaCollection";
 import { createAuthMiddleware, requireAdmin } from "./middleware";
 import { swaggerSpec } from "./swagger";
-import { createMediaCollectionRouter } from "./mediaCollection";
-import { createAvatarRouter } from "./avatar";
 import { createUserRouter } from "./user";
-import { createAdminRouter } from "./admin";
-import { Mailer } from "../services/mailer";
 
 
 export const registerRoutes = (
@@ -46,7 +46,7 @@ export const registerRoutes = (
     app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
     // Authentication routes
-    app.use('/auth', createAuthRouter(authConfig, userDal));
+    app.use('/auth', createAuthRouter(authConfig, mailer, userDal));
 
     // Apply authentication middleware to all API routes
     app.use(createAuthMiddleware(authConfig, userDal));

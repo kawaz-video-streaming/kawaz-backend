@@ -1,3 +1,4 @@
+import { NotFoundError } from '@ido_kawaz/server-framework';
 import { UserDal } from '../../../dal/user';
 import { Mailer } from '../../../services/mailer';
 import { createAdminLogic } from '../logic';
@@ -45,15 +46,12 @@ describe('createAdminLogic.approveUser', () => {
         expect(mailer.sendApprovalEmail).toHaveBeenCalledWith('alice', 'alice@example.com');
     });
 
-    it('does not send email when user is not found', async () => {
+    it('throws NotFoundError when user is not found', async () => {
         const userDal = makeUserDal({ approveUser: jest.fn().mockResolvedValue(null) });
-        const mailer = makeMailer();
-        const logic = createAdminLogic(mailer, userDal);
+        const logic = createAdminLogic(makeMailer(), userDal);
 
-        await logic.approveUser('unknown');
-
+        await expect(logic.approveUser('unknown')).rejects.toThrow(NotFoundError);
         expect(userDal.approveUser).toHaveBeenCalledWith('unknown');
-        expect(mailer.sendApprovalEmail).not.toHaveBeenCalled();
     });
 });
 
@@ -74,18 +72,15 @@ describe('createAdminLogic.denyUser', () => {
         expect(userDal.removeUser).toHaveBeenCalledWith('alice');
     });
 
-    it('does not send email or remove user when user is not found', async () => {
+    it('throws NotFoundError when user is not found', async () => {
         const userDal = makeUserDal({
             denyUser: jest.fn().mockResolvedValue(null),
             removeUser: jest.fn(),
         });
-        const mailer = makeMailer();
-        const logic = createAdminLogic(mailer, userDal);
+        const logic = createAdminLogic(makeMailer(), userDal);
 
-        await logic.denyUser('unknown');
-
+        await expect(logic.denyUser('unknown')).rejects.toThrow(NotFoundError);
         expect(userDal.denyUser).toHaveBeenCalledWith('unknown');
-        expect(mailer.sendDenialEmail).not.toHaveBeenCalled();
         expect(userDal.removeUser).not.toHaveBeenCalled();
     });
 });

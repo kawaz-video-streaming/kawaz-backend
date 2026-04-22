@@ -2,9 +2,10 @@ import { Router } from "@ido_kawaz/server-framework";
 import { UserDal } from "../../dal/user";
 import { createAuthHandlers } from "./handlers";
 import { AuthConfig } from "./types";
+import { Mailer } from "../../services/mailer";
 
-export const createAuthRouter = (authConfig: AuthConfig, userDal: UserDal) => {
-  const authHandlers = createAuthHandlers(authConfig, userDal);
+export const createAuthRouter = (authConfig: AuthConfig, mailer: Mailer, userDal: UserDal) => {
+  const authHandlers = createAuthHandlers(authConfig, mailer, userDal);
   const router = Router();
 
   /**

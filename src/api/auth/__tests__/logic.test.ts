@@ -6,6 +6,7 @@ import {
 import bcrypt from "bcrypt";
 import * as jsonwebtoken from "jsonwebtoken";
 import { UserDal } from "../../../dal/user";
+import { Mailer } from "../../../services/mailer";
 import { createAuthLogic } from "../logic";
 import { USER_ROLE } from "../../../utils/types";
 
@@ -31,12 +32,20 @@ const makeUserDal = (
     ...overrides,
   }) as unknown as UserDal;
 
+const makeMailer = (overrides: Partial<Record<keyof Mailer, jest.Mock>> = {}) =>
+  ({
+    sendApprovalRequestEmail: jest.fn().mockResolvedValue(undefined),
+    sendApprovalEmail: jest.fn().mockResolvedValue(undefined),
+    sendDenialEmail: jest.fn().mockResolvedValue(undefined),
+    ...overrides,
+  }) as unknown as Mailer;
+
 describe("createAuthLogic.signUp", () => {
   it("throws ConflictError when username already exists", async () => {
     const userDal = makeUserDal({
       verifyUser: jest.fn().mockResolvedValue(true),
     });
-    const logic = createAuthLogic(AUTH_CONFIG, userDal);
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
 
     await expect(
       logic.signUp("ido", "strongpassword123", "dummyemail@example.com"),
@@ -44,14 +53,15 @@ describe("createAuthLogic.signUp", () => {
     expect(userDal.createUser).not.toHaveBeenCalled();
   });
 
-  it("hashes password and creates user without returning a token", async () => {
+  it("hashes password, creates user, and sends approval request email", async () => {
     const userDal = makeUserDal({
       verifyUser: jest.fn().mockResolvedValue(false),
       createUser: jest.fn().mockResolvedValue(undefined),
     });
     mockedBcrypt.hash.mockResolvedValue("hashed-password" as never);
+    const mailer = makeMailer();
 
-    const logic = createAuthLogic(AUTH_CONFIG, userDal);
+    const logic = createAuthLogic(AUTH_CONFIG, mailer, userDal);
     const result = await logic.signUp(
       "ido",
       "strongpassword123",
@@ -62,6 +72,10 @@ describe("createAuthLogic.signUp", () => {
     expect(userDal.createUser).toHaveBeenCalledWith(
       "ido",
       "hashed-password",
+      "dummyemail@example.com",
+    );
+    expect(mailer.sendApprovalRequestEmail).toHaveBeenCalledWith(
+      "ido",
       "dummyemail@example.com",
     );
     expect(mockedSign).not.toHaveBeenCalled();
@@ -76,7 +90,7 @@ describe("createAuthLogic.login", () => {
     });
     mockedBcrypt.compare.mockResolvedValue(false as never);
 
-    const logic = createAuthLogic(AUTH_CONFIG, userDal);
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
 
     await expect(logic.login("ido", "strongpassword123")).rejects.toThrow(
       UnauthorizedError,
@@ -89,13 +103,32 @@ describe("createAuthLogic.login", () => {
         name: "ido",
         password: "hashed-password",
         role: USER_ROLE,
+        status: "approved",
       }),
     });
     mockedBcrypt.compare.mockResolvedValue(false as never);
 
-    const logic = createAuthLogic(AUTH_CONFIG, userDal);
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
 
     await expect(logic.login("ido", "wrongpassword123")).rejects.toThrow(
+      UnauthorizedError,
+    );
+  });
+
+  it("throws UnauthorizedError when user is not approved", async () => {
+    const userDal = makeUserDal({
+      findUser: jest.fn().mockResolvedValue({
+        name: "ido",
+        password: "hashed-password",
+        role: USER_ROLE,
+        status: "pending",
+      }),
+    });
+    mockedBcrypt.compare.mockResolvedValue(true as never);
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+
+    await expect(logic.login("ido", "strongpassword123")).rejects.toThrow(
       UnauthorizedError,
     );
   });
@@ -106,12 +139,13 @@ describe("createAuthLogic.login", () => {
         name: "ido",
         password: "hashed-password",
         role: USER_ROLE,
+        status: "approved",
       }),
     });
     mockedBcrypt.compare.mockResolvedValue(true as never);
     mockedSign.mockReturnValue("signed-token");
 
-    const logic = createAuthLogic(AUTH_CONFIG, userDal);
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
     const token = await logic.login("ido", "strongpassword123");
 
     expect(mockedSign).toHaveBeenCalledWith(
@@ -126,7 +160,7 @@ describe("createAuthLogic.login", () => {
 describe("createAuthLogic.promoteAdmin", () => {
   it("throws UnauthorizedError when secret is wrong", async () => {
     const userDal = makeUserDal();
-    const logic = createAuthLogic(AUTH_CONFIG, userDal);
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
 
     await expect(logic.promoteAdmin("wrong-secret", "ido")).rejects.toThrow(
       UnauthorizedError,
@@ -138,7 +172,7 @@ describe("createAuthLogic.promoteAdmin", () => {
     const userDal = makeUserDal({
       promoteToAdmin: jest.fn().mockResolvedValue(false),
     });
-    const logic = createAuthLogic(AUTH_CONFIG, userDal);
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
 
     await expect(
       logic.promoteAdmin(AUTH_CONFIG.adminPromotionSecret, "unknown"),
@@ -149,7 +183,7 @@ describe("createAuthLogic.promoteAdmin", () => {
     const userDal = makeUserDal({
       promoteToAdmin: jest.fn().mockResolvedValue(true),
     });
-    const logic = createAuthLogic(AUTH_CONFIG, userDal);
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
 
     await expect(
       logic.promoteAdmin(AUTH_CONFIG.adminPromotionSecret, "ido"),

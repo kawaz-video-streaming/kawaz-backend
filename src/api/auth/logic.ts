@@ -7,8 +7,10 @@ import bycrpt from "bcrypt";
 import { sign } from "jsonwebtoken";
 import { isNil } from "ramda";
 import { UserDal } from "../../dal/user";
-import { AuthConfig, TokenPayload } from "./types";
+import { APPROVED_STATUS } from "../../dal/user/model";
+import { Mailer } from "../../services/mailer";
 import { Role, USER_ROLE } from "../../utils/types";
+import { AuthConfig, TokenPayload } from "./types";
 
 const createUserTokenPayload = (
   username: string,
@@ -17,6 +19,7 @@ const createUserTokenPayload = (
 
 export const createAuthLogic = (
   { jwtSecret, adminPromotionSecret }: AuthConfig,
+  mailer: Mailer,
   userDal: UserDal,
 ) => ({
   signUp: async (username: string, password: string, email: string) => {
@@ -26,17 +29,14 @@ export const createAuthLogic = (
     }
     const passwordHash = await bycrpt.hash(password, 12);
     await userDal.createUser(username, passwordHash, email);
+    await mailer.sendApprovalRequestEmail(username, email);
   },
 
   login: async (username: string, password: string) => {
     const user = await userDal.findUser(username);
     const passwordMatch = await bycrpt.compare(password, user?.password ?? "");
-    if (isNil(user) || !passwordMatch) {
+    if (isNil(user) || !passwordMatch || user.status !== APPROVED_STATUS) {
       throw new UnauthorizedError("Invalid username or password");
-    } else if (user.status === "pending") {
-      throw new UnauthorizedError("Account is awaiting admin approval");
-    } else if (user.status === "denied") {
-      throw new UnauthorizedError("Account application denied by admin");
     }
     const token = sign(
       createUserTokenPayload(user.name, user.role),

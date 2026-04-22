@@ -25,6 +25,7 @@ import { UserDal } from '../dal/user';
 import { createMediaRouter } from '../api/media';
 import { createAuthRouter } from '../api/auth';
 import { createAuthMiddleware } from '../api/middleware';
+import { Mailer } from '../services/mailer';
 import { uploadMediaHandler, uploadSuccessHandler } from '../background/upload/handler';
 import { UploadConfig } from '../background/upload/config';
 
@@ -85,7 +86,7 @@ describe('Media upload integration', () => {
         userDal = {
             verifyUser: jest.fn().mockResolvedValue(true),
             createUser: jest.fn().mockResolvedValue(undefined),
-            findUser: jest.fn().mockResolvedValue({ name: 'admin', password: 'hashed-password', role: 'admin' }),
+            findUser: jest.fn().mockResolvedValue({ name: 'admin', password: 'hashed-password', role: 'admin', status: 'approved' }),
             promoteToAdmin: jest.fn(),
         };
 
@@ -103,7 +104,12 @@ describe('Media upload integration', () => {
         app = express();
         app.use(parseCookies);
         app.use(express.json());
-        app.use('/auth', createAuthRouter(AUTH_CONFIG, userDal as unknown as UserDal));
+        const mailer = {
+            sendApprovalRequestEmail: jest.fn().mockResolvedValue(undefined),
+            sendApprovalEmail: jest.fn().mockResolvedValue(undefined),
+            sendDenialEmail: jest.fn().mockResolvedValue(undefined),
+        } as unknown as Mailer;
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, mailer, userDal as unknown as UserDal));
         app.use(authMiddleware);
         app.use('/media', createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'upload-bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },

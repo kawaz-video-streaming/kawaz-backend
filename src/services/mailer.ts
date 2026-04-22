@@ -6,14 +6,17 @@ export interface MailerConfig {
 }
 
 export class Mailer {
-  constructor(private readonly config: MailerConfig) { }
+  private transport: nodemailer.Transporter;
+  constructor(private readonly config: MailerConfig) {
+    this.transport = Mailer.createTransport(config);
+  }
 
-  private createTransport = () =>
+  private static createTransport = (config: MailerConfig) =>
     nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: this.config.gmailUser,
-        pass: this.config.gmailAppPassword,
+        user: config.gmailUser,
+        pass: config.gmailAppPassword,
       },
     });
 
@@ -21,7 +24,7 @@ export class Mailer {
     username: string,
     email: string,
   ): Promise<void> => {
-    await this.createTransport().sendMail({
+    await this.transport.sendMail({
       from: this.config.gmailUser,
       to: this.config.gmailUser,
       subject: "New User Approval Request",
@@ -39,7 +42,7 @@ export class Mailer {
     username: string,
     email: string,
   ): Promise<void> => {
-    await this.createTransport().sendMail({
+    await this.transport.sendMail({
       from: this.config.gmailUser,
       to: email,
       subject: "Your Kawaz account has been approved",
@@ -57,7 +60,7 @@ export class Mailer {
     username: string,
     email: string,
   ): Promise<void> => {
-    await this.createTransport().sendMail({
+    await this.transport.sendMail({
       from: this.config.gmailUser,
       to: email,
       subject: "Your Kawaz account request was not approved",

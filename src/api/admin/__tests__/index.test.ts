@@ -150,7 +150,7 @@ describe('POST /admin/pending/:username/approve', () => {
         expect(mailer.sendApprovalEmail).toHaveBeenCalledWith('alice', 'alice@example.com');
     });
 
-    it('returns 200 without sending email when user is not found', async () => {
+    it('returns 404 when user is not found', async () => {
         const userDal = makeAdminDal({ approveUser: jest.fn().mockResolvedValue(null) });
         const mailer = makeMailer();
         const app = makeApp(userDal, mailer);
@@ -159,7 +159,7 @@ describe('POST /admin/pending/:username/approve', () => {
             .post('/admin/pending/unknown/approve')
             .set('Cookie', `kawaz-token=${adminToken}`);
 
-        expect(response.status).toBe(200);
+        expect(response.status).toBe(404);
         expect(mailer.sendApprovalEmail).not.toHaveBeenCalled();
     });
 
@@ -210,7 +210,7 @@ describe('POST /admin/pending/:username/deny', () => {
         expect(userDal.removeUser).toHaveBeenCalledWith('alice');
     });
 
-    it('returns 200 without sending email or removing user when user is not found', async () => {
+    it('returns 404 when user is not found', async () => {
         const userDal = makeAdminDal({ denyUser: jest.fn().mockResolvedValue(null) });
         const mailer = makeMailer();
         const app = makeApp(userDal, mailer);
@@ -219,7 +219,7 @@ describe('POST /admin/pending/:username/deny', () => {
             .post('/admin/pending/unknown/deny')
             .set('Cookie', `kawaz-token=${adminToken}`);
 
-        expect(response.status).toBe(200);
+        expect(response.status).toBe(404);
         expect(mailer.sendDenialEmail).not.toHaveBeenCalled();
         expect(userDal.removeUser).not.toHaveBeenCalled();
     });

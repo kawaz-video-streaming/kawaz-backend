@@ -1,7 +1,9 @@
 import { Request, Response } from "@ido_kawaz/server-framework";
 import { StatusCodes } from "http-status-codes";
 import { UserDal } from "../../dal/user";
+import { Mailer } from "../../services/mailer";
 import { requestHandlerDecorator } from "../../utils/decorator";
+import { AuthenticatedRequest } from "../../utils/types";
 import { createAuthLogic } from "./logic";
 import {
   AuthConfig,
@@ -9,13 +11,13 @@ import {
   validateLoginRequest,
   validatePromoteRequest,
 } from "./types";
-import { AuthenticatedRequest } from "../../utils/types";
 
 export const createAuthHandlers = (
   authConfig: AuthConfig,
+  mailer: Mailer,
   userDal: UserDal,
 ) => {
-  const logic = createAuthLogic(authConfig, userDal);
+  const logic = createAuthLogic(authConfig, mailer, userDal);
   return {
     me: requestHandlerDecorator("me", async (req: Request, res: Response) => {
       const authenticatedReq = req as AuthenticatedRequest;

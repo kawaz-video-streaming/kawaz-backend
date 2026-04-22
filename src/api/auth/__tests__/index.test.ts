@@ -4,6 +4,7 @@ import express, { Application } from 'express';
 import * as jsonwebtoken from 'jsonwebtoken';
 import request from 'supertest';
 import { UserDal } from '../../../dal/user';
+import { Mailer } from '../../../services/mailer';
 import { createAuthRouter } from '../index';
 
 jest.mock('bcrypt');
@@ -13,6 +14,23 @@ const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 const mockedSign = jsonwebtoken.sign as jest.Mock;
 
 const AUTH_CONFIG = { jwtSecret: 'test-secret', adminPromotionSecret: 'test-admin-secret' };
+
+const makeMailer = (): jest.Mocked<Mailer> =>
+    ({
+        sendApprovalRequestEmail: jest.fn().mockResolvedValue(undefined),
+        sendApprovalEmail: jest.fn().mockResolvedValue(undefined),
+        sendDenialEmail: jest.fn().mockResolvedValue(undefined),
+    }) as unknown as jest.Mocked<Mailer>;
+
+const makeErrorHandler = () =>
+    (error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+        if (error instanceof ApiError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
+        const message = error instanceof Error ? error.message : 'Internal server error';
+        res.status(500).json({ message });
+    };
 
 describe('POST /auth/signup', () => {
     let app: Application;
@@ -31,15 +49,8 @@ describe('POST /auth/signup', () => {
 
         app = express();
         app.use(express.json());
-        app.use('/auth', createAuthRouter(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-            if (error instanceof ApiError) {
-                res.status(error.statusCode).json({ message: error.message });
-                return;
-            }
-            const message = error instanceof Error ? error.message : 'Internal server error';
-            res.status(500).json({ message });
-        });
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, makeMailer(), userDal as unknown as UserDal));
+        app.use(makeErrorHandler());
     });
 
     it('returns 202 for valid signup', async () => {
@@ -67,7 +78,7 @@ describe('POST /auth/signup', () => {
     it('returns 400 when username is too short', async () => {
         const response = await request(app)
             .post('/auth/signup')
-            .send({ username: 'id', password: 'strongpassword123' });
+            .send({ username: 'id', password: 'strongpassword123', email: 'ido@example.com' });
 
         expect(response.status).toBe(400);
     });
@@ -75,7 +86,15 @@ describe('POST /auth/signup', () => {
     it('returns 400 when password is too short', async () => {
         const response = await request(app)
             .post('/auth/signup')
-            .send({ username: 'ido', password: 'short' });
+            .send({ username: 'ido', password: 'short', email: 'ido@example.com' });
+
+        expect(response.status).toBe(400);
+    });
+
+    it('returns 400 when email is missing', async () => {
+        const response = await request(app)
+            .post('/auth/signup')
+            .send({ username: 'ido', password: 'strongpassword123' });
 
         expect(response.status).toBe(400);
     });
@@ -95,7 +114,7 @@ describe('POST /auth/login', () => {
         userDal = {
             verifyUser: jest.fn(),
             createUser: jest.fn(),
-            findUser: jest.fn().mockResolvedValue({ name: 'ido', password: 'hashed-password', role: 'user' }),
+            findUser: jest.fn().mockResolvedValue({ name: 'ido', password: 'hashed-password', role: 'user', status: 'approved' }),
             promoteToAdmin: jest.fn(),
         };
 
@@ -104,15 +123,8 @@ describe('POST /auth/login', () => {
 
         app = express();
         app.use(express.json());
-        app.use('/auth', createAuthRouter(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-            if (error instanceof ApiError) {
-                res.status(error.statusCode).json({ message: error.message });
-                return;
-            }
-            const message = error instanceof Error ? error.message : 'Internal server error';
-            res.status(500).json({ message });
-        });
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, makeMailer(), userDal as unknown as UserDal));
+        app.use(makeErrorHandler());
     });
 
     it('returns 200 with cookie for valid credentials', async () => {
@@ -147,6 +159,16 @@ describe('POST /auth/login', () => {
         expect(response.status).toBe(401);
     });
 
+    it('returns 401 when user is not approved', async () => {
+        userDal.findUser.mockResolvedValue({ name: 'ido', password: 'hashed-password', role: 'user', status: 'pending' });
+
+        const response = await request(app)
+            .post('/auth/login')
+            .send({ username: 'ido', password: 'strongpassword123' });
+
+        expect(response.status).toBe(401);
+    });
+
     it('returns 400 when body is missing', async () => {
         const response = await request(app).post('/auth/login');
 
@@ -168,15 +190,8 @@ describe('POST /auth/promote', () => {
 
         app = express();
         app.use(express.json());
-        app.use('/auth', createAuthRouter(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-            if (error instanceof ApiError) {
-                res.status(error.statusCode).json({ message: error.message });
-                return;
-            }
-            const message = error instanceof Error ? error.message : 'Internal server error';
-            res.status(500).json({ message });
-        });
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, makeMailer(), userDal as unknown as UserDal));
+        app.use(makeErrorHandler());
     });
 
     it('returns 200 when secret and username are valid', async () => {
@@ -227,4 +242,3 @@ describe('POST /auth/promote', () => {
         expect(response.status).toBe(404);
     });
 });
-
