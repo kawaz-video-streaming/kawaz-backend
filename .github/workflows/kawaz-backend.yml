@@ -84,6 +84,8 @@ jobs:
             --from-literal=AMQP_CONNECTION_STRING=${{ secrets.AMQP_CONNECTION_STRING }} \
             --from-literal=AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
             --from-literal=AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+            --from-literal=GMAIL_USER=${{ secrets.GMAIL_USER }} \
+            --from-literal=GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }} \
             --namespace kawaz \
             --dry-run=client -o yaml | kubectl apply -f -
 
