@@ -42,16 +42,15 @@ describe('POST /auth/signup', () => {
         });
     });
 
-    it('returns 201 with cookie for valid signup', async () => {
+    it('returns 202 for valid signup', async () => {
         const response = await request(app)
             .post('/auth/signup')
-            .send({ username: 'ido', password: 'strongpassword123' });
+            .send({ username: 'ido', password: 'strongpassword123', email: 'ido@example.com' });
 
-        expect(response.status).toBe(201);
-        expect(response.body).toEqual({ message: 'Signup successful' });
-        expect(response.headers['set-cookie']).toBeDefined();
-        expect(response.headers['set-cookie'][0]).toContain('kawaz-token=signed-token');
-        expect(userDal.createUser).toHaveBeenCalledWith('ido', 'hashed-password');
+        expect(response.status).toBe(202);
+        expect(response.body).toEqual({ message: 'signup finished. Your account is awaiting admin approval' });
+        expect(response.headers['set-cookie']).toBeUndefined();
+        expect(userDal.createUser).toHaveBeenCalledWith('ido', 'hashed-password', 'ido@example.com');
     });
 
     it('returns 409 when username already exists', async () => {
@@ -59,7 +58,7 @@ describe('POST /auth/signup', () => {
 
         const response = await request(app)
             .post('/auth/signup')
-            .send({ username: 'ido', password: 'strongpassword123' });
+            .send({ username: 'ido', password: 'strongpassword123', email: 'ido@example.com' });
 
         expect(response.status).toBe(409);
         expect(userDal.createUser).not.toHaveBeenCalled();

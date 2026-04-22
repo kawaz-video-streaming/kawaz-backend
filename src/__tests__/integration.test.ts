@@ -302,10 +302,10 @@ describe('Media upload integration', () => {
         // Step 1: Sign up
         const signupRes = await request(app)
             .post('/auth/signup')
-            .send({ username: 'admin', password: 'strongpassword123' });
+            .send({ username: 'admin', password: 'strongpassword123', email: 'admin@example.com' });
 
-        expect(signupRes.status).toBe(201);
-        expect(signupRes.body).toEqual({ message: 'Signup successful' });
+        expect(signupRes.status).toBe(202);
+        expect(signupRes.body).toEqual({ message: 'signup finished. Your account is awaiting admin approval' });
 
         // Step 2: Login
         const loginRes = await request(app)
@@ -370,7 +370,7 @@ describe('Media upload integration', () => {
     it('returns 409 on duplicate signup', async () => {
         const response = await request(app)
             .post('/auth/signup')
-            .send({ username: 'ido', password: 'strongpassword123' });
+            .send({ username: 'ido', password: 'strongpassword123', email: 'ido@example.com' });
 
         expect(response.status).toBe(409);
         expect(userDal.createUser).not.toHaveBeenCalled();

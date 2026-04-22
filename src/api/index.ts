@@ -7,47 +7,55 @@ import { BackendServerConfig } from "../config";
 import { Dals } from "../dal/types";
 import { createAuthRouter } from "./auth";
 import { createMediaRouter } from "./media";
-import { createAuthMiddleware } from "./middleware";
+import { createAuthMiddleware, requireAdmin } from "./middleware";
 import { swaggerSpec } from "./swagger";
 import { createMediaCollectionRouter } from "./mediaCollection";
 import { createAvatarRouter } from "./avatar";
 import { createUserRouter } from "./user";
+import { createAdminRouter } from "./admin";
+import { Mailer } from "../services/mailer";
 
 
-export const registerRoutes = (config: BackendServerConfig, storageClient: StorageClient, amqpClient: AmqpClient, dals: Dals) =>
-    (app: Application) => {
-        const { mediaDal, userDal, avatarDal } = dals;
-        const { authConfig } = config;
+export const registerRoutes = (
+    config: BackendServerConfig,
+    storageClient: StorageClient,
+    amqpClient: AmqpClient,
+    mailer: Mailer,
+    dals: Dals
+) => (app: Application) => {
+    const { mediaDal, userDal, avatarDal } = dals;
+    const { authConfig } = config;
 
-        /**
-         * @openapi
-         * /health:
-         *   get:
-         *     summary: Health check endpoint
-         *     description: Returns OK if the server is running
-         *     tags:
-         *       - Health
-         *     responses:
-         *       200:
-         *         description: Server is healthy
-         */
-        app.get("/health", (_req, res) => {
-            res.sendStatus(StatusCodes.OK);
-        });
+    /**
+     * @openapi
+     * /health:
+     *   get:
+     *     summary: Health check endpoint
+     *     description: Returns OK if the server is running
+     *     tags:
+     *       - Health
+     *     responses:
+     *       200:
+     *         description: Server is healthy
+     */
+    app.get("/health", (_req, res) => {
+        res.sendStatus(StatusCodes.OK);
+    });
 
-        // Swagger documentation
-        app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+    // Swagger documentation
+    app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-        // Authentication routes
-        app.use('/auth', createAuthRouter(authConfig, userDal));
+    // Authentication routes
+    app.use('/auth', createAuthRouter(authConfig, userDal));
 
-        // Apply authentication middleware to all API routes
-        app.use(createAuthMiddleware(authConfig, userDal));
+    // Apply authentication middleware to all API routes
+    app.use(createAuthMiddleware(authConfig, userDal));
 
-        // API routes
-        app.use('/user', createUserRouter(userDal));
-        app.use("/avatar", createAvatarRouter(config.bucketsConfig, avatarDal, storageClient));
-        app.use("/media", createMediaRouter(config.bucketsConfig, mediaDal, amqpClient, storageClient));
-        app.use("/mediaCollection", createMediaCollectionRouter(config.bucketsConfig, dals, storageClient));
-        return app;
-    };
+    // API routes
+    app.use('/admin', requireAdmin, createAdminRouter(mailer, userDal));
+    app.use('/user', createUserRouter(userDal));
+    app.use("/avatar", createAvatarRouter(config.bucketsConfig, avatarDal, storageClient));
+    app.use("/media", createMediaRouter(config.bucketsConfig, mediaDal, amqpClient, storageClient));
+    app.use("/mediaCollection", createMediaCollectionRouter(config.bucketsConfig, dals, storageClient));
+    return app;
+};
