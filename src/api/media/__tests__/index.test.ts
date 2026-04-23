@@ -241,14 +241,15 @@ describe('GET /media/uploading', () => {
         expect(mediaDal.getAllNoneCompletedMedia).toHaveBeenCalledTimes(1);
     });
 
-    it('returns 404 when there are no non-completed media', async () => {
+    it('returns 200 with empty array when there are no non-completed media', async () => {
         mediaDal.getAllNoneCompletedMedia.mockResolvedValueOnce([]);
 
         const response = await request(app)
             .get('/media/uploading')
             .set('Cookie', `kawaz-token=${userToken}`);
 
-        expect(response.status).toBe(404);
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual([]);
     });
 
     it('returns 401 when not authenticated', async () => {

@@ -3,14 +3,15 @@ import { createMongoConfig, MongoConfig } from "@ido_kawaz/mongo-client";
 import { createServerConfig, ServerConfig } from "@ido_kawaz/server-framework";
 import { createStorageConfig, StorageConfig } from "@ido_kawaz/storage-client";
 import { mergeDeepRight } from "ramda";
-import { z } from 'zod';
+import { z } from "zod";
 import { AuthConfig } from "./api/auth/types";
 import { ConsumersConfig } from "./background/config";
 import { BucketsConfig } from "./utils/types";
+import { MailerConfig } from "./services/mailer";
 
 class InvalidConfigError extends Error {
   constructor(error: z.ZodError) {
-    const message = `Invalid configuration: \n${error.issues.map(detail => detail.message).join(',\n')}`;
+    const message = `Invalid configuration: \n${error.issues.map((detail) => detail.message).join(",\n")}`;
     super(message);
   }
 }
@@ -19,7 +20,7 @@ export const SERVICE_NAME = "kawaz-backend";
 
 const environments = ["development", "local", "test", "production"] as const;
 
-export type Environment = typeof environments[number];
+export type Environment = (typeof environments)[number];
 
 const environmentVariablesSchema = z.object({
   NODE_ENV: z.enum(environments).default("development"),
@@ -29,7 +30,9 @@ const environmentVariablesSchema = z.object({
   THUMBNAIL_PREFIX: z.string(),
   AVATAR_PREFIX: z.string(),
   JWT_SECRET: z.string(),
-  ADMIN_PROMOTION_SECRET: z.string()
+  ADMIN_PROMOTION_SECRET: z.string(),
+  GMAIL_USER: z.email(),
+  GMAIL_APP_PASSWORD: z.string(),
 });
 
 export interface BackendServerConfig extends ServerConfig {
@@ -44,10 +47,13 @@ export interface SystemConfig {
   storageConfig: StorageConfig;
   serverConfig: BackendServerConfig;
   dbConfig: MongoConfig;
+  mailerConfig: MailerConfig;
 }
 
 export const getConfig = (env: {} = {}): SystemConfig => {
-  const parseResult = environmentVariablesSchema.safeParse(mergeDeepRight(process.env, env));
+  const parseResult = environmentVariablesSchema.safeParse(
+    mergeDeepRight(process.env, env),
+  );
   if (!parseResult.success) {
     throw new InvalidConfigError(parseResult.error);
   }
@@ -62,7 +68,7 @@ export const getConfig = (env: {} = {}): SystemConfig => {
     },
     vod: {
       vodStorageBucket: envVars.VOD_STORAGE_BUCKET,
-    }
+    },
   };
   return {
     nodeEnv: envVars.NODE_ENV,
@@ -72,7 +78,7 @@ export const getConfig = (env: {} = {}): SystemConfig => {
         jwtSecret: envVars.JWT_SECRET,
         adminPromotionSecret: envVars.ADMIN_PROMOTION_SECRET,
       },
-      bucketsConfig
+      bucketsConfig,
     },
     dbConfig: createMongoConfig(),
     storageConfig: storageConfig,
@@ -81,7 +87,11 @@ export const getConfig = (env: {} = {}): SystemConfig => {
       upload: {
         bucketsConfig,
         partSize: storageConfig.partSize,
-      }
-    }
-  }
-}
+      },
+    },
+    mailerConfig: {
+      gmailUser: envVars.GMAIL_USER,
+      gmailAppPassword: envVars.GMAIL_APP_PASSWORD,
+    },
+  };
+};
