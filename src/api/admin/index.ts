@@ -40,9 +40,7 @@ export const createAdminRouter = (
      *                   role:
      *                     type: string
      *       401:
-     *         description: Not authenticated
-     *       403:
-     *         description: Not authorized (admin only)
+     *         description: Not authenticated or not authorized (admin only)
      */
     router.get("/pending", adminHandlers.getPendingUsers);
 
@@ -67,9 +65,7 @@ export const createAdminRouter = (
      *       200:
      *         description: User approved successfully
      *       401:
-     *         description: Not authenticated
-     *       403:
-     *         description: Not authorized (admin only)
+     *         description: Not authenticated or not authorized (admin only)
      *       404:
      *         description: User not found
      */
@@ -96,9 +92,7 @@ export const createAdminRouter = (
      *       200:
      *         description: User denied successfully
      *       401:
-     *         description: Not authenticated
-     *       403:
-     *         description: Not authorized (admin only)
+     *         description: Not authenticated or not authorized (admin only)
      *       404:
      *         description: User not found
      */

@@ -1,7 +1,7 @@
 import { Dal } from "@ido_kawaz/mongo-client";
 import { isNil, isNotNil } from "ramda";
 import { ADMIN_ROLE } from "../../utils/types";
-import { APPROVED_STATUS, DENIED_STATUS, PENDING_STATUS, Profile, User, UserModel } from "./model";
+import { APPROVED_STATUS, DENIED_STATUS, PENDING_STATUS, Profile, User, UserModel, UserProjection } from "./model";
 
 export class UserDal extends Dal<User> {
   constructor(userModel: UserModel) {
@@ -35,8 +35,8 @@ export class UserDal extends Dal<User> {
   promoteToAdmin = async (name: string): Promise<boolean> =>
     isNotNil(await this.model.findOneAndUpdate({ name }, { role: ADMIN_ROLE }));
 
-  getPendingUsers = (): Promise<User[]> =>
-    this.model.find({ status: PENDING_STATUS }).lean<User[]>().exec();
+  getPendingUsers = (): Promise<UserProjection[]> =>
+    this.model.find({ status: PENDING_STATUS }, { name: 1, email: 1 }).lean<UserProjection[]>().exec();
 
   createProfile = async (
     name: string,

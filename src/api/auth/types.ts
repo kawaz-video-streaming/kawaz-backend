@@ -14,7 +14,7 @@ export interface TokenPayload {
   role: Role;
 }
 
-export const authRequestSchema: z.ZodType<ValidatedAuthRequest> = z
+export const authSignupRequestSchema: z.ZodType<ValidatedAuthRequest> = z
   .object({
     body: z.object({
       username: z.string().min(3, "Username is required"),
@@ -30,7 +30,7 @@ interface ValidatedAuthRequest {
   email: string;
 }
 
-export const validateAuthRequest = validateRequest(authRequestSchema);
+export const validateAuthRequest = validateRequest(authSignupRequestSchema);
 
 const loginRequestSchema: z.ZodType<ValidatedLoginRequest> = z
   .object({

@@ -27,6 +27,8 @@ export interface User {
   profiles: Profile[];
 }
 
+export type UserProjection = Pick<User, "name" | "email">;
+
 const profileSchema = new Schema<Profile>({
   name: { type: String, required: true },
   avatarId: { type: String, required: true },
