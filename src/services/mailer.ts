@@ -18,6 +18,7 @@ export class Mailer {
         user: config.gmailUser,
         pass: config.gmailAppPassword,
       },
+      tls: { rejectUnauthorized: false },
     });
 
   sendApprovalRequestEmail = async (
