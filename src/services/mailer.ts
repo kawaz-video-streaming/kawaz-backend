@@ -34,7 +34,7 @@ export class Mailer {
         `  Username: ${username}`,
         `  Email:    ${email}`,
         ``,
-        `Review pending users: https://kawazplus.com/admin/users`,
+        `Review pending users: https://kawazplus.com`,
       ].join("\n"),
     });
   };
