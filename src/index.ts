@@ -11,7 +11,7 @@ const main = async () => {
 };
 
 main().then(() => {
-    console.log("System started successfully")
+    console.log("System started successfully");
 }).catch((error) => {
     console.error(`Error starting the system: \n${error.message}`);
     process.exit(1);
