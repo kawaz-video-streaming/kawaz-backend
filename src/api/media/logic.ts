@@ -40,6 +40,6 @@ export const createMediaLogic = (
   getTiles: (mediaId: string) => storageClient.getPresignedUrl(vodStorageBucket, `${mediaId}/thumbnails.jpg`, PRESIGNED_URL_EXPIRY_SECONDS),
   getThumbnail: (mediaId: string) => storageClient.getPresignedUrl(kawazBucket, `${thumbnailPrefix}/${mediaId}.jpg`, PRESIGNED_URL_EXPIRY_SECONDS),
   getManifest: (mediaId: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/output.mpd`),
-  getSegmentUrl: (mediaId: string, filename: string) => storageClient.getPresignedUrl(vodStorageBucket, `${mediaId}/${filename}`, PRESIGNED_URL_EXPIRY_SECONDS),
+  getSegment: (mediaId: string, filename: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/${filename}`),
   getVtt: (mediaId: string, filename: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/${filename}`),
 });

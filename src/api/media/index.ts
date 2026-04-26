@@ -333,7 +333,7 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
    * /media/stream/{id}/{filename}.m4s:
    *   get:
    *     summary: Get video segment
-   *     description: Redirects to the URL for a specific video segment (.m4s files only)
+   *     description: Streams a specific video segment (.m4s files only) directly as binary data
    *     tags:
    *       - Media
    *     security:
@@ -353,8 +353,13 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
    *           pattern: '^.+\.m4s$'
    *         description: Segment filename (must end in .m4s)
    *     responses:
-   *       302:
-   *         description: Redirects to the segment URL
+   *       200:
+   *         description: Video segment binary data (video/iso.segment)
+   *         content:
+   *           video/iso.segment:
+   *             schema:
+   *               type: string
+   *               format: binary
    *       401:
    *         description: Unauthorized
    *       500:
