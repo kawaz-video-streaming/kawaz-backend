@@ -58,7 +58,7 @@ export const createAvatarHandlers = (bucketsConfig: BucketsConfig, avatarDal: Av
                     const { params: { id: avatarId } } = validateRequestWithId(req);
                     const image = await logic.getAvatarImage(avatarId);
                     res.setHeader("Content-Type", "image/jpeg");
-                    res.setHeader('Cache-Control', 'public, max-age=3600');
+                    res.setHeader('Cache-Control', 'public, max-age=172800');
                     image.pipe(res);
                 })
     };
