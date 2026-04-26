@@ -2,6 +2,8 @@ import { AmqpConfig, createAmqpConfig } from "@ido_kawaz/amqp-client";
 import { createMongoConfig, MongoConfig } from "@ido_kawaz/mongo-client";
 import { createServerConfig, ServerConfig } from "@ido_kawaz/server-framework";
 import { createStorageConfig, StorageConfig } from "@ido_kawaz/storage-client";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
+import * as https from "https";
 import { mergeDeepRight } from "ramda";
 import { z } from "zod";
 import { AuthConfig } from "./api/auth/types";
@@ -58,7 +60,12 @@ export const getConfig = (env: {} = {}): SystemConfig => {
     throw new InvalidConfigError(parseResult.error);
   }
   const envVars = parseResult.data;
-  const storageConfig = createStorageConfig();
+  const storageConfig: StorageConfig = {
+    ...createStorageConfig(),
+    requestHandler: new NodeHttpHandler({
+      httpsAgent: new https.Agent({ maxSockets: 500, keepAlive: true }),
+    }),
+  };
   const bucketsConfig: BucketsConfig = {
     kawazPlus: {
       kawazStorageBucket: envVars.KAWAZ_PLUS_BUCKET,

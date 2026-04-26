@@ -65,6 +65,7 @@ export const createMediaCollectionHandlers = (bucketsConfig: BucketsConfig, dals
                     const thumbnail = await logic.getThumbnail(mediaCollectionId);
                     res.setHeader("Content-Type", "image/jpeg");
                     res.setHeader('Cache-Control', 'public, max-age=172800');
+                    res.on('close', () => thumbnail.destroy());
                     thumbnail.pipe(res);
                 })
     };

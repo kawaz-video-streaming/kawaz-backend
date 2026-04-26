@@ -107,6 +107,7 @@ export const createMediaHandlers = (
         const thumbnail = await logic.getThumbnail(mediaId);
         res.setHeader("Content-Type", "image/jpeg");
         res.setHeader('Cache-Control', 'public, max-age=172800');
+        res.on('close', () => thumbnail.destroy());
         thumbnail.pipe(res);
       },
     ),
@@ -117,6 +118,7 @@ export const createMediaHandlers = (
         const tiles = await logic.getTiles(videoId);
         res.setHeader("Content-Type", "image/jpeg");
         res.setHeader('Cache-Control', 'public, max-age=172800');
+        res.on('close', () => tiles.destroy());
         tiles.pipe(res);
       },
     ),
@@ -127,6 +129,7 @@ export const createMediaHandlers = (
         const manifestStream = await logic.getManifest(videoId);
         res.setHeader("Content-Type", "application/dash+xml");
         res.setHeader('Cache-Control', 'public, max-age=172800');
+        res.on('close', () => manifestStream.destroy());
         manifestStream.pipe(res);
       },
     ),
@@ -135,12 +138,10 @@ export const createMediaHandlers = (
       async (req: Request, res: Response) => {
         const videoId = req.params[0];
         const filename = req.params[1];
-        const segmentStream = await logic.getSegment(
-          videoId,
-          filename,
-        );
+        const segmentStream = await logic.getSegment(videoId, filename);
         res.setHeader("Content-Type", "video/iso.segment");
         res.setHeader('Cache-Control', 'public, max-age=172800');
+        res.on('close', () => segmentStream.destroy());
         segmentStream.pipe(res);
       },
     ),
@@ -152,6 +153,7 @@ export const createMediaHandlers = (
         const vttStream = await logic.getVtt(videoId, filename);
         res.setHeader("Content-Type", "text/vtt");
         res.setHeader('Cache-Control', 'public, max-age=172800');
+        res.on('close', () => vttStream.destroy());
         vttStream.pipe(res);
       },
     ),
