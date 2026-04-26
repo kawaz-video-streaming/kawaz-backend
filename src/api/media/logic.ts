@@ -5,7 +5,7 @@ import { UPLOAD_CONSUMER_EXCHANGE, UPLOAD_CONSUMER_TOPIC } from "../../backgroun
 import { Upload } from "../../background/upload/types";
 import { MediaDal } from "../../dal/media";
 import { cleanupPath } from "../../utils/files";
-import { BucketsConfig, PRESIGNED_URL_EXPIRY_SECONDS, UploadedFile } from "../../utils/types";
+import { BucketsConfig, UploadedFile } from "../../utils/types";
 import { MediaUpdateRequestBody } from "./types";
 
 export const createMediaLogic = (
@@ -37,8 +37,8 @@ export const createMediaLogic = (
   getAllNoneCompletedMedia: () => mediaDal.getAllNoneCompletedMedia(),
   getMedia: (mediaId: string) => mediaDal.getMedia(mediaId),
   getMediaUploadProgress: async (mediaId: string) => mediaDal.getMediaUploadProgress(mediaId),
-  getTiles: (mediaId: string) => storageClient.getPresignedUrl(vodStorageBucket, `${mediaId}/thumbnails.jpg`, PRESIGNED_URL_EXPIRY_SECONDS),
-  getThumbnail: (mediaId: string) => storageClient.getPresignedUrl(kawazBucket, `${thumbnailPrefix}/${mediaId}.jpg`, PRESIGNED_URL_EXPIRY_SECONDS),
+  getTiles: (mediaId: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/thumbnails.jpg`),
+  getThumbnail: (mediaId: string) => storageClient.downloadObject(kawazBucket, `${thumbnailPrefix}/${mediaId}.jpg`),
   getManifest: (mediaId: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/output.mpd`),
   getSegment: (mediaId: string, filename: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/${filename}`),
   getVtt: (mediaId: string, filename: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/${filename}`),

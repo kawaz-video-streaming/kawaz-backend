@@ -62,9 +62,10 @@ export const createMediaCollectionHandlers = (bucketsConfig: BucketsConfig, dals
                 'get media collection thumbnail',
                 async (req: Request, res: Response) => {
                     const { params: { id: mediaCollectionId } } = validateRequestWithId(req);
-                    const thumbnailPresignedUrl = await logic.getThumbnail(mediaCollectionId);
+                    const thumbnail = await logic.getThumbnail(mediaCollectionId);
                     res.setHeader("Content-Type", "image/jpeg");
-                    res.redirect(thumbnailPresignedUrl);
+                    res.setHeader('Cache-Control', 'public, max-age=3600');
+                    thumbnail.pipe(res);
                 })
-    }
+    };
 };

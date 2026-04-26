@@ -272,7 +272,7 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
    * /media/{id}/thumbnail:
    *   get:
    *     summary: Get media thumbnail
-   *     description: Redirects to the thumbnail image URL for a media
+   *     description: Streams the media thumbnail directly as JPEG
    *     tags:
    *       - Media
    *     security:
@@ -285,8 +285,13 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
    *           type: string
    *         description: Media ID
    *     responses:
-   *       302:
-   *         description: Redirects to the thumbnail URL
+   *       200:
+   *         description: Thumbnail image binary data (image/jpeg)
+   *         content:
+   *           image/jpeg:
+   *             schema:
+   *               type: string
+   *               format: binary
    *       401:
    *         description: Unauthorized
    *       404:
@@ -333,7 +338,7 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
    * /media/stream/{id}/{filename}.m4s:
    *   get:
    *     summary: Get video segment
-   *     description: Streams a specific video segment (.m4s files only) directly as binary data
+   *     description: Streams a specific video segment (.m4s files only) as binary data
    *     tags:
    *       - Media
    *     security:
@@ -372,7 +377,7 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
    * /media/stream/{id}/thumbnails.jpg:
    *   get:
    *     summary: Get video tiles
-   *     description: Redirects to the URL for the video tiles (.jpg files only)
+   *     description: Streams the video sprite-sheet tile thumbnails directly as JPEG
    *     tags:
    *       - Media
    *     security:
@@ -392,8 +397,13 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
    *           pattern: '^.+\.jpg$'
    *         description: Tile filename (must end in .jpg)
    *     responses:
-   *       302:
-   *         description: Redirects to the tile URL
+   *       200:
+   *         description: Tile image binary data (image/jpeg)
+   *         content:
+   *           image/jpeg:
+   *             schema:
+   *               type: string
+   *               format: binary
    *       401:
    *         description: Unauthorized
    *       500:

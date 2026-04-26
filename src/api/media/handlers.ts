@@ -104,20 +104,20 @@ export const createMediaHandlers = (
         const {
           params: { id: mediaId },
         } = validateRequestWithId(req);
-        const thumbnailPresignedUrl = await logic.getThumbnail(mediaId);
+        const thumbnail = await logic.getThumbnail(mediaId);
         res.setHeader("Content-Type", "image/jpeg");
         res.setHeader('Cache-Control', 'public, max-age=3600');
-        res.redirect(thumbnailPresignedUrl);
+        thumbnail.pipe(res);
       },
     ),
     getTiles: requestHandlerDecorator(
       "get media tiles",
       async (req: Request, res: Response) => {
         const videoId = req.params[0];
-        const tilesPresignedUrl = await logic.getTiles(videoId);
+        const tiles = await logic.getTiles(videoId);
         res.setHeader("Content-Type", "image/jpeg");
         res.setHeader('Cache-Control', 'public, max-age=3600');
-        res.redirect(tilesPresignedUrl);
+        tiles.pipe(res);
       },
     ),
     getManifest: requestHandlerDecorator(

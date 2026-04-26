@@ -139,7 +139,7 @@ export const createAvatarRouter = (bucketsConfig: BucketsConfig, avatarDal: Avat
      * /avatar/{id}/image:
      *   get:
      *     summary: Get avatar image
-     *     description: Redirects to the image URL for an avatar
+     *     description: Streams the avatar image directly as JPEG
      *     tags:
      *       - Avatar
      *     security:
@@ -152,8 +152,13 @@ export const createAvatarRouter = (bucketsConfig: BucketsConfig, avatarDal: Avat
      *           type: string
      *         description: Avatar ID
      *     responses:
-     *       302:
-     *         description: Redirects to the image URL
+     *       200:
+     *         description: Avatar image binary data (image/jpeg)
+     *         content:
+     *           image/jpeg:
+     *             schema:
+     *               type: string
+     *               format: binary
      *       401:
      *         description: Unauthorized
      *       404:
