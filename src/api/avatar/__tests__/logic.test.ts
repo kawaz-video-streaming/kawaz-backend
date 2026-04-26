@@ -3,6 +3,7 @@ import { AvatarDal } from '../../../dal/avatar';
 import { Avatar } from '../../../dal/avatar/model';
 import { BucketsConfig, UploadedFile } from '../../../utils/types';
 import { createAvatarLogic } from '../logic';
+import { Readable } from 'stream';
 
 jest.mock('fs', () => ({ createReadStream: jest.fn().mockReturnValue({}) }));
 jest.mock('fs/promises', () => ({ unlink: jest.fn().mockResolvedValue(undefined) }));
@@ -24,10 +25,12 @@ const makeAvatarDal = (): jest.Mocked<Pick<AvatarDal, 'createAvatar' | 'deleteAv
     getAvatarById: jest.fn().mockResolvedValue(null),
 });
 
-const makeStorageClient = (): jest.Mocked<Pick<StorageClient, 'uploadObject' | 'deleteObject' | 'getPresignedUrl'>> => ({
+const objectStream = Readable.from('https://presigned-url');
+
+const makeStorageClient = (): jest.Mocked<Pick<StorageClient, 'uploadObject' | 'deleteObject' | 'downloadObject'>> => ({
     uploadObject: jest.fn().mockResolvedValue(undefined),
     deleteObject: jest.fn().mockResolvedValue(undefined),
-    getPresignedUrl: jest.fn().mockResolvedValue('https://presigned-url'),
+    downloadObject: jest.fn().mockResolvedValue(objectStream),
 });
 
 const makeAvatar = (overrides: Partial<Avatar> = {}): Avatar => ({
@@ -126,15 +129,15 @@ describe('createAvatarLogic.getAvatar', () => {
 });
 
 describe('createAvatarLogic.getAvatarImage', () => {
-    it('returns a presigned URL for the avatar image', async () => {
+    it('returns a stream of the avatar image', async () => {
         const avatarDal = makeAvatarDal();
         const storageClient = makeStorageClient();
-        storageClient.getPresignedUrl.mockResolvedValue('https://presigned-avatar-url');
+        storageClient.downloadObject.mockResolvedValue(objectStream);
 
         const logic = createAvatarLogic(makeBucketsConfig(), avatarDal as unknown as AvatarDal, storageClient as unknown as StorageClient);
-        const url = await logic.getAvatarImage('av-1');
+        const stream = await logic.getAvatarImage('av-1');
 
-        expect(storageClient.getPresignedUrl).toHaveBeenCalledWith('kawaz-bucket', 'avatars/av-1.jpg', 3600);
-        expect(url).toBe('https://presigned-avatar-url');
+        expect(storageClient.downloadObject).toHaveBeenCalledWith('kawaz-bucket', 'avatars/av-1.jpg');
+        expect(stream).toBe(objectStream);
     });
 });

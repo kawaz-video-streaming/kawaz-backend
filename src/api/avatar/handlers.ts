@@ -56,9 +56,10 @@ export const createAvatarHandlers = (bucketsConfig: BucketsConfig, avatarDal: Av
                 'get avatar image',
                 async (req: Request, res: Response) => {
                     const { params: { id: avatarId } } = validateRequestWithId(req);
-                    const imagePresignedUrl = await logic.getAvatarImage(avatarId);
+                    const image = await logic.getAvatarImage(avatarId);
                     res.setHeader("Content-Type", "image/jpeg");
-                    res.redirect(imagePresignedUrl);
+                    res.setHeader('Cache-Control', 'public, max-age=172800');
+                    image.pipe(res);
                 })
-    }
+    };
 };

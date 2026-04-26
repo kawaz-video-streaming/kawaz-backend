@@ -1,9 +1,9 @@
 import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
 import { AvatarDal } from "../../dal/avatar";
-import { BucketsConfig, PRESIGNED_URL_EXPIRY_SECONDS, UploadedFile } from "../../utils/types";
 import { Avatar } from "../../dal/avatar/model";
 import { cleanupPath } from "../../utils/files";
+import { BucketsConfig, UploadedFile } from "../../utils/types";
 
 export const createAvatarLogic = (
     { kawazPlus: { kawazStorageBucket, avatarPrefix } }: BucketsConfig,
@@ -22,5 +22,5 @@ export const createAvatarLogic = (
     },
     getAllAvatars: () => avatarDal.getAllAvatars(),
     getAvatar: (avatarId: string) => avatarDal.getAvatarById(avatarId),
-    getAvatarImage: (avatarId: string) => storageClient.getPresignedUrl(kawazStorageBucket, `${avatarPrefix}/${avatarId}.jpg`, PRESIGNED_URL_EXPIRY_SECONDS)
+    getAvatarImage: (avatarId: string) => storageClient.downloadObject(kawazStorageBucket, `${avatarPrefix}/${avatarId}.jpg`)
 });

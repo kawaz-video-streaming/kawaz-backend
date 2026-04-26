@@ -11,6 +11,7 @@ import { Dals } from '../../../dal/types';
 import { createMediaCollectionLogic } from '../logic';
 import { MediaCollectionUpdateRequestBody } from '../types';
 import { UploadedFile } from '../../../utils/types';
+import { Readable } from 'stream';
 
 const makeConfig = () => ({
     kawazPlus: {
@@ -54,9 +55,11 @@ const makeDals = (overrides: Partial<Dals> = {}): Dals => ({
     ...overrides,
 });
 
-const makeStorageClient = (): jest.Mocked<Pick<StorageClient, 'uploadObject' | 'getPresignedUrl' | 'deleteObject'>> => ({
+const objectStream = Readable.from('https://presigned-url');
+
+const makeStorageClient = (): jest.Mocked<Pick<StorageClient, 'uploadObject' | 'downloadObject' | 'deleteObject'>> => ({
     uploadObject: jest.fn().mockResolvedValue(undefined),
-    getPresignedUrl: jest.fn().mockResolvedValue('https://presigned-url'),
+    downloadObject: jest.fn().mockResolvedValue(objectStream),
     deleteObject: jest.fn().mockResolvedValue(undefined),
 });
 
@@ -163,9 +166,9 @@ describe('createMediaCollectionLogic.getThumbnail', () => {
         const storageClient = makeStorageClient();
 
         const logic = createMediaCollectionLogic(makeConfig(), dals, storageClient as unknown as StorageClient);
-        const url = await logic.getThumbnail('col-1');
+        const stream = await logic.getThumbnail('col-1');
 
-        expect(storageClient.getPresignedUrl).toHaveBeenCalledWith('upload-bucket', 'raw/thumbnails/col-1.jpg', 3600);
-        expect(url).toBe('https://presigned-url');
+        expect(storageClient.downloadObject).toHaveBeenCalledWith('upload-bucket', 'raw/thumbnails/col-1.jpg');
+        expect(stream).toBe(objectStream);
     });
 });

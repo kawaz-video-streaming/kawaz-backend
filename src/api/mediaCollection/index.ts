@@ -206,7 +206,7 @@ export const createMediaCollectionRouter = (bucketsConfig: BucketsConfig, dals: 
      * /mediaCollection/{id}/thumbnail:
      *   get:
      *     summary: Get media collection thumbnail
-     *     description: Redirects to the thumbnail image URL for a media collection
+     *     description: Streams the media collection thumbnail directly as JPEG
      *     tags:
      *       - MediaCollection
      *     security:
@@ -219,8 +219,13 @@ export const createMediaCollectionRouter = (bucketsConfig: BucketsConfig, dals: 
      *           type: string
      *         description: Media Collection ID
      *     responses:
-     *       302:
-     *         description: Redirects to the thumbnail URL
+     *       200:
+     *         description: Thumbnail image binary data (image/jpeg)
+     *         content:
+     *           image/jpeg:
+     *             schema:
+     *               type: string
+     *               format: binary
      *       401:
      *         description: Unauthorized
      *       404:

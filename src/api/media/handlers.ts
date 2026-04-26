@@ -104,20 +104,20 @@ export const createMediaHandlers = (
         const {
           params: { id: mediaId },
         } = validateRequestWithId(req);
-        const thumbnailPresignedUrl = await logic.getThumbnail(mediaId);
+        const thumbnail = await logic.getThumbnail(mediaId);
         res.setHeader("Content-Type", "image/jpeg");
-        res.setHeader('Cache-Control', 'public, max-age=3600');
-        res.redirect(thumbnailPresignedUrl);
+        res.setHeader('Cache-Control', 'public, max-age=172800');
+        thumbnail.pipe(res);
       },
     ),
     getTiles: requestHandlerDecorator(
       "get media tiles",
       async (req: Request, res: Response) => {
         const videoId = req.params[0];
-        const tilesPresignedUrl = await logic.getTiles(videoId);
+        const tiles = await logic.getTiles(videoId);
         res.setHeader("Content-Type", "image/jpeg");
-        res.setHeader('Cache-Control', 'public, max-age=3600');
-        res.redirect(tilesPresignedUrl);
+        res.setHeader('Cache-Control', 'public, max-age=172800');
+        tiles.pipe(res);
       },
     ),
     getManifest: requestHandlerDecorator(
@@ -126,7 +126,7 @@ export const createMediaHandlers = (
         const videoId = req.params[0];
         const manifestStream = await logic.getManifest(videoId);
         res.setHeader("Content-Type", "application/dash+xml");
-        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.setHeader('Cache-Control', 'public, max-age=172800');
         manifestStream.pipe(res);
       },
     ),
@@ -140,7 +140,7 @@ export const createMediaHandlers = (
           filename,
         );
         res.setHeader("Content-Type", "video/iso.segment");
-        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.setHeader('Cache-Control', 'public, max-age=172800');
         segmentStream.pipe(res);
       },
     ),
@@ -151,7 +151,7 @@ export const createMediaHandlers = (
         const filename = req.params[1];
         const vttStream = await logic.getVtt(videoId, filename);
         res.setHeader("Content-Type", "text/vtt");
-        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.setHeader('Cache-Control', 'public, max-age=172800');
         vttStream.pipe(res);
       },
     ),

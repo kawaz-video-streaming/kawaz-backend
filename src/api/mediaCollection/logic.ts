@@ -3,7 +3,7 @@ import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
 import { Dals } from "../../dal/types";
 import { cleanupPath } from "../../utils/files";
-import { BucketsConfig, PRESIGNED_URL_EXPIRY_SECONDS, UploadedFile } from "../../utils/types";
+import { BucketsConfig, UploadedFile } from "../../utils/types";
 import { MediaCollectionUpdateRequestBody } from "./types";
 
 class CollectionNotEmptyError extends InternalServerError {
@@ -42,5 +42,5 @@ export const createMediaCollectionLogic = (
   },
   getAllMediaCollections: () => mediaCollectionDal.getAllCollections(),
   getMediaCollection: (collectionId: string) => mediaCollectionDal.getCollection(collectionId),
-  getThumbnail: (collectionId: string) => storageClient.getPresignedUrl(kawazStorageBucket, `${thumbnailPrefix}/${collectionId}.jpg`, PRESIGNED_URL_EXPIRY_SECONDS)
+  getThumbnail: (collectionId: string) => storageClient.downloadObject(kawazStorageBucket, `${thumbnailPrefix}/${collectionId}.jpg`)
 });
