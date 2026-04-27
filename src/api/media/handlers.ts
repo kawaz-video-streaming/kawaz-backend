@@ -9,8 +9,9 @@ import { BucketsConfig } from "../../utils/types";
 import { validateRequestWithId } from "../../utils/zod";
 import { createMediaLogic } from "./logic";
 import {
+  validateCompleteUploadRequest,
+  validateInitiateUploadRequest,
   validateMediaUpdateRequest,
-  validateMediaUploadRequest,
 } from "./types";
 
 export const createMediaHandlers = (
@@ -43,14 +44,20 @@ export const createMediaHandlers = (
         res.status(StatusCodes.OK).json(medias);
       },
     ),
-    uploadMedia: requestHandlerDecorator(
-      "upload media",
+    initiateUpload: requestHandlerDecorator(
+      "initiate media upload",
       async (rawReq: Request, res: Response) => {
-        const { body, file, thumbnail } = validateMediaUploadRequest(rawReq);
-        const mediaId = await logic.uploadMedia(body, file, thumbnail);
-        res
-          .status(StatusCodes.OK)
-          .json({ message: "Media Started Uploading", mediaId });
+        const body = validateInitiateUploadRequest(rawReq);
+        const result = await logic.initiateUpload(body);
+        res.status(StatusCodes.OK).json(result);
+      },
+    ),
+    completeUpload: requestHandlerDecorator(
+      "complete media upload",
+      async (rawReq: Request, res: Response) => {
+        const { body: { mediaId } } = validateCompleteUploadRequest(rawReq);
+        await logic.completeUpload(mediaId);
+        res.status(StatusCodes.OK).json({ message: "Media processing started" });
       },
     ),
     deleteMedia: requestHandlerDecorator(

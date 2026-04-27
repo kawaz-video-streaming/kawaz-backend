@@ -2,9 +2,7 @@ import { AmqpClient } from '@ido_kawaz/amqp-client';
 import type { Application } from '@ido_kawaz/server-framework';
 import { ApiError } from '@ido_kawaz/server-framework';
 import express from 'express';
-import { existsSync, mkdirSync, readdirSync, rmdirSync, rmSync, writeFileSync } from 'fs';
 import jwt from 'jsonwebtoken';
-import path from 'path';
 import request from 'supertest';
 import { MediaDal } from '../../../dal/media';
 import { UserDal } from '../../../dal/user';
@@ -21,33 +19,15 @@ const parseCookies = (req: express.Request, _res: express.Response, next: expres
     next();
 };
 
-describe('POST /media/upload route', () => {
+describe('POST /upload/initiate and POST /upload/complete routes', () => {
     const AUTH_CONFIG = { jwtSecret: 'media-test-secret', adminPromotionSecret: 'admin-secret' };
-    const fixtureDir = path.join(process.cwd(), 'src', 'api', 'media', '__tests__', 'fixtures');
-    const fixtureFile = path.join(fixtureDir, 'sample-upload.mp4');
-    const fixtureThumbnailFile = path.join(fixtureDir, 'sample-thumbnail.jpg');
-    const tmpDir = path.join(process.cwd(), 'tmp');
-
-    let tmpDirExistedBeforeAll = false;
-    let fixtureDirExistedBeforeAll = false;
-    let tmpEntriesBeforeEach = new Set<string>();
 
     let app: Application;
-    let mediaDal: { createMedia: jest.Mock };
-    let userDal: { findUser: jest.Mock };
-    let amqpClient: { publish: jest.Mock };
-    let storageClient: jest.Mock;
+    let mediaDal: { createMedia: jest.Mock; getPendingMedia: jest.Mock; updateMedia: jest.Mock; };
+    let userDal: { findUser: jest.Mock; };
+    let amqpClient: { publish: jest.Mock; };
+    let storageClient: { ensureBucket: jest.Mock; getPutPresignedUrl: jest.Mock; };
     let adminToken: string;
-
-    beforeAll(() => {
-        tmpDirExistedBeforeAll = existsSync(tmpDir);
-        fixtureDirExistedBeforeAll = existsSync(fixtureDir);
-
-        mkdirSync(fixtureDir, { recursive: true });
-        writeFileSync(fixtureFile, 'test upload content');
-        writeFileSync(fixtureThumbnailFile, 'fake jpg content');
-        mkdirSync(tmpDir, { recursive: true });
-    });
 
     beforeEach(() => {
         mediaDal = {
@@ -56,9 +36,17 @@ describe('POST /media/upload route', () => {
                 fileName: 'sample-upload.mp4',
                 title: 'My Upload',
                 tags: [],
-                size: 19,
+                size: 1000,
+                status: 'pending',
+                percentage: 10,
+                thumbnailFocalPoint: { x: 0.5, y: 0.5 },
+            }),
+            getPendingMedia: jest.fn().mockResolvedValue({
+                _id: 'media-1',
+                fileName: 'sample-upload.mp4',
                 status: 'pending',
             }),
+            updateMedia: jest.fn().mockResolvedValue(undefined),
         };
 
         userDal = {
@@ -69,13 +57,15 @@ describe('POST /media/upload route', () => {
             publish: jest.fn(),
         };
 
-        storageClient = jest.fn();
-
-        tmpEntriesBeforeEach = new Set(existsSync(tmpDir) ? readdirSync(tmpDir) : []);
+        storageClient = {
+            ensureBucket: jest.fn().mockResolvedValue(undefined),
+            getPutPresignedUrl: jest.fn().mockResolvedValue('https://presigned-url'),
+        };
 
         adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
 
         app = express();
+        app.use(express.json());
         app.use(parseCookies);
         app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
         app.use('/media', createMediaRouter({
@@ -92,45 +82,18 @@ describe('POST /media/upload route', () => {
         });
     });
 
-    afterEach(() => {
-        if (!existsSync(tmpDir)) {
-            return;
-        }
-
-        for (const entry of readdirSync(tmpDir)) {
-            if (!tmpEntriesBeforeEach.has(entry)) {
-                rmSync(path.join(tmpDir, entry), { recursive: true, force: true });
-            }
-        }
-    });
-
-    afterAll(() => {
-        if (existsSync(fixtureFile)) {
-            rmSync(fixtureFile, { force: true });
-        }
-        if (existsSync(fixtureThumbnailFile)) {
-            rmSync(fixtureThumbnailFile, { force: true });
-        }
-
-        if (!fixtureDirExistedBeforeAll && existsSync(fixtureDir) && readdirSync(fixtureDir).length === 0) {
-            rmdirSync(fixtureDir);
-        }
-
-        if (!tmpDirExistedBeforeAll && existsSync(tmpDir) && readdirSync(tmpDir).length === 0) {
-            rmdirSync(tmpDir);
-        }
-    });
-
-    it('returns 200 and publishes upload event for valid multipart request', async () => {
+    it('POST /upload/initiate returns 200 with presigned URLs for valid request', async () => {
         const response = await request(app)
-            .post('/media/upload')
+            .post('/media/upload/initiate')
             .set('Cookie', `kawaz-token=${adminToken}`)
-            .field('title', 'My Upload')
-            .attach('file', fixtureFile)
-            .attach('thumbnail', fixtureThumbnailFile);
+            .send({ title: 'My Upload', fileName: 'sample-upload.mp4', fileSize: 1000, mimeType: 'video/mp4' });
 
         expect(response.status).toBe(200);
-        expect(response.body).toEqual({ message: 'Media Started Uploading', mediaId: 'media-1' });
+        expect(response.body).toEqual({
+            mediaId: 'media-1',
+            videoUploadUrl: 'https://presigned-url',
+            thumbnailUploadUrl: 'https://presigned-url',
+        });
 
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
         expect(mediaDal.createMedia).toHaveBeenCalledWith({
@@ -138,53 +101,73 @@ describe('POST /media/upload route', () => {
             tags: [],
             thumbnailFocalPoint: { x: 0.5, y: 0.5 },
             fileName: 'sample-upload.mp4',
-            size: expect.any(Number),
-            path: expect.any(String),
-            mimetype: expect.any(String),
+            size: 1000,
         });
 
-        expect(amqpClient.publish).toHaveBeenCalledTimes(1);
-        expect(amqpClient.publish).toHaveBeenCalledWith(
-            'upload',
-            'upload.media',
-            expect.objectContaining({
-                media: expect.objectContaining({
-                    _id: 'media-1',
-                    fileName: 'sample-upload.mp4',
-                    size: 19,
-                }),
-                mediaPath: expect.stringContaining('tmp'),
-                thumbnailPath: expect.stringContaining('tmp'),
-            }),
-        );
+        expect(storageClient.ensureBucket).toHaveBeenCalledWith('upload-bucket');
+        expect(storageClient.getPutPresignedUrl).toHaveBeenCalledTimes(2);
     });
 
-    it('returns 400 when request is missing file', async () => {
+    it('POST /upload/initiate returns 400 when required fields are missing', async () => {
         const response = await request(app)
-            .post('/media/upload')
-            .set('Cookie', `kawaz-token=${adminToken}`);
+            .post('/media/upload/initiate')
+            .set('Cookie', `kawaz-token=${adminToken}`)
+            .send({ title: 'My Upload' });
 
         expect(response.status).toBe(400);
         expect(response.body.message).toContain('Invalid request');
 
         expect(mediaDal.createMedia).not.toHaveBeenCalled();
-        expect(amqpClient.publish).not.toHaveBeenCalled();
     });
 
-    it('returns 500 when DAL createMedia fails', async () => {
+    it('POST /upload/initiate returns 500 when DAL createMedia fails', async () => {
         mediaDal.createMedia.mockRejectedValueOnce(new Error('db failure'));
 
         const response = await request(app)
-            .post('/media/upload')
+            .post('/media/upload/initiate')
             .set('Cookie', `kawaz-token=${adminToken}`)
-            .field('title', 'My Upload')
-            .attach('file', fixtureFile)
-            .attach('thumbnail', fixtureThumbnailFile);
+            .send({ title: 'My Upload', fileName: 'sample-upload.mp4', fileSize: 1000, mimeType: 'video/mp4' });
 
         expect(response.status).toBe(500);
         expect(response.body.message).toContain('db failure');
 
         expect(mediaDal.createMedia).toHaveBeenCalledTimes(1);
+        expect(amqpClient.publish).not.toHaveBeenCalled();
+    });
+
+    it('POST /upload/complete returns 200 and publishes convert event when media is pending', async () => {
+        const response = await request(app)
+            .post('/media/upload/complete')
+            .set('Cookie', `kawaz-token=${adminToken}`)
+            .send({ mediaId: 'media-1' });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ message: 'Media processing started' });
+
+        expect(mediaDal.getPendingMedia).toHaveBeenCalledWith('media-1');
+        expect(amqpClient.publish).toHaveBeenCalledTimes(1);
+        expect(amqpClient.publish).toHaveBeenCalledWith(
+            'convert',
+            'convert.media',
+            expect.objectContaining({
+                mediaId: 'media-1',
+                mediaFileName: 'sample-upload.mp4',
+                mediaStorageBucket: 'upload-bucket',
+            }),
+        );
+        expect(mediaDal.updateMedia).toHaveBeenCalledWith('media-1', { status: 'processing', percentage: 20 });
+    });
+
+    it('POST /upload/complete returns 404 when media not found or already processing', async () => {
+        mediaDal.getPendingMedia.mockResolvedValueOnce(null);
+
+        const response = await request(app)
+            .post('/media/upload/complete')
+            .set('Cookie', `kawaz-token=${adminToken}`)
+            .send({ mediaId: 'media-1' });
+
+        expect(response.status).toBe(404);
+        expect(mediaDal.getPendingMedia).toHaveBeenCalledWith('media-1');
         expect(amqpClient.publish).not.toHaveBeenCalled();
     });
 });
@@ -193,8 +176,8 @@ describe('GET /media/uploading', () => {
     const AUTH_CONFIG = { jwtSecret: 'uploading-test-secret', adminPromotionSecret: 'admin-secret' };
 
     let app: Application;
-    let mediaDal: { getAllNoneCompletedMedia: jest.Mock };
-    let userDal: { findUser: jest.Mock };
+    let mediaDal: { getAllNoneCompletedMedia: jest.Mock; };
+    let userDal: { findUser: jest.Mock; };
     let userToken: string;
 
     const makeApp = () => {
@@ -264,8 +247,8 @@ describe('GET /media/:id/progress', () => {
     const mediaId = '507f1f77bcf86cd799439011';
 
     let app: Application;
-    let mediaDal: { getMediaUploadProgress: jest.Mock };
-    let userDal: { findUser: jest.Mock };
+    let mediaDal: { getMediaUploadProgress: jest.Mock; };
+    let userDal: { findUser: jest.Mock; };
     let userToken: string;
 
     beforeEach(() => {

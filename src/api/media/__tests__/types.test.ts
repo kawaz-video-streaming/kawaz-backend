@@ -1,73 +1,62 @@
-import { validateMediaUploadRequest } from '../types';
+import { validateInitiateUploadRequest, validateCompleteUploadRequest } from '../types';
 
-describe('validateMediaUploadRequest', () => {
-    const makeFileEntry = (overrides: Record<string, unknown> = {}) => ({
-        path: '/tmp/video.mp4',
-        originalname: 'video.mp4',
-        mimetype: 'video/mp4',
-        size: 111,
-        ...overrides,
-    });
-
-    const makeBody = (overrides: Record<string, unknown> = {}) => ({
-        title: 'My Video',
-        ...overrides,
-    });
-
-    const makeThumbnailEntry = (overrides: Record<string, unknown> = {}) => ({
-        path: '/tmp/thumb.jpg',
-        originalname: 'thumb.jpg',
-        mimetype: 'image/jpeg',
-        size: 8,
-        ...overrides,
-    });
-
+describe('validateInitiateUploadRequest', () => {
     const makeReq = (overrides: Record<string, unknown> = {}) => ({
-        files: { file: [makeFileEntry()], thumbnail: [makeThumbnailEntry()] },
-        body: makeBody(),
-        ...overrides,
+        body: {
+            title: 'My Video',
+            fileName: 'video.mp4',
+            fileSize: 1024,
+            mimeType: 'video/mp4',
+            tags: [],
+            thumbnailFocalPoint: { x: 0.5, y: 0.5 },
+            ...overrides,
+        },
     });
 
-    it('returns file and body fields for a valid upload payload', () => {
-        const result = validateMediaUploadRequest(makeReq() as any);
-
+    it('returns parsed body for a valid payload', () => {
+        const result = validateInitiateUploadRequest(makeReq() as any);
         expect(result).toMatchObject({
-            file: { path: '/tmp/video.mp4', fileName: 'video.mp4', mimetype: 'video/mp4', size: 111 },
-            body: { title: 'My Video', tags: [] },
+            title: 'My Video',
+            fileName: 'video.mp4',
+            fileSize: 1024,
+            mimeType: 'video/mp4',
         });
     });
 
-    it('throws Invalid request when file is missing', () => {
-        expect(() => validateMediaUploadRequest(makeReq({ files: {} }) as any)).toThrow('Invalid request');
+    it('throws when title is empty', () => {
+        expect(() => validateInitiateUploadRequest(makeReq({ title: '' }) as any)).toThrow('Title is required');
     });
 
-    it('throws when mimetype is not a video', () => {
-        const req = makeReq({ files: { file: [makeFileEntry({ mimetype: 'application/pdf' })], thumbnail: [makeThumbnailEntry()] } });
-        expect(() => validateMediaUploadRequest(req as any)).toThrow('Only video files are allowed');
+    it('throws when fileName is missing', () => {
+        expect(() => validateInitiateUploadRequest(makeReq({ fileName: '' }) as any)).toThrow();
     });
 
-    it('throws when file size is not a number', () => {
-        const req = makeReq({ files: { file: [makeFileEntry({ size: '111' })], thumbnail: [makeThumbnailEntry()] } });
-        expect(() => validateMediaUploadRequest(req as any)).toThrow('Invalid request');
+    it('throws when mimeType is not a video', () => {
+        expect(() => validateInitiateUploadRequest(makeReq({ mimeType: 'image/jpeg' }) as any)).toThrow('Only video files are allowed');
     });
 
-    it('throws when title is empty in body', () => {
-        const req = makeReq({ body: { title: '' } });
-        expect(() => validateMediaUploadRequest(req as any)).toThrow('Title is required');
+    it('throws when fileSize is not positive', () => {
+        expect(() => validateInitiateUploadRequest(makeReq({ fileSize: 0 }) as any)).toThrow();
     });
 
-    it('returns thumbnail in result', () => {
-        const result = validateMediaUploadRequest(makeReq() as any);
-        expect(result.thumbnail).toMatchObject({ fileName: 'thumb.jpg', mimetype: 'image/jpeg' });
+    it('defaults tags to empty array when omitted', () => {
+        const req = { body: { title: 'T', fileName: 'v.mp4', fileSize: 1, mimeType: 'video/mp4' } };
+        const result = validateInitiateUploadRequest(req as any);
+        expect(result.tags).toEqual([]);
+    });
+});
+
+describe('validateCompleteUploadRequest', () => {
+    it('accepts a valid mediaId', () => {
+        const result = validateCompleteUploadRequest({ body: { mediaId: 'abc123' } } as any);
+        expect(result.body.mediaId).toBe('abc123');
     });
 
-    it('throws when thumbnail is missing', () => {
-        const req = makeReq({ files: { file: [makeFileEntry()] } });
-        expect(() => validateMediaUploadRequest(req as any)).toThrow('Invalid request');
+    it('throws when mediaId is missing', () => {
+        expect(() => validateCompleteUploadRequest({ body: {} } as any)).toThrow();
     });
 
-    it('throws when thumbnail mimetype is not an image', () => {
-        const req = makeReq({ files: { file: [makeFileEntry()], thumbnail: [makeThumbnailEntry({ mimetype: 'video/mp4' })] } });
-        expect(() => validateMediaUploadRequest(req as any)).toThrow('Only image files are allowed');
+    it('throws when mediaId is empty string', () => {
+        expect(() => validateCompleteUploadRequest({ body: { mediaId: '' } } as any)).toThrow();
     });
 });
