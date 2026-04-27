@@ -32,43 +32,45 @@ npx jest --config jest.config.js src/api/media/__tests__/index.test.ts --verbose
 
 ## Architecture
 
-This is a **media upload microservice** with two main processing paths:
+This is a **media backend service** with two main processing paths:
 
-1. **HTTP API** (`src/api/`) — Accepts file uploads, saves metadata to MongoDB (status: "pending"), publishes AMQP message (with temp file path) to trigger background processing.
-2. **AMQP Consumer** (`src/background/`) — Two consumers:
-   - **Upload** (`src/background/upload/`) — Listens for upload events, uploads file to S3 (`uploadMediaHandler`), then on success triggers video conversion / updates status and cleans up the temp file (`uploadSuccessHandler`). Storage errors are wrapped as `UploadError` (retriable via `AmqpRetriableError`).
+1. **HTTP API** (`src/api/`) — Handles auth (admin-approved signup), admin panel, media presigned-URL upload flow, avatar/media/collection CRUD, and MPEG-DASH streaming.
+2. **AMQP Consumer** (`src/background/`) — One active consumer:
+   - **Upload** (`src/background/upload/`) — **Currently disabled.** Browsers now upload directly to S3 via presigned PUT URLs returned by `/media/upload/initiate`.
    - **Progress** (`src/background/progress/`) — Listens for progress events, updates media `status` and `percentage` for any of the four statuses (`pending`, `processing`, `completed`, `failed`); saves video `metadata` only when status is `"completed"`.
 
 ### Request Flow
 
 ```
-POST /media/upload  (multipart: fields file + thumbnail, both required)
-  → Multer (temp files saved to ./tmp)
-  → Validate request (Zod) — requires video file + image thumbnail
+POST /media/upload/initiate  (JSON: title, fileName, fileSize, mimeType, [description, tags, thumbnailFocalPoint, collectionId])
+  → Validate request (Zod) — requires title, fileName, fileSize, mimeType (video/*)
   → Save media record to MongoDB (status: "pending", thumbnailFocalPoint stored)
-  → Publish to AMQP exchange "upload", topic "upload.media"
-      (includes mediaPath + thumbnailPath)
-  → Return 200 { message: "Media Started Uploading" }
+  → storageClient.getPutPresignedUrl for video key (<uploadPrefix>/<fileName>)
+  → storageClient.getPutPresignedUrl for thumbnail key (<thumbnailPrefix>/<mediaId>.jpg)
+  → Return 200 { mediaId, videoUploadUrl, thumbnailUploadUrl }
+  (browser then uploads directly to storage using the presigned PUT URLs)
 
-AMQP consumer (exchange: "upload", topic: "upload.media")
-  → Validate payload (Zod)
-  → uploadMediaHandler(storageClient, config): Upload media + thumbnail to S3
-      → media → <uploadPrefix>/<fileName>  (multipart if size > partSize)
-      → thumbnail → <thumbnailPrefix>/<mediaId>.jpg
-      → On StorageError: throw UploadError (retriable, max 3 retries)
-  → uploadSuccessHandler(amqpClient, mediaDal, config):
-      → Always: publish to "convert" exchange, update media status → "processing"
-      → Delete temp media file and temp thumbnail file
-  → On fatal error: Delete temp file
+POST /media/upload/complete  (JSON: { mediaId })
+  → mediaDal.getPendingMedia(mediaId) — 404 if not found or not "pending"
+  → Publish ConvertMessage to AMQP exchange "convert", topic "convert.media"
+      (includes mediaId, mediaFileName, mediaStorageBucket, mediaRoutingKey)
+  → mediaDal.updateMedia(mediaId, { status: "processing", percentage: 20 })
+  → Return 200 { message: "Media processing started" }
+
+Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
+      Browsers upload directly to storage via presigned URLs.
 ```
 
 ### HTTP Endpoints
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/auth/signup` | No | Register a new user, sets `kawaz-token` HttpOnly cookie |
-| `POST` | `/auth/login` | No | Login, sets `kawaz-token` HttpOnly cookie |
+| `POST` | `/auth/signup` | No | Register a new user (requires email); returns 202, account awaits admin approval |
+| `POST` | `/auth/login` | No | Login; sets `kawaz-token` HttpOnly cookie (maxAge: 2 days). Blocked if status is `pending` or `denied` |
 | `POST` | `/auth/promote` | No (x-admin-secret header) | Promote a user to admin role |
+| `GET` | `/admin/pending` | Yes (admin only) | List users awaiting approval (`[{ name, email }]`) |
+| `POST` | `/admin/pending/:username/approve` | Yes (admin only) | Approve a pending user; sends approval email |
+| `POST` | `/admin/pending/:username/deny` | Yes (admin only) | Deny a pending user; sends denial email and removes user |
 | `GET` | `/user/me` | Yes | Returns the authenticated user's info (`username`, `role`) |
 | `POST` | `/user/profile` | Yes | Create a profile for the authenticated user |
 | `PUT` | `/user/profile` | Yes | Update the avatar of an existing profile (matched by `profileName`) |
@@ -76,27 +78,28 @@ AMQP consumer (exchange: "upload", topic: "upload.media")
 | `GET` | `/user/profiles` | Yes | List all profiles for the authenticated user |
 | `GET` | `/avatar` | Yes | List all avatars |
 | `GET` | `/avatar/:id` | Yes | Get a single avatar's metadata |
-| `GET` | `/avatar/:id/image` | Yes | Redirect to presigned avatar image URL |
+| `GET` | `/avatar/:id/image` | Yes | Stream avatar image as `image/jpeg` with `Cache-Control: public, max-age=172800` |
 | `POST` | `/avatar` | Yes (admin only) | Create an avatar with image upload |
 | `DELETE` | `/avatar/:id` | Yes (admin only) | Delete an avatar from DB and storage |
-| `POST` | `/media/upload` | Yes (admin only) | Upload video + thumbnail (multipart/form-data); returns `{ message, mediaId }` |
+| `POST` | `/media/upload/initiate` | Yes (admin only) | Create media record; returns `{ mediaId, videoUploadUrl, thumbnailUploadUrl }` (presigned PUT URLs) |
+| `POST` | `/media/upload/complete` | Yes (admin only) | Signal browser upload done; triggers convert AMQP message, sets status to `processing` |
 | `GET` | `/media` | Yes | List all completed media from MongoDB |
 | `GET` | `/media/uploading` | Yes | List all non-completed media (pending/processing/failed) |
 | `GET` | `/media/:id` | Yes | Get a single media's metadata from MongoDB |
 | `GET` | `/media/:id/progress` | Yes | Get upload progress `{ status, percentage }` for a media item |
 | `PUT` | `/media/:id` | Yes (admin only) | Update media title, description, tags, thumbnail image, or thumbnail focal point |
 | `DELETE` | `/media/:id` | Yes (admin only) | Delete media from DB and VOD storage |
-| `GET` | `/media/:id/thumbnail` | Yes | Redirect to presigned thumbnail URL |
+| `GET` | `/media/:id/thumbnail` | Yes | Stream thumbnail as `image/jpeg` with `Cache-Control: public, max-age=172800` |
 | `GET` | `/media/stream/:id/output.mpd` | Yes | Stream MPEG-DASH manifest from VOD storage bucket |
-| `GET` | `/media/stream/:id/:filename.m4s` | Yes | Redirect to presigned URL for a video segment |
+| `GET` | `/media/stream/:id/:filename.m4s` | Yes | Stream video segment as `video/iso.segment` with `Cache-Control: public, max-age=172800` |
 | `GET` | `/media/stream/:id/:filename.vtt` | Yes | Stream VTT subtitle file from VOD storage bucket |
-| `GET` | `/media/stream/:id/thumbnails.jpg` | Yes | Stream sprite-sheet tile thumbnails image from VOD storage bucket |
+| `GET` | `/media/stream/:id/thumbnails.jpg` | Yes | Stream sprite-sheet tile thumbnails as `image/jpeg` with `Cache-Control: public, max-age=172800` |
 | `POST` | `/media-collection` | Yes (admin only) | Create a collection with a required thumbnail |
 | `GET` | `/media-collection` | Yes | List all media collections |
 | `GET` | `/media-collection/:id` | Yes | Get a single collection's metadata |
 | `PUT` | `/media-collection/:id` | Yes (admin only) | Update collection title, description, tags, thumbnail image, or thumbnail focal point |
 | `DELETE` | `/media-collection/:id` | Yes (admin only) | Delete a collection (must be empty) |
-| `GET` | `/media-collection/:id/thumbnail` | Yes | Redirect to presigned thumbnail URL |
+| `GET` | `/media-collection/:id/thumbnail` | Yes | Stream thumbnail as `image/jpeg` with `Cache-Control: public, max-age=172800` |
 | `GET` | `/health` | No | Health check — returns 200 OK |
 | `GET` | `/api-docs` | No | Swagger UI (OpenAPI documentation) |
 
@@ -137,13 +140,29 @@ Thumbnail is uploaded to storage at key `<thumbnailPrefix>/<mediaId>.jpg` by the
 
 `MediaMetadata` contains name, durationInMs, playUrl, chaptersUrl, chapters, videoStreams, audioStreams, and subtitleStreams — populated when the progress consumer receives a completed event from the media processor.
 
+### User Model (`src/dal/user/model.ts`)
+
+```ts
+interface User {
+  name: string;               // unique username
+  password: string;           // bcrypt-hashed
+  email: string;              // required at signup
+  status: "pending" | "approved" | "denied";  // defaults to "pending"
+  role: "user" | "admin";     // defaults to "user"
+  profiles: Profile[];        // embedded, defaults to []
+}
+```
+
+Login is blocked unless `status === "approved"`. Admin approval sends an email via `Mailer`.
+
 ### System Initialization (`src/services/system.ts`)
 
 Wires everything together:
-- `StorageClient` (S3-compatible, shared between upload consumer and media API)
-- Two `AmqpClient` instances — one for publishing (API), one for consuming (background)
+- `Mailer` (Gmail SMTP) for user approval/denial emails
+- `StorageClient` (S3-compatible, shared between media API; upload consumer disabled)
+- One `AmqpClient` instance for consuming (background); API publishes via same client
 - MongoDB connection + DALs
-- AMQP consumers
+- AMQP consumers (progress consumer only; upload consumer is currently disabled)
 - HTTP server with routes
 
 ### Key Internal Packages
@@ -164,7 +183,7 @@ All `@ido_kawaz/*` packages are listed as **devDependencies** (resolved locally 
 - **Nullable update fields**: `description` and `collectionId` use `z.string().nullish()` — sending `null` triggers a MongoDB `$unset`, omitting the field leaves the DB value unchanged.
 - **Shared types**: `MEDIA_TAGS`, `MediaTag`, `AVATAR_CATEGORIES`, `AvatarCategory`, `BucketsConfig`, `Coordinates`, `UploadedFile`, `RequestWithIdParam` are defined in `src/utils/types.ts` and shared across modules.
 - **BucketsConfig**: All storage bucket names and key prefixes are consolidated into a single `BucketsConfig` object (see `src/utils/types.ts`) passed down to media, mediaCollection, and upload consumer — no per-feature config interfaces for storage.
-- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia(MediaInfo)`, `updateMedia()`, `deleteMedia()`, `getAllMedia()`, `getMedia()`, `isCollectionEmpty()`. MediaCollection: `createCollection()`, `updateCollection()`, `deleteCollection()`, `getAllCollections()`, `getCollection()`, `isCollectionEmpty()`. User: `createUser()`, `findUser()`, `verifyUser()`. Avatar: `createAvatar()`, `deleteAvatar()`, `getAllAvatars()`, `getAvatarById()`.
+- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia(MediaInfo)`, `updateMedia()`, `deleteMedia()`, `getAllMedia()`, `getMedia()`, `getPendingMedia()`, `getMediaUploadProgress()`, `getAllNoneCompletedMedia()`, `isCollectionEmpty()`. MediaCollection: `createCollection()`, `updateCollection()`, `deleteCollection()`, `getAllCollections()`, `getCollection()`, `isCollectionEmpty()`. User: `createUser(name, password, email)`, `findUser()`, `verifyUser()`, `approveUser()`, `denyUser()`, `removeUser()`, `getPendingUsers()`, `promoteToAdmin()`. Avatar: `createAvatar()`, `deleteAvatar()`, `getAllAvatars()`, `getAvatarById()`.
 - **Colocated tests**: `__tests__/` directories next to the source they test.
 - **Handler decorator** from server-framework wraps route handlers for logging and error propagation.
 
@@ -176,7 +195,7 @@ Service-specific env vars validated in `src/config.ts`:
 
 | Variable | Required | Description |
 |---|---|---|
-| `NODE_ENV` | No (default: `"development"`) | `"development"` \| `"local"` \| `"test"` |
+| `NODE_ENV` | No (default: `"development"`) | `"development"` \| `"local"` \| `"test"` \| `"production"` |
 | `KAWAZ_PLUS_BUCKET` | Yes | S3 bucket name for kawaz-plus uploads (media, thumbnails, avatars) |
 | `UPLOAD_PREFIX` | Yes | Key prefix for raw media uploads within kawaz-plus bucket |
 | `THUMBNAIL_PREFIX` | Yes | Key prefix for thumbnails within kawaz-plus bucket |
@@ -184,6 +203,8 @@ Service-specific env vars validated in `src/config.ts`:
 | `VOD_STORAGE_BUCKET` | Yes | S3 bucket name for VOD content (manifests, segments, VTT) |
 | `JWT_SECRET` | Yes | Secret for signing/verifying JWT tokens |
 | `ADMIN_PROMOTION_SECRET` | Yes | Secret required in `x-admin-secret` header to promote a user to admin |
+| `GMAIL_USER` | Yes | Gmail address used as the Mailer sender/recipient for approval request emails |
+| `GMAIL_APP_PASSWORD` | Yes | Gmail app password for SMTP authentication in the Mailer service |
 
 Additional env vars are consumed by the internal packages (`createServerConfig()`, `createMongoConfig()`, `createAmqpConfig()`, `createStorageConfig()`) — refer to each package's documentation for their required variables.
 

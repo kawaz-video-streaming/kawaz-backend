@@ -5,15 +5,14 @@ Kawaz Plus media backend service.
 ## What it does
 
 - Exposes a health endpoint (`GET /health`)
-- Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`, `POST /auth/promote`) — JWT-based authentication with role support
+- Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`, `POST /auth/promote`) — signup requires email and creates users in `"pending"` status awaiting admin approval; login blocked for non-approved users; JWT stored in HttpOnly cookie
+- Exposes admin endpoints (`GET /admin/pending`, `POST /admin/pending/:username/approve`, `POST /admin/pending/:username/deny`) — manage pending user registrations with email notifications
 - Exposes user endpoints (`GET /user/me`, `POST /user/profile`, `PUT /user/profile`, `DELETE /user/profile/:name`, `GET /user/profiles`) — per-user profile management
-- Exposes avatar endpoints (`GET /avatar`, `GET /avatar/:id`, `GET /avatar/:id/image`, `POST /avatar`, `DELETE /avatar/:id`) — avatar catalog with image storage
+- Exposes avatar endpoints (`GET /avatar`, `GET /avatar/:id`, `GET /avatar/:id/image`, `POST /avatar`, `DELETE /avatar/:id`) — avatar catalog; image streamed directly as JPEG with cache headers
 - Exposes media CRUD endpoints (`GET /media`, `GET /media/uploading`, `GET /media/:id`, `PUT /media/:id`, `DELETE /media/:id`) — served from MongoDB; `/uploading` returns all non-completed media
-- Exposes media upload endpoint (`POST /media/upload`, `multipart/form-data`) — video + required thumbnail, requires admin role
-- Exposes media collection CRUD endpoints (`/mediaCollection`) — group media into nestable collections
-- Exposes MPEG-DASH streaming endpoints (`/media/stream/:id/output.mpd`, `*.m4s`, `*.vtt`, `thumbnails.jpg`) direct from VOD storage
-- Publishes upload jobs to AMQP for async processing
-- Consumes upload jobs and uploads files to object storage
+- Exposes presigned-URL based media upload endpoints (`POST /media/upload/initiate`, `POST /media/upload/complete`) — browser uploads directly to S3 using presigned PUT URLs, then calls complete to trigger processing
+- Exposes media collection CRUD endpoints (`/media-collection`) — group media into nestable collections; thumbnail streamed directly
+- Exposes MPEG-DASH streaming endpoints (`/media/stream/:id/output.mpd`, `*.m4s`, `*.vtt`, `thumbnails.jpg`) — all streamed directly from VOD storage with cache headers
 - Persists media metadata and status in MongoDB
 - Exposes OpenAPI docs at `GET /api-docs`
 
@@ -53,10 +52,12 @@ This service validates all environment variables at startup using Zod schemas. M
 - `VOD_STORAGE_BUCKET` - S3 bucket for VOD content (manifests, segments, VTT files)
 - `JWT_SECRET` - Secret key used to sign and verify JWT tokens
 - `ADMIN_PROMOTION_SECRET` - Secret required in `x-admin-secret` header to promote a user to admin
+- `GMAIL_USER` - Gmail address used as sender for Mailer (approval requests, approval/denial emails)
+- `GMAIL_APP_PASSWORD` - Gmail app password for SMTP authentication in the Mailer service
 
 **Optional variables:**
 
-- `NODE_ENV` - `development` | `local` | `test` (defaults to `development`)
+- `NODE_ENV` - `development` | `local` | `test` | `production` (defaults to `development`)
 
 **Inherited from shared clients** (see Prerequisites for details):
 
@@ -68,9 +69,9 @@ This service validates all environment variables at startup using Zod schemas. M
 **Troubleshooting startup:**
 
 If the app fails to start, verify:
-1. All required variables (`KAWAZ_PLUS_BUCKET`, `UPLOAD_PREFIX`, `THUMBNAIL_PREFIX`, `AVATAR_PREFIX`, `VOD_STORAGE_BUCKET`) are set
+1. All required variables (`KAWAZ_PLUS_BUCKET`, `UPLOAD_PREFIX`, `THUMBNAIL_PREFIX`, `AVATAR_PREFIX`, `VOD_STORAGE_BUCKET`, `JWT_SECRET`, `ADMIN_PROMOTION_SECRET`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`) are set
 2. Shared client environment variables are valid (MongoDB, AMQP, S3 credentials)
-3. `NODE_ENV` is one of the supported values
+3. `NODE_ENV` is one of the supported values (`development`, `local`, `test`, `production`)
  
 **Example local setup:**
 
@@ -97,6 +98,9 @@ UPLOAD_PREFIX=raw
 THUMBNAIL_PREFIX=raw/thumbnails
 AVATAR_PREFIX=avatars
 VOD_STORAGE_BUCKET=kawaz-plus-vod
+
+GMAIL_USER=your-gmail@gmail.com
+GMAIL_APP_PASSWORD=your-app-password
 ```
 
 ## Scripts
@@ -142,16 +146,17 @@ Returns `200 OK` if service is running.
 ### `POST /auth/signup`
 
 - Content type: `application/json`
-- Body: `{ "username": string (min 3), "password": string (min 12) }`
-- Success response: `201 { "token": "<jwt>" }`
-- Error responses: `400` (invalid body), `409` (username taken)
+- Body: `{ "username": string (min 3), "password": string (min 12), "email": string }`
+- Success response: `202 { "message": "signup finished. Your account is awaiting admin approval" }`
+- Error responses: `400` (invalid body or missing email), `409` (username taken)
+- Note: no JWT is issued; the account is in `"pending"` status until an admin approves it. An approval-request email is sent to the configured `GMAIL_USER`.
 
 ### `POST /auth/login`
 
 - Content type: `application/json`
 - Body: `{ "username": string, "password": string }`
-- Success response: `200 { "token": "<jwt>" }`
-- Error responses: `400` (invalid body), `401` (invalid credentials)
+- Success response: `200 { "message": "Login successful" }` + sets `kawaz-token` HttpOnly cookie (maxAge: 2 days)
+- Error responses: `400` (invalid body), `401` (invalid credentials or account not yet approved / denied)
 
 ### `POST /auth/promote`
 
@@ -160,6 +165,26 @@ Returns `200 OK` if service is running.
 - Body: `{ "username": string }`
 - Success response: `200 { "message": "User \"<username>\" promoted to admin" }`
 - Error responses: `400` (missing header/body), `401` (wrong secret), `404` (user not found)
+
+### `GET /admin/pending`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Success response: `200 [{ "name": string, "email": string }]` — users with `status: "pending"`
+- Error responses: `401`, `403`
+
+### `POST /admin/pending/:username/approve`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Sets user status to `"approved"`; sends approval email to the user's registered email
+- Success response: `200 { "message": "User approved" }`
+- Error responses: `401`, `403`, `404` (user not found or not pending)
+
+### `POST /admin/pending/:username/deny`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Sets user status to `"denied"`, sends denial email, then deletes the user record
+- Success response: `200 { "message": "User denied" }`
+- Error responses: `401`, `403`, `404` (user not found or not pending)
 
 ### `GET /user/me`
 
@@ -210,7 +235,7 @@ Returns `200 OK` if service is running.
 ### `GET /avatar/:id/image`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `302` redirect to presigned avatar image URL
+- Success response: `200` image/jpeg binary stream with `Cache-Control: public, max-age=172800`
 - Error responses: `401`, `404`
 
 ### `POST /avatar`
@@ -228,13 +253,22 @@ Returns `200 OK` if service is running.
 - Success response: `200 { "message": "Avatar deleted" }`
 - Error responses: `400` (invalid id), `401`, `403`, `404`
 
-### `POST /media/upload`
+### `POST /media/upload/initiate`
 
 - Requires: `kawaz-token` cookie with **admin role**
-- Content type: `multipart/form-data`
-- Fields: `title` (required string), `description` (optional), `tags` (optional array), `thumbnailFocalPoint` (optional `{ x, y }`, defaults to `{ x: 0.5, y: 0.5 }`), `file` (video, required), `thumbnail` (image, required)
-- Success response: `200 { "message": "Media Started Uploading", "mediaId": string }`
-- Error responses: `400` (missing file/thumbnail/title or non-video/image mimetype), `401` (unauthenticated), `403` (not admin)
+- Content type: `application/json`
+- Body: `{ "title": string (required), "fileName": string (required), "fileSize": number (required), "mimeType": string (required, must start with `video/`), "description"?: string, "tags"?: string[], "thumbnailFocalPoint"?: { x, y }, "collectionId"?: string }`
+- Success response: `200 { "mediaId": string, "videoUploadUrl": string, "thumbnailUploadUrl": string }` — presigned PUT URLs for direct browser-to-storage upload
+- Error responses: `400` (missing/invalid fields or non-video mimetype), `401`, `403`
+- Note: after calling this endpoint, the browser uploads the video file to `videoUploadUrl` and the thumbnail to `thumbnailUploadUrl` directly using HTTP `PUT`, then calls `/media/upload/complete`.
+
+### `POST /media/upload/complete`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Content type: `application/json`
+- Body: `{ "mediaId": string }`
+- Success response: `200 { "message": "Media processing started" }`
+- Error responses: `400` (missing mediaId), `401`, `403`, `404` (media not found or not in `pending` status)
 
 ### `GET /media`
 
@@ -281,7 +315,7 @@ Returns `200 OK` if service is running.
 ### `GET /media/:id/thumbnail`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `302` redirect to presigned thumbnail URL
+- Success response: `200` image/jpeg binary stream with `Cache-Control: public, max-age=172800`
 - Error responses: `401`, `404`
 
 ### `POST /media-collection`
@@ -322,7 +356,7 @@ Returns `200 OK` if service is running.
 ### `GET /media-collection/:id/thumbnail`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `302` redirect to presigned thumbnail URL
+- Success response: `200` image/jpeg binary stream with `Cache-Control: public, max-age=172800`
 - Error responses: `401`, `404`
 
 ### `GET /media/stream/:id/output.mpd`
@@ -334,7 +368,7 @@ Returns `200 OK` if service is running.
 ### `GET /media/stream/:id/:filename.m4s`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `302` redirect to presigned segment URL
+- Success response: `200` video/iso.segment binary stream with `Cache-Control: public, max-age=172800`
 - Error responses: `401`, `500`
 
 ### `GET /media/stream/:id/:filename.vtt`
@@ -347,7 +381,7 @@ Returns `200 OK` if service is running.
 
 - Requires: `kawaz-token` cookie with valid JWT
 - Streams the sprite-sheet / tile thumbnails image for the video directly from VOD storage
-- Success response: `200` image/jpeg content
+- Success response: `200` image/jpeg binary stream with `Cache-Control: public, max-age=172800`
 - Error responses: `401`, `500`
 
 ### `GET /api-docs`
@@ -356,13 +390,12 @@ Swagger UI for API documentation.
 
 ## Upload processing flow
 
-1. API receives a file and stores initial media metadata in MongoDB (`pending` status).
-2. API publishes an upload event to AMQP (`upload` / `upload.media`).
-3. Upload consumer reads the temporary file and uploads it to object storage. Storage errors are retried up to 3 times.
-4. On success, if media type is video: consumer publishes convert event (`convert` / `convert.media`) and sets status to `processing`.
-5. On success, if media type is image: consumer sets status to `completed`.
-6. Temp file is deleted after successful processing (or on fatal error).
-7. Progress consumer (`progress` / `progress.media`) receives downstream events and updates media status to `completed` or `failed`.
+1. Client calls `POST /media/upload/initiate` with JSON metadata (title, fileName, fileSize, mimeType).
+2. API creates a media record in MongoDB (`pending` status) and returns presigned PUT URLs for the video and thumbnail.
+3. Browser uploads the video file and thumbnail directly to S3 using the presigned PUT URLs.
+4. Client calls `POST /media/upload/complete` with the `mediaId`.
+5. API verifies the media is still in `pending` status, publishes a convert event to AMQP (`convert` / `convert.media`), and sets status to `processing` (percentage: 20).
+6. Progress consumer (`progress` / `progress.media`) receives downstream events from the media processor and updates media status to `completed` or `failed`.
 
 ## Project structure
 
@@ -379,18 +412,20 @@ src/
 
 ### Key modules:
 
-- **api/auth** - Signup, login, and admin promotion
+- **api/auth** - Signup (pending status, email required), login, admin promotion
+- **api/admin** - Admin panel: list/approve/deny pending users with email notifications
 - **api/user** - User info (`/me`) and profile management (`/profile`, `/profiles`)
-- **api/avatar** - Avatar catalog CRUD with image storage
-- **api/media** - Media upload handlers and request validation
-- **api/mediaCollection** - Media collection CRUD handlers
-- **background/upload** - AMQP consumer for processing upload jobs
+- **api/avatar** - Avatar catalog CRUD; image streamed directly with cache headers
+- **api/media** - Presigned-URL upload (initiate + complete), media CRUD, streaming
+- **api/mediaCollection** - Media collection CRUD; thumbnail streamed directly
+- **background/upload** - AMQP upload consumer (currently disabled)
 - **background/progress** - AMQP consumer for updating media status to `completed` or `failed`
-- **dal/user** - User model with embedded profiles
+- **dal/user** - User model (name, password, email, status, role) with embedded profiles
 - **dal/avatar** - Avatar model and database operations
-- **dal/media** - Media model and database operations
+- **dal/media** - Media model and database operations; includes `getPendingMedia`
 - **dal/mediaCollection** - MediaCollection model and database operations
-- **services/system.ts** - Initializes API server and starts AMQP consumers
+- **services/mailer.ts** - Nodemailer-based Gmail SMTP service for user approval emails
+- **services/system.ts** - Initializes API server, Mailer, and starts AMQP consumers
 
 ## Database schema
 
@@ -448,6 +483,8 @@ Stores user credentials and their profiles.
 |-------|------|----------|-------------|
 | `name` | String | Yes | Unique username |
 | `password` | String | Yes | Bcrypt-hashed password |
+| `email` | String | Yes | Email address (provided at signup) |
+| `status` | String | Yes | `pending` \| `approved` \| `denied` (defaults to `pending`) |
 | `role` | String | Yes | `user` or `admin` (defaults to `user`) |
 | `profiles` | Profile[] | Yes | List of user profiles (defaults to `[]`) |
 
@@ -537,15 +574,7 @@ The service runs AMQP consumers that process async jobs:
 
 ### Upload consumer
 
-**Exchange:** `upload`
-**Topic:** `upload.media`
-**Handler:** `src/background/upload/handler.ts`
-
-Triggered when API publishes upload events. Responsibilities:
-
-1. Reads file from temporary storage and uploads to S3-compatible storage (retries up to 3× on storage errors)
-2. On success: detects media type, updates MongoDB status, publishes to `convert` exchange (for videos), cleans up temp file
-3. On fatal error: cleans up temp file
+**Status: disabled** — browsers now upload directly to S3 via presigned PUT URLs. The upload consumer code remains in `src/background/upload/` but is not registered.
 
 ### Progress consumer
 
@@ -561,10 +590,10 @@ For environment configuration, see [Environment variables](#environment-variable
 
 ### Production environment variables
 
-Set `NODE_ENV=development` (or omit for default):
+Set `NODE_ENV=production`:
 
 ```env
-NODE_ENV=development
+NODE_ENV=production
 PORT=3000
 SECURED=true
 
@@ -583,6 +612,9 @@ UPLOAD_PREFIX=media
 THUMBNAIL_PREFIX=media/thumbnails
 AVATAR_PREFIX=avatars
 VOD_STORAGE_BUCKET=kawaz-prod-vod
+
+GMAIL_USER=your-gmail@gmail.com
+GMAIL_APP_PASSWORD=your-app-password
 ```
 
 ### Build and start

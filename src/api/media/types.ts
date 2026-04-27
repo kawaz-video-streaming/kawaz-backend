@@ -2,6 +2,13 @@ import z from "zod";
 import { Coordinates, MEDIA_TAGS, MediaTag, RequestWithIdParam, requestWithIdParamZodSchema, UploadedFile, uploadedFileZodSchema } from "../../utils/types";
 import { validateRequest } from "../../utils/zod";
 
+export interface ConvertMessage {
+    mediaId: string;
+    mediaFileName: string;
+    mediaStorageBucket: string;
+    mediaRoutingKey: string;
+}
+
 export interface MediaUpdateRequestBody {
     title: string;
     description?: string | null;
