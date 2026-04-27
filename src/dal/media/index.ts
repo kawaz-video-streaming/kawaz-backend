@@ -54,6 +54,9 @@ export class MediaDal extends Dal<Media> {
     .exec()
     .then(result => result ?? { status: PENDING, percentage: 0 });
 
+  getPendingMedia = async (mediaId: string): Promise<Media | null> =>
+    this.model.findOne({ _id: mediaId, status: PENDING }).lean<Media>().exec();
+
   isCollectionEmpty = async (collectionId: string): Promise<boolean> =>
     isNil(await this.model.exists({ collectionId, status: COMPLETED }).lean().exec());
 };

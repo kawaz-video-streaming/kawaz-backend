@@ -1,5 +1,5 @@
-import { UploadConfig } from "./upload/config";
+// import { UploadConfig } from "./upload/config";
 
 export interface ConsumersConfig {
-    upload: UploadConfig
+    // upload: UploadConfig
 }

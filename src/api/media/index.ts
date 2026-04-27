@@ -10,6 +10,7 @@ import { createMediaHandlers } from "./handlers";
 export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaDal, amqpClient: AmqpClient, storageClient: StorageClient) => {
   const mediaHandlers = createMediaHandlers(bucketsConfig, mediaDal, amqpClient, storageClient);
   const router = Router();
+  // multer is kept for thumbnail-only updates (PUT /:id)
   const upload = multer({ storage: multer.diskStorage({ destination: './tmp' }) });
 
   /**
@@ -66,10 +67,10 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
 
   /**
    * @openapi
-   * /media/upload:
+   * /media/upload/initiate:
    *   post:
-   *     summary: Upload a media file
-   *     description: Uploads a media file along with its metadata. The media will be processed asynchronously after upload.
+   *     summary: Initiate a media upload
+   *     description: Creates a media record and returns presigned PUT URLs for direct browser-to-storage upload.
    *     tags:
    *       - Media
    *     security:
@@ -77,9 +78,10 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
    *     requestBody:
    *       required: true
    *       content:
-   *         multipart/form-data:
+   *         application/json:
    *           schema:
    *             type: object
+   *             required: [title, fileName, fileSize, mimeType]
    *             properties:
    *               title:
    *                 type: string
@@ -89,12 +91,6 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
    *                 type: array
    *                 items:
    *                   type: string
-   *               file:
-   *                 type: string
-   *                 format: binary
-   *               thumbnail:
-   *                 type: string
-   *                 format: binary
    *               thumbnailFocalPoint:
    *                 type: object
    *                 properties:
@@ -102,19 +98,59 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
    *                     type: number
    *                   y:
    *                     type: number
+   *               fileName:
+   *                 type: string
+   *               fileSize:
+   *                 type: number
+   *               mimeType:
+   *                 type: string
+   *               collectionId:
+   *                 type: string
    *     responses:
    *       200:
-   *         description: Media upload started successfully
+   *         description: Presigned upload URLs
    *       400:
-   *         description: Bad request - invalid input data
+   *         description: Bad request
    *       401:
    *         description: Unauthorized
    *       403:
    *         description: Forbidden - admin only
-   *       500:
-   *         description: Internal server error
    */
-  router.post("/upload", requireAdmin, upload.fields([{ name: "file", maxCount: 1 }, { name: "thumbnail", maxCount: 1 }]), mediaHandlers.uploadMedia);
+  router.post("/upload/initiate", requireAdmin, mediaHandlers.initiateUpload);
+
+  /**
+   * @openapi
+   * /media/upload/complete:
+   *   post:
+   *     summary: Complete a media upload
+   *     description: Signals that the browser has finished uploading to storage and triggers media processing.
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [mediaId]
+   *             properties:
+   *               mediaId:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Media processing started
+   *       400:
+   *         description: Bad request
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       404:
+   *         description: Media not found or already processing
+   */
+  router.post("/upload/complete", requireAdmin, mediaHandlers.completeUpload);
 
   /**
    * @openapi
