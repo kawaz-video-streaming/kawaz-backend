@@ -8,8 +8,6 @@ import { BucketsConfig } from "../../utils/types";
 import { validateRequestWithId } from "../../utils/zod";
 import { createAvatarLogic } from "./logic";
 import { validateAvatarCreationRequest } from "./types";
-// import { createMediaCollectionLogic } from "./logic";
-// import { validateMediaCollectionCreationRequest, validateMediaCollectionUpdateRequest } from './types';
 
 export const createAvatarHandlers = (bucketsConfig: BucketsConfig, avatarDal: AvatarDal, storageClient: StorageClient) => {
     const logic = createAvatarLogic(bucketsConfig, avatarDal, storageClient);

@@ -10,7 +10,6 @@ import { createMediaHandlers } from "./handlers";
 export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaDal, amqpClient: AmqpClient, storageClient: StorageClient) => {
   const mediaHandlers = createMediaHandlers(bucketsConfig, mediaDal, amqpClient, storageClient);
   const router = Router();
-  // multer is kept for thumbnail-only updates (PUT /:id)
   const upload = multer({ storage: multer.diskStorage({ destination: './tmp' }) });
 
   /**
