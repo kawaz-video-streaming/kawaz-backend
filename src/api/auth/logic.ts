@@ -1,11 +1,8 @@
-import {
-  ConflictError,
-  NotFoundError,
-  UnauthorizedError,
-} from "@ido_kawaz/server-framework";
+import { BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from "@ido_kawaz/server-framework";
 import bycrpt from "bcrypt";
 import { sign } from "jsonwebtoken";
-import { isNil } from "ramda";
+import { createHash, randomBytes } from "node:crypto";
+import { isNil, isNotNil } from "ramda";
 import { UserDal } from "../../dal/user";
 import { APPROVED_STATUS } from "../../dal/user/model";
 import { Mailer } from "../../services/mailer";
@@ -55,4 +52,24 @@ export const createAuthLogic = (
       throw new NotFoundError(`User "${username}" not found`);
     }
   },
+
+  forgotPassword: async (email: string) => {
+    const rawToken = randomBytes(32).toString("hex");
+    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+    const created = await userDal.createPasswordResetRequestForUser(email, tokenHash);
+    if (created) {
+      await mailer.sendPasswordResetEmail(email, rawToken);
+    }
+  },
+
+  resetPassword: async (resetToken: string, newPassword: string) => {
+    const tokenHash = createHash("sha256").update(resetToken).digest("hex");
+    const user = await userDal.findUserByPasswordResetToken(tokenHash);
+    if (isNotNil(user)) {
+      const newPasswordHash = await bycrpt.hash(newPassword, 12);
+      await userDal.resetUserPassword(user, newPasswordHash);
+    } else {
+      throw new BadRequestError("Invalid or expired password reset token");
+    }
+  }
 });

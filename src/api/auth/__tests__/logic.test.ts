@@ -1,4 +1,5 @@
 import {
+  BadRequestError,
   ConflictError,
   NotFoundError,
   UnauthorizedError,
@@ -29,6 +30,9 @@ const makeUserDal = (
     createUser: jest.fn(),
     findUser: jest.fn(),
     promoteToAdmin: jest.fn(),
+    createPasswordResetRequestForUser: jest.fn(),
+    findUserByPasswordResetToken: jest.fn(),
+    resetUserPassword: jest.fn(),
     ...overrides,
   }) as unknown as UserDal;
 
@@ -37,6 +41,7 @@ const makeMailer = (overrides: Partial<Record<keyof Mailer, jest.Mock>> = {}) =>
     sendApprovalRequestEmail: jest.fn().mockResolvedValue(undefined),
     sendApprovalEmail: jest.fn().mockResolvedValue(undefined),
     sendDenialEmail: jest.fn().mockResolvedValue(undefined),
+    sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   }) as unknown as Mailer;
 
@@ -189,5 +194,61 @@ describe("createAuthLogic.promoteAdmin", () => {
       logic.promoteAdmin(AUTH_CONFIG.adminPromotionSecret, "ido"),
     ).resolves.toBeUndefined();
     expect(userDal.promoteToAdmin).toHaveBeenCalledWith("ido");
+  });
+});
+
+describe("createAuthLogic.forgotPassword", () => {
+  it("does not send email when email is not registered", async () => {
+    const mailer = makeMailer();
+    const userDal = makeUserDal({
+      createPasswordResetRequestForUser: jest.fn().mockResolvedValue(false),
+    });
+    const logic = createAuthLogic(AUTH_CONFIG, mailer, userDal);
+
+    await expect(logic.forgotPassword("unknown@example.com")).resolves.toBeUndefined();
+    expect(mailer.sendPasswordResetEmail).not.toHaveBeenCalled();
+  });
+
+  it("stores a hashed token and sends the raw token by email", async () => {
+    const mailer = makeMailer();
+    const userDal = makeUserDal({
+      createPasswordResetRequestForUser: jest.fn().mockResolvedValue(true),
+    });
+    const logic = createAuthLogic(AUTH_CONFIG, mailer, userDal);
+
+    await logic.forgotPassword("ido@example.com");
+
+    const [emailArg, rawToken] = (mailer.sendPasswordResetEmail as jest.Mock).mock.calls[0];
+    const [, storedHash] = (userDal.createPasswordResetRequestForUser as jest.Mock).mock.calls[0];
+
+    expect(emailArg).toBe("ido@example.com");
+    expect(rawToken).not.toBe(storedHash);
+    expect(storedHash).toHaveLength(64); // SHA-256 hex
+    expect(rawToken).toHaveLength(64);   // 32 randomBytes as hex
+  });
+});
+
+describe("createAuthLogic.resetPassword", () => {
+  it("throws BadRequestError when token is invalid or expired", async () => {
+    const userDal = makeUserDal({
+      findUserByPasswordResetToken: jest.fn().mockResolvedValue(null),
+    });
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+
+    await expect(logic.resetPassword("invalid-token", "newpassword123")).rejects.toThrow(BadRequestError);
+    expect(userDal.resetUserPassword).not.toHaveBeenCalled();
+  });
+
+  it("hashes new password and resets it when token is valid", async () => {
+    const userDal = makeUserDal({
+      findUserByPasswordResetToken: jest.fn().mockResolvedValue("ido"),
+      resetUserPassword: jest.fn().mockResolvedValue(undefined),
+    });
+    mockedBcrypt.hash.mockResolvedValue("new-hashed-password" as never);
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+
+    await expect(logic.resetPassword("valid-token", "newpassword123")).resolves.toBeUndefined();
+    expect(mockedBcrypt.hash).toHaveBeenCalledWith("newpassword123", 12);
+    expect(userDal.resetUserPassword).toHaveBeenCalledWith("ido", "new-hashed-password");
   });
 });

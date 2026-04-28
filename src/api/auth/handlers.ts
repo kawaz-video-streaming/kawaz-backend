@@ -7,9 +7,11 @@ import { AuthenticatedRequest } from "../../utils/types";
 import { createAuthLogic } from "./logic";
 import {
   AuthConfig,
-  validateAuthRequest,
+  validateAuthSignupRequest,
+  validateForgotPasswordRequest,
   validateLoginRequest,
   validatePromoteRequest,
+  validateResetPasswordRequest,
 } from "./types";
 
 export const createAuthHandlers = (
@@ -26,11 +28,9 @@ export const createAuthHandlers = (
     signUp: requestHandlerDecorator(
       "signup",
       async (req: Request, res: Response) => {
-        const { username, password, email } = validateAuthRequest(req);
+        const { username, password, email } = validateAuthSignupRequest(req);
         await logic.signUp(username, password, email);
-        res.status(StatusCodes.ACCEPTED).json({
-          message: "signup finished. Your account is awaiting admin approval",
-        });
+        res.status(StatusCodes.ACCEPTED).json({ message: "signup finished. Your account is awaiting admin approval" });
       },
     ),
     login: requestHandlerDecorator(
@@ -38,25 +38,36 @@ export const createAuthHandlers = (
       async (req: Request, res: Response) => {
         const { username, password } = validateLoginRequest(req);
         const token = await logic.login(username, password);
-        res
-          .status(StatusCodes.OK)
-          .cookie("kawaz-token", token, {
-            httpOnly: true,
-            sameSite: "strict",
-            maxAge: 2 * 24 * 60 * 60 * 1000,
-          })
-          .json({ message: "Login successful" });
+        res.status(StatusCodes.OK).cookie("kawaz-token", token, {
+          httpOnly: true,
+          sameSite: "strict",
+          maxAge: 2 * 24 * 60 * 60 * 1000
+        }).json({ message: "Login successful" });
       },
     ),
     promoteAdmin: requestHandlerDecorator(
-      "promoteAdmin",
+      "promote admin",
       async (req: Request, res: Response) => {
         const { secret, username } = validatePromoteRequest(req);
         await logic.promoteAdmin(secret, username);
-        res
-          .status(StatusCodes.OK)
-          .json({ message: `User "${username}" promoted to admin` });
+        res.status(StatusCodes.OK).json({ message: `User "${username}" promoted to admin` });
       },
     ),
+    forgotPassword: requestHandlerDecorator(
+      "forgot password",
+      async (req: Request, res: Response) => {
+        const { email } = validateForgotPasswordRequest(req);
+        await logic.forgotPassword(email);
+        res.status(StatusCodes.OK).json({ message: "If an account with that email exists, a password reset email has been sent" });
+      },
+    ),
+    resetPassword: requestHandlerDecorator(
+      "reset password",
+      async (req: Request, res: Response) => {
+        const { token, newPassword } = validateResetPasswordRequest(req);
+        await logic.resetPassword(token, newPassword);
+        res.status(StatusCodes.OK).json({ message: "Password reset successful" });
+      },
+    )
   };
 };
