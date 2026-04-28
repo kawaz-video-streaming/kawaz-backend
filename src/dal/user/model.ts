@@ -18,6 +18,11 @@ export interface Profile {
   avatarId: string;
 }
 
+interface PasswordResetRequest {
+  token: string;
+  expiration: Date;
+}
+
 export interface User {
   name: string;
   password: string;
@@ -25,6 +30,7 @@ export interface User {
   status: Status;
   role: Role;
   profiles: Profile[];
+  passwordResetRequest?: PasswordResetRequest;
 }
 
 export type UserProjection = Pick<User, "name" | "email">;
@@ -34,14 +40,20 @@ const profileSchema = new Schema<Profile>({
   avatarId: { type: String, required: true },
 });
 
+const passwordResetRequestSchema = new Schema<PasswordResetRequest>({
+  token: { type: String, required: true },
+  expiration: { type: Date, required: true }
+});
+
 const userSchema = new Schema<User>(
   {
-    name: { type: String, required: true },
+    name: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    email: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
     status: { type: String, enum: statuses, default: PENDING_STATUS },
     role: { type: String, enum: roles, default: USER_ROLE },
     profiles: { type: [profileSchema], default: [] },
+    passwordResetRequest: { type: passwordResetRequestSchema, required: false },
   },
   { versionKey: false },
 );

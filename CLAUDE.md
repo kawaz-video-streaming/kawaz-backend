@@ -68,6 +68,8 @@ Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
 | `POST` | `/auth/signup` | No | Register a new user (requires email); returns 202, account awaits admin approval |
 | `POST` | `/auth/login` | No | Login; sets `kawaz-token` HttpOnly cookie (maxAge: 2 days). Blocked if status is `pending` or `denied` |
 | `POST` | `/auth/promote` | No (x-admin-secret header) | Promote a user to admin role |
+| `POST` | `/auth/forgot-password` | No | Request password reset; emails raw token if email is registered. Always returns 200 (no email enumeration) |
+| `POST` | `/auth/reset-password` | No | Reset password using a valid reset token; token is SHA-256 hashed before DB lookup; clears reset request on success |
 | `GET` | `/admin/pending` | Yes (admin only) | List users awaiting approval (`[{ name, email }]`) |
 | `POST` | `/admin/pending/:username/approve` | Yes (admin only) | Approve a pending user; sends approval email |
 | `POST` | `/admin/pending/:username/deny` | Yes (admin only) | Deny a pending user; sends denial email and removes user |
@@ -144,16 +146,21 @@ Thumbnail is uploaded to storage at key `<thumbnailPrefix>/<mediaId>.jpg` by the
 
 ```ts
 interface User {
-  name: string;               // unique username
+  name: string;               // unique username (unique index)
   password: string;           // bcrypt-hashed
-  email: string;              // required at signup
+  email: string;              // required at signup; unique index
   status: "pending" | "approved" | "denied";  // defaults to "pending"
   role: "user" | "admin";     // defaults to "user"
   profiles: Profile[];        // embedded, defaults to []
+  passwordResetRequest?: {    // set by forgot-password; cleared on reset
+    token: string;            // SHA-256 hash of the emailed raw token
+    expiration: Date;         // 1 hour from creation
+  };
 }
 ```
 
 Login is blocked unless `status === "approved"`. Admin approval sends an email via `Mailer`.
+Password reset: `POST /auth/forgot-password` generates a `randomBytes(32)` token, stores its SHA-256 hash + 1-hour expiry, emails the raw token. `POST /auth/reset-password` re-hashes the submitted token and looks it up; on match, bcrypt-hashes the new password and `$unset`s `passwordResetRequest`.
 
 ### System Initialization (`src/services/system.ts`)
 
@@ -183,7 +190,7 @@ All `@ido_kawaz/*` packages are listed as **devDependencies** (resolved locally 
 - **Nullable update fields**: `description` and `collectionId` use `z.string().nullish()` — sending `null` triggers a MongoDB `$unset`, omitting the field leaves the DB value unchanged.
 - **Shared types**: `MEDIA_TAGS`, `MediaTag`, `AVATAR_CATEGORIES`, `AvatarCategory`, `BucketsConfig`, `Coordinates`, `UploadedFile`, `RequestWithIdParam` are defined in `src/utils/types.ts` and shared across modules.
 - **BucketsConfig**: All storage bucket names and key prefixes are consolidated into a single `BucketsConfig` object (see `src/utils/types.ts`) passed down to media, mediaCollection, and upload consumer — no per-feature config interfaces for storage.
-- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia(MediaInfo)`, `updateMedia()`, `deleteMedia()`, `getAllMedia()`, `getMedia()`, `getPendingMedia()`, `getMediaUploadProgress()`, `getAllNoneCompletedMedia()`, `isCollectionEmpty()`. MediaCollection: `createCollection()`, `updateCollection()`, `deleteCollection()`, `getAllCollections()`, `getCollection()`, `isCollectionEmpty()`. User: `createUser(name, password, email)`, `findUser()`, `verifyUser()`, `approveUser()`, `denyUser()`, `removeUser()`, `getPendingUsers()`, `promoteToAdmin()`. Avatar: `createAvatar()`, `deleteAvatar()`, `getAllAvatars()`, `getAvatarById()`.
+- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia(MediaInfo)`, `updateMedia()`, `deleteMedia()`, `getAllMedia()`, `getMedia()`, `getPendingMedia()`, `getMediaUploadProgress()`, `getAllNoneCompletedMedia()`, `isCollectionEmpty()`. MediaCollection: `createCollection()`, `updateCollection()`, `deleteCollection()`, `getAllCollections()`, `getCollection()`, `isCollectionEmpty()`. User: `createUser(name, password, email)`, `findUser()`, `verifyUser()`, `verifyEmail()`, `approveUser()`, `denyUser()`, `removeUser()`, `getPendingUsers()`, `promoteToAdmin()`, `createPasswordResetRequestForUser(email, tokenHash)`, `findUserByPasswordResetToken(tokenHash)`, `resetUserPassword(name, newPasswordHash)`. Avatar: `createAvatar()`, `deleteAvatar()`, `getAllAvatars()`, `getAvatarById()`.
 - **Colocated tests**: `__tests__/` directories next to the source they test.
 - **Handler decorator** from server-framework wraps route handlers for logging and error propagation.
 

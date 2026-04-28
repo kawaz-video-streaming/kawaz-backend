@@ -21,10 +21,7 @@ export class Mailer {
       tls: { rejectUnauthorized: false },
     });
 
-  sendApprovalRequestEmail = async (
-    username: string,
-    email: string,
-  ): Promise<void> => {
+  sendApprovalRequestEmail = async (username: string, email: string): Promise<void> => {
     await this.transport.sendMail({
       from: this.config.gmailUser,
       to: this.config.gmailUser,
@@ -39,10 +36,7 @@ export class Mailer {
     });
   };
 
-  sendApprovalEmail = async (
-    username: string,
-    email: string,
-  ): Promise<void> => {
+  sendApprovalEmail = async (username: string, email: string): Promise<void> => {
     await this.transport.sendMail({
       from: this.config.gmailUser,
       to: email,
@@ -57,10 +51,7 @@ export class Mailer {
     });
   };
 
-  sendDenialEmail = async (
-    username: string,
-    email: string,
-  ): Promise<void> => {
+  sendDenialEmail = async (username: string, email: string): Promise<void> => {
     await this.transport.sendMail({
       from: this.config.gmailUser,
       to: email,
@@ -70,6 +61,22 @@ export class Mailer {
         ``,
         `Unfortunately your account request has been denied.`,
         `If you believe this was a mistake, please contact us.`,
+      ].join("\n"),
+    });
+  };
+
+  sendPasswordResetEmail = async (email: string, token: string): Promise<void> => {
+    await this.transport.sendMail({
+      from: this.config.gmailUser,
+      to: email,
+      subject: "Password Reset Request - Kawaz Plus",
+      text: [
+        `Hi,`,
+        ``,
+        `You requested a password reset. You can reset your password at the following link:`,
+        ` https://kawazplus.com/reset-password?token=${token}`,
+        ``,
+        `If you did not request this, please ignore this email.`,
       ].join("\n"),
     });
   };

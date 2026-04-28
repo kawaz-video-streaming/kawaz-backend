@@ -14,7 +14,7 @@ export interface TokenPayload {
   role: Role;
 }
 
-export const authSignupRequestSchema: z.ZodType<ValidatedAuthRequest> = z
+const authSignupRequestSchema: z.ZodType<ValidatedAuthSignupRequest> = z
   .object({
     body: z.object({
       username: z.string().min(3, "Username is required"),
@@ -24,13 +24,13 @@ export const authSignupRequestSchema: z.ZodType<ValidatedAuthRequest> = z
   })
   .transform(({ body }) => body);
 
-interface ValidatedAuthRequest {
+interface ValidatedAuthSignupRequest {
   username: string;
   password: string;
   email: string;
 }
 
-export const validateAuthRequest = validateRequest(authSignupRequestSchema);
+export const validateAuthSignupRequest = validateRequest(authSignupRequestSchema);
 
 const loginRequestSchema: z.ZodType<ValidatedLoginRequest> = z
   .object({
@@ -52,9 +52,7 @@ const promoteRequestSchema = z.object({
   username: z.string().min(3, "Username is required"),
 });
 
-export const validatePromoteRequest = (
-  req: Request,
-): { secret: string; username: string } => {
+export const validatePromoteRequest = (req: Request): { secret: string; username: string } => {
   const secret = req.headers["x-admin-secret"];
   if (typeof secret !== "string" || isNil(secret)) {
     throw new BadRequestError("Missing x-admin-secret header");
@@ -67,3 +65,34 @@ export const validatePromoteRequest = (
   }
   return { secret, username: validationResult.data.username };
 };
+
+
+const forgotPasswordRequestSchema: z.ZodType<ValidatedForgotPasswordRequest> = z
+  .object({
+    body: z.object({
+      email: z.email("Valid email is required"),
+    }),
+  })
+  .transform(({ body }) => body);
+
+interface ValidatedForgotPasswordRequest {
+  email: string;
+}
+
+export const validateForgotPasswordRequest = validateRequest(forgotPasswordRequestSchema);
+
+const resetPasswordRequestSchema: z.ZodType<ValidatedResetPasswordRequest> = z
+  .object({
+    body: z.object({
+      token: z.string().min(1, "Reset token is required"),
+      newPassword: z.string().min(12, "New password is required"),
+    }),
+  })
+  .transform(({ body }) => body);
+
+interface ValidatedResetPasswordRequest {
+  token: string;
+  newPassword: string;
+}
+
+export const validateResetPasswordRequest = validateRequest(resetPasswordRequestSchema);

@@ -20,6 +20,7 @@ const makeMailer = (): jest.Mocked<Mailer> =>
         sendApprovalRequestEmail: jest.fn().mockResolvedValue(undefined),
         sendApprovalEmail: jest.fn().mockResolvedValue(undefined),
         sendDenialEmail: jest.fn().mockResolvedValue(undefined),
+        sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
     }) as unknown as jest.Mocked<Mailer>;
 
 const makeErrorHandler = () =>
@@ -240,5 +241,118 @@ describe('POST /auth/promote', () => {
             .send({ username: 'unknown' });
 
         expect(response.status).toBe(404);
+    });
+});
+
+describe('POST /auth/forgot-password', () => {
+    let app: Application;
+    let userDal: { verifyUser: jest.Mock; createUser: jest.Mock; findUser: jest.Mock; promoteToAdmin: jest.Mock; createPasswordResetRequestForUser: jest.Mock };
+
+    beforeEach(() => {
+        userDal = {
+            verifyUser: jest.fn(),
+            createUser: jest.fn(),
+            findUser: jest.fn(),
+            promoteToAdmin: jest.fn(),
+            createPasswordResetRequestForUser: jest.fn().mockResolvedValue(true),
+        };
+
+        app = express();
+        app.use(express.json());
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, makeMailer(), userDal as unknown as UserDal));
+        app.use(makeErrorHandler());
+    });
+
+    it('returns 200 when email is registered', async () => {
+        const response = await request(app)
+            .post('/auth/forgot-password')
+            .send({ email: 'ido@example.com' });
+
+        expect(response.status).toBe(200);
+    });
+
+    it('returns 200 even when email is not registered (no enumeration)', async () => {
+        userDal.createPasswordResetRequestForUser.mockResolvedValue(false);
+
+        const response = await request(app)
+            .post('/auth/forgot-password')
+            .send({ email: 'unknown@example.com' });
+
+        expect(response.status).toBe(200);
+    });
+
+    it('returns 400 when email is missing', async () => {
+        const response = await request(app)
+            .post('/auth/forgot-password')
+            .send({});
+
+        expect(response.status).toBe(400);
+    });
+
+    it('returns 400 when email is invalid', async () => {
+        const response = await request(app)
+            .post('/auth/forgot-password')
+            .send({ email: 'not-an-email' });
+
+        expect(response.status).toBe(400);
+    });
+});
+
+describe('POST /auth/reset-password', () => {
+    let app: Application;
+    let userDal: { verifyUser: jest.Mock; createUser: jest.Mock; findUser: jest.Mock; promoteToAdmin: jest.Mock; findUserByPasswordResetToken: jest.Mock; resetUserPassword: jest.Mock };
+
+    beforeEach(() => {
+        userDal = {
+            verifyUser: jest.fn(),
+            createUser: jest.fn(),
+            findUser: jest.fn(),
+            promoteToAdmin: jest.fn(),
+            findUserByPasswordResetToken: jest.fn().mockResolvedValue('ido'),
+            resetUserPassword: jest.fn().mockResolvedValue(undefined),
+        };
+
+        mockedBcrypt.hash.mockResolvedValue('new-hashed-password' as never);
+
+        app = express();
+        app.use(express.json());
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, makeMailer(), userDal as unknown as UserDal));
+        app.use(makeErrorHandler());
+    });
+
+    it('returns 200 when token is valid', async () => {
+        const response = await request(app)
+            .post('/auth/reset-password')
+            .send({ token: 'valid-token', newPassword: 'newpassword123' });
+
+        expect(response.status).toBe(200);
+        expect(userDal.resetUserPassword).toHaveBeenCalledWith('ido', 'new-hashed-password');
+    });
+
+    it('returns 400 when token is invalid or expired', async () => {
+        userDal.findUserByPasswordResetToken.mockResolvedValue(null);
+
+        const response = await request(app)
+            .post('/auth/reset-password')
+            .send({ token: 'expired-token', newPassword: 'newpassword123' });
+
+        expect(response.status).toBe(400);
+        expect(userDal.resetUserPassword).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when new password is too short', async () => {
+        const response = await request(app)
+            .post('/auth/reset-password')
+            .send({ token: 'valid-token', newPassword: 'short' });
+
+        expect(response.status).toBe(400);
+    });
+
+    it('returns 400 when body is missing', async () => {
+        const response = await request(app)
+            .post('/auth/reset-password')
+            .send({});
+
+        expect(response.status).toBe(400);
     });
 });
