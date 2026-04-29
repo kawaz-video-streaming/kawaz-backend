@@ -2,6 +2,7 @@ import { AmqpClient } from '@ido_kawaz/amqp-client';
 import { NotFoundError } from '@ido_kawaz/server-framework';
 import { StorageClient } from '@ido_kawaz/storage-client';
 import { MediaDal } from '../../../dal/media';
+import { Dals } from '../../../dal/types';
 import { createMediaLogic } from '../logic';
 import { InitiateUploadRequestBody } from '../types';
 
@@ -17,6 +18,7 @@ const makeConfig = () => ({
 
 const makeBody = (overrides: Partial<InitiateUploadRequestBody> = {}): InitiateUploadRequestBody => ({
     title: 'My Video',
+    kind: 'movie',
     tags: [],
     thumbnailFocalPoint: { x: 0.5, y: 0.5 },
     fileName: 'video.mp4',
@@ -36,11 +38,12 @@ describe('createMediaLogic.initiateUpload', () => {
                 .mockResolvedValueOnce('https://minio/raw/thumbnails/m1.jpg?sig=xyz'),
         } as unknown as StorageClient;
 
-        const logic = createMediaLogic(makeConfig(), mediaDal, {} as any, storageClient);
+        const logic = createMediaLogic(makeConfig(), { mediaDal, mediaCollectionDal: {} } as unknown as Dals, {} as any, storageClient);
         const result = await logic.initiateUpload(makeBody());
 
         expect(mediaDal.createMedia).toHaveBeenCalledWith({
             title: 'My Video',
+            kind: 'movie',
             tags: [],
             thumbnailFocalPoint: { x: 0.5, y: 0.5 },
             fileName: 'video.mp4',
@@ -63,7 +66,7 @@ describe('createMediaLogic.initiateUpload', () => {
             getPutPresignedUrl: jest.fn(),
         } as unknown as StorageClient;
 
-        const logic = createMediaLogic(makeConfig(), mediaDal, {} as any, storageClient);
+        const logic = createMediaLogic(makeConfig(), { mediaDal, mediaCollectionDal: {} } as unknown as Dals, {} as any, storageClient);
 
         await expect(logic.initiateUpload(makeBody())).rejects.toThrow('db write failed');
         expect(storageClient.getPutPresignedUrl).not.toHaveBeenCalled();
@@ -79,7 +82,7 @@ describe('createMediaLogic.completeUpload', () => {
         } as unknown as MediaDal;
         const amqpClient = { publish: jest.fn() } as unknown as AmqpClient;
 
-        const logic = createMediaLogic(makeConfig(), mediaDal, amqpClient, {} as any);
+        const logic = createMediaLogic(makeConfig(), { mediaDal, mediaCollectionDal: {} } as unknown as Dals, amqpClient, {} as any);
         await logic.completeUpload('m1');
 
         expect(mediaDal.getPendingMedia).toHaveBeenCalledWith('m1');
@@ -96,7 +99,7 @@ describe('createMediaLogic.completeUpload', () => {
         const mediaDal = { getPendingMedia: jest.fn().mockResolvedValue(null) } as unknown as MediaDal;
         const amqpClient = { publish: jest.fn() } as unknown as AmqpClient;
 
-        const logic = createMediaLogic(makeConfig(), mediaDal, amqpClient, {} as any);
+        const logic = createMediaLogic(makeConfig(), { mediaDal, mediaCollectionDal: {} } as unknown as Dals, amqpClient, {} as any);
 
         await expect(logic.completeUpload('m-missing')).rejects.toThrow(NotFoundError);
         expect(amqpClient.publish).not.toHaveBeenCalled();
@@ -110,7 +113,7 @@ describe('createMediaLogic.completeUpload', () => {
         } as unknown as MediaDal;
         const amqpClient = { publish: jest.fn().mockImplementation(() => { throw new Error('amqp down'); }) } as unknown as AmqpClient;
 
-        const logic = createMediaLogic(makeConfig(), mediaDal, amqpClient, {} as any);
+        const logic = createMediaLogic(makeConfig(), { mediaDal, mediaCollectionDal: {} } as unknown as Dals, amqpClient, {} as any);
 
         await expect(logic.completeUpload('m1')).rejects.toThrow('amqp down');
         expect(mediaDal.updateMedia).not.toHaveBeenCalled();

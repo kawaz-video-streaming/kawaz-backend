@@ -23,7 +23,7 @@ export const registerRoutes = (
     mailer: Mailer,
     dals: Dals
 ) => (app: Application) => {
-    const { mediaDal, userDal, avatarDal } = dals;
+    const { userDal, avatarDal } = dals;
     const { authConfig } = config;
 
     /**
@@ -55,7 +55,7 @@ export const registerRoutes = (
     app.use('/admin', requireAdmin, createAdminRouter(mailer, userDal));
     app.use('/user', createUserRouter(userDal));
     app.use("/avatar", createAvatarRouter(config.bucketsConfig, avatarDal, storageClient));
-    app.use("/media", createMediaRouter(config.bucketsConfig, mediaDal, amqpClient, storageClient));
+    app.use("/media", createMediaRouter(config.bucketsConfig, dals, amqpClient, storageClient));
     app.use("/mediaCollection", createMediaCollectionRouter(config.bucketsConfig, dals, storageClient));
     return app;
 };

@@ -1,12 +1,12 @@
 import { AmqpClient } from "@ido_kawaz/amqp-client";
-import { NotFoundError } from "@ido_kawaz/server-framework";
+import { BadRequestError, NotFoundError } from "@ido_kawaz/server-framework";
 import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
-import { MediaDal } from "../../dal/media";
+import { isNil, isNotNil } from "ramda";
+import { Dals } from "../../dal/types";
 import { cleanupPath } from "../../utils/files";
 import { BucketsConfig, UploadedFile } from "../../utils/types";
 import { ConvertMessage, InitiateUploadRequestBody, InitiateUploadResponse, MediaUpdateRequestBody } from "./types";
-import { isNil } from "ramda";
 
 const PRESIGNED_URL_EXPIRY_SECONDS = 3600;
 
@@ -15,12 +15,22 @@ export const createMediaLogic = (
     vod: { vodStorageBucket },
     kawazPlus: { kawazStorageBucket: kawazBucket, uploadPrefix, thumbnailPrefix }
   }: BucketsConfig,
-  mediaDal: MediaDal,
+  { mediaDal, mediaCollectionDal }: Dals,
   amqpClient: AmqpClient,
   storageClient: StorageClient,
 ) => ({
   initiateUpload: async (body: InitiateUploadRequestBody): Promise<InitiateUploadResponse> => {
     const { fileName, fileSize, mimeType: _mimeType, ...mediaBody } = body;
+    const { kind, collectionId: containingCollectionId } = mediaBody;
+    const containingCollection = isNil(containingCollectionId) ? null : await mediaCollectionDal.getCollection(containingCollectionId);
+    if (isNotNil(containingCollectionId) && isNil(containingCollection)) {
+      throw new BadRequestError("Parent collection not found");
+    }
+    if (kind === 'episode' && containingCollection?.kind !== "season") {
+      throw new BadRequestError("An episode must belong to a season");
+    } else if (kind === "movie" && isNotNil(containingCollection) && containingCollection.kind !== "collection") {
+      throw new BadRequestError("Movies can only be contained within a general collection if at all");
+    }
     await storageClient.ensureBucket(kawazBucket);
     const media = await mediaDal.createMedia({ ...mediaBody, fileName, size: fileSize });
     const videoKey = `${uploadPrefix}/${fileName}`;

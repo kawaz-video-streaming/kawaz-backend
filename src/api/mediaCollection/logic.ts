@@ -1,12 +1,13 @@
-import { InternalServerError } from "@ido_kawaz/server-framework";
+import { BadRequestError } from "@ido_kawaz/server-framework";
 import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
 import { Dals } from "../../dal/types";
 import { cleanupPath } from "../../utils/files";
 import { BucketsConfig, UploadedFile } from "../../utils/types";
 import { MediaCollectionUpdateRequestBody } from "./types";
+import { isNil, isNotNil } from "ramda";
 
-class CollectionNotEmptyError extends InternalServerError {
+class CollectionNotEmptyError extends BadRequestError {
   constructor() {
     super("Cannot delete collection that is not empty");
   }
@@ -18,6 +19,16 @@ export const createMediaCollectionLogic = (
   storageClient: StorageClient,
 ) => ({
   createMediaCollection: async (body: MediaCollectionUpdateRequestBody, thumbnail: UploadedFile) => {
+    const { collectionId: containingCollectionId, kind } = body;
+    const containingCollection = isNotNil(containingCollectionId) ? await mediaCollectionDal.getCollection(containingCollectionId) : null;
+    if (isNotNil(containingCollectionId) && isNil(containingCollection)) {
+      throw new BadRequestError("Parent collection not found");
+    }
+    if (kind === "season" && containingCollection?.kind !== "show") {
+      throw new BadRequestError("A season must be nested inside a show");
+    } else if (kind === "show" && isNotNil(containingCollection) && containingCollection.kind !== "collection") {
+      throw new BadRequestError("A show can only be nested inside a generic collection");
+    }
     const collection = await mediaCollectionDal.createCollection(body);
     const thumbnailObject: StorageObject = { key: `${thumbnailPrefix}/${collection._id}.jpg`, data: createReadStream(thumbnail.path) };
     await storageClient.uploadObject(kawazStorageBucket, thumbnailObject);

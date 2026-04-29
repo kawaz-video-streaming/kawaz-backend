@@ -1,7 +1,6 @@
 import { Model, MongoClient, Schema, Types } from "@ido_kawaz/mongo-client";
 import z from "zod";
 import { Coordinates, coordinatesSchema, MEDIA_TAGS, MediaKind, mediaKinds, MediaTag } from "../../utils/types";
-import { isNil, isNotNil } from "ramda";
 
 export const mediaResultStatuses = ["completed", "failed"] as const;
 
@@ -131,35 +130,11 @@ export interface Media {
   metadata?: MediaMetadata;
 }
 
-export interface MediaInfo extends Omit<Media, "_id" | "description" | "collectionId"> {
+export interface MediaInfo extends Omit<Media, "_id" | "description" | "episodeNumber" | "collectionId"> {
   description?: string | null;
+  episodeNumber?: number | null;
   collectionId?: string | null;
 }
-
-export const mediaZodSchema = z.object({
-  _id: z.string().refine((v) => Types.ObjectId.isValid(v), { message: 'Invalid ObjectId' }),
-  fileName: z.string(),
-  title: z.string(),
-  description: z.string().optional(),
-  kind: z.enum(mediaKinds),
-  episodeNumber: z.coerce.number().optional(),
-  tags: z.array(z.enum(MEDIA_TAGS)).default([]),
-  size: z.coerce.number(),
-  status: z.enum(mediaStatuses).default(PENDING),
-  percentage: z.coerce.number().default(0),
-  thumbnailFocalPoint: z.object({
-    x: z.number(),
-    y: z.number()
-  }),
-  metadata: mediaMetadataZodSchema.optional()
-}).superRefine((val, ctx) => {
-  if (val.kind === "episode" && isNil(val.episodeNumber)) {
-    ctx.addIssue({ code: "custom", message: "episodeNumber is required for episodes" });
-  }
-  if (val.kind === "movie" && isNotNil(val.episodeNumber)) {
-    ctx.addIssue({ code: "custom", message: "episodeNumber is not valid for movies" });
-  }
-}) satisfies z.ZodType<Media>;
 
 const mediaSchema = new Schema<Media>(
   {

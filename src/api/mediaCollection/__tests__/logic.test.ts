@@ -1,17 +1,17 @@
+import { BadRequestError } from '@ido_kawaz/server-framework';
 import { StorageClient } from '@ido_kawaz/storage-client';
-import { InternalServerError } from '@ido_kawaz/server-framework';
+import { Readable } from 'stream';
+import { AvatarDal } from '../../../dal/avatar';
+import { MediaDal } from '../../../dal/media';
+import { MediaCollectionDal } from '../../../dal/mediaCollection';
+import { Dals } from '../../../dal/types';
+import { UserDal } from '../../../dal/user';
+import { UploadedFile } from '../../../utils/types';
+import { createMediaCollectionLogic } from '../logic';
+import { MediaCollectionUpdateRequestBody } from '../types';
 
 jest.mock('fs', () => ({ createReadStream: jest.fn().mockReturnValue({}) }));
 jest.mock('fs/promises', () => ({ unlink: jest.fn().mockResolvedValue(undefined) }));
-import { AvatarDal } from '../../../dal/avatar';
-import { MediaCollectionDal } from '../../../dal/mediaCollection';
-import { MediaDal } from '../../../dal/media';
-import { UserDal } from '../../../dal/user';
-import { Dals } from '../../../dal/types';
-import { createMediaCollectionLogic } from '../logic';
-import { MediaCollectionUpdateRequestBody } from '../types';
-import { UploadedFile } from '../../../utils/types';
-import { Readable } from 'stream';
 
 const makeConfig = () => ({
     kawazPlus: {
@@ -33,6 +33,7 @@ const makeThumbnail = (overrides: Partial<UploadedFile> = {}): UploadedFile => (
 
 const makeBody = (overrides: Partial<MediaCollectionUpdateRequestBody> = {}): MediaCollectionUpdateRequestBody => ({
     title: 'My Collection',
+    kind: 'collection',
     tags: [],
     thumbnailFocalPoint: { x: 0.5, y: 0.5 },
     ...overrides,
@@ -113,7 +114,7 @@ describe('createMediaCollectionLogic.deleteMediaCollection', () => {
         const storageClient = makeStorageClient();
 
         const logic = createMediaCollectionLogic(makeConfig(), dals, storageClient as unknown as StorageClient);
-        await expect(logic.deleteMediaCollection('col-1')).rejects.toBeInstanceOf(InternalServerError);
+        await expect(logic.deleteMediaCollection('col-1')).rejects.toBeInstanceOf(BadRequestError);
 
         expect(dals.mediaCollectionDal.deleteCollection).not.toHaveBeenCalled();
     });
@@ -128,7 +129,7 @@ describe('createMediaCollectionLogic.deleteMediaCollection', () => {
         const storageClient = makeStorageClient();
 
         const logic = createMediaCollectionLogic(makeConfig(), dals, storageClient as unknown as StorageClient);
-        await expect(logic.deleteMediaCollection('col-1')).rejects.toBeInstanceOf(InternalServerError);
+        await expect(logic.deleteMediaCollection('col-1')).rejects.toBeInstanceOf(BadRequestError);
 
         expect(dals.mediaCollectionDal.deleteCollection).not.toHaveBeenCalled();
     });

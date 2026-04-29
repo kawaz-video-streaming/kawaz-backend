@@ -42,8 +42,9 @@ This is a **media backend service** with two main processing paths:
 ### Request Flow
 
 ```
-POST /media/upload/initiate  (JSON: title, fileName, fileSize, mimeType, [description, tags, thumbnailFocalPoint, collectionId])
-  → Validate request (Zod) — requires title, fileName, fileSize, mimeType (video/*)
+POST /media/upload/initiate  (JSON: title, fileName, fileSize, mimeType, kind, [description, episodeNumber, tags, thumbnailFocalPoint, collectionId])
+  → Validate request (Zod) — requires title, fileName, fileSize, mimeType (video/*), kind ("movie"|"episode")
+  → Validate parent-kind rules: episode must be in a season; movie may only be in a generic collection
   → Save media record to MongoDB (status: "pending", thumbnailFocalPoint stored)
   → storageClient.getPutPresignedUrl for video key (<uploadPrefix>/<fileName>)
   → storageClient.getPutPresignedUrl for thumbnail key (<thumbnailPrefix>/<mediaId>.jpg)
@@ -113,12 +114,14 @@ interface Media {
   fileName: string;              // original filename
   title: string;                 // user-provided display title
   description?: string;
+  kind: "movie" | "episode";
+  episodeNumber?: number;        // required when kind === "episode"
   tags: MediaTag[];              // e.g. "Action", "Comedy", etc.
   size: number;                  // file size in bytes
   status: MediaStatus;           // "pending" | "processing" | "completed" | "failed"
   percentage: number;            // upload progress 0–100; set by upload/progress consumers
   thumbnailFocalPoint: Coordinates; // { x, y } crop anchor, defaults to { x: 0.5, y: 0.5 }
-  collectionId?: string;         // optional parent collection
+  collectionId?: string;         // episode must reference a season; movie may reference a collection
   metadata?: MediaMetadata;      // populated by progress consumer on completion; includes thumbnailsUrl
 }
 ```
@@ -130,13 +133,21 @@ interface MediaCollection {
   _id: string;
   title: string;
   description?: string;
+  kind: "show" | "season" | "collection";
+  seasonNumber?: number;         // required when kind === "season"
   tags: MediaTag[];
   thumbnailFocalPoint: Coordinates;
-  collectionId?: string;         // optional parent collection (nesting)
+  collectionId?: string;         // season must reference a show; show may reference a collection
 }
 ```
 
-Deletion is blocked if the collection still contains media or subcollections (`CollectionNotEmptyError`).
+Deletion is blocked if the collection still contains media or subcollections (`CollectionNotEmptyError`, now a 400).
+
+**Parent-kind rules** (enforced in `api/mediaCollection/logic.ts` and `api/media/logic.ts`):
+- `season` must have a `collectionId` pointing to a `show`
+- `show` must not have a `collectionId` pointing to a `show` or `season`
+- `episode` must have a `collectionId` pointing to a `season`
+- `movie` must not have a `collectionId` pointing to a `season` or `show`
 
 Thumbnail is uploaded to storage at key `<thumbnailPrefix>/<mediaId>.jpg` by the upload consumer. The `thumbnailFocalPoint` is stored in the DB and used downstream for cropping.
 

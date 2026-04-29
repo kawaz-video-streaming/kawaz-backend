@@ -8,13 +8,15 @@ export class MediaDal extends Dal<Media> {
   }
 
   createMedia = async (mediaInfo: Omit<MediaInfo, "status" | "percentage">): Promise<Media> => {
-    const { fileName, title, description, tags, size, thumbnailFocalPoint, collectionId } = mediaInfo;
+    const { fileName, title, description, kind, episodeNumber, tags, size, thumbnailFocalPoint, collectionId } = mediaInfo;
     const media: Media = {
       _id: new Types.ObjectId().toString(),
       fileName,
       title,
       ...(isNotNil(description) && { description }),
       ...(isNotNil(collectionId) && { collectionId }),
+      kind,
+      ...(isNotNil(episodeNumber) && { episodeNumber }),
       tags,
       size,
       status: PENDING,

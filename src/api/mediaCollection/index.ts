@@ -53,9 +53,15 @@ export const createMediaCollectionRouter = (bucketsConfig: BucketsConfig, dals: 
      *         multipart/form-data:
      *           schema:
      *             type: object
+     *             required: [title, kind]
      *             properties:
      *               title:
      *                 type: string
+     *               kind:
+     *                 type: string
+     *                 enum: [show, season, collection]
+     *               seasonNumber:
+     *                 type: number
      *               tags:
      *                 type: array
      *                 items:
@@ -73,7 +79,7 @@ export const createMediaCollectionRouter = (bucketsConfig: BucketsConfig, dals: 
      *               collectionId:
      *                 type: string
      *                 required: false
-     *                 description: Optional ID of a containing collection if this collection is nested within another collection
+     *                 description: Optional ID of a containing collection. Season must reference a show; show must reference a collection or be top-level.
      *     responses:
      *       200:
      *         description: Media collection created successfully
@@ -111,9 +117,15 @@ export const createMediaCollectionRouter = (bucketsConfig: BucketsConfig, dals: 
      *         application/json:
      *           schema:
      *             type: object
+     *             required: [title, kind]
      *             properties:
      *               title:
      *                 type: string
+     *               kind:
+     *                 type: string
+     *                 enum: [show, season, collection]
+     *               seasonNumber:
+     *                 type: number
      *               tags:
      *                 type: array
      *                 items:

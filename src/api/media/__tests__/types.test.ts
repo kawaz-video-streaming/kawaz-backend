@@ -6,6 +6,7 @@ describe('validateInitiateUploadRequest', () => {
             title: 'My Video',
             fileName: 'video.mp4',
             fileSize: 1024,
+            kind: 'movie',
             mimeType: 'video/mp4',
             tags: [],
             thumbnailFocalPoint: { x: 0.5, y: 0.5 },
@@ -40,7 +41,7 @@ describe('validateInitiateUploadRequest', () => {
     });
 
     it('defaults tags to empty array when omitted', () => {
-        const req = { body: { title: 'T', fileName: 'v.mp4', fileSize: 1, mimeType: 'video/mp4' } };
+        const req = { body: { title: 'T', fileName: 'v.mp4', kind: 'movie', fileSize: 1, mimeType: 'video/mp4' } };
         const result = validateInitiateUploadRequest(req as any);
         expect(result.tags).toEqual([]);
     });

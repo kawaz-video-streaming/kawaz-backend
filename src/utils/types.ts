@@ -64,6 +64,11 @@ export interface Coordinates {
   y: number;
 }
 
+export const coordinatesZodSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+}) satisfies z.ZodType<Coordinates>;
+
 export const coordinatesSchema = new Schema<Coordinates>(
   {
     x: { type: Number, required: true },

@@ -17,8 +17,8 @@ import request from 'supertest';
 import { AmqpClient } from '@ido_kawaz/amqp-client';
 import { StorageClient } from '@ido_kawaz/storage-client';
 import { Types } from '@ido_kawaz/mongo-client';
-import { MediaDal } from '../dal/media';
 import { UserDal } from '../dal/user';
+import { Dals } from '../dal/types';
 import { createMediaRouter } from '../api/media';
 import { createAuthRouter } from '../api/auth';
 import { createAuthMiddleware } from '../api/middleware';
@@ -99,7 +99,7 @@ describe('Media upload integration', () => {
         app.use('/media', createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'upload-bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient, storageClient as unknown as StorageClient));
+        }, { mediaDal, mediaCollectionDal: {} } as unknown as Dals, amqpClient as unknown as AmqpClient, storageClient as unknown as StorageClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -114,7 +114,7 @@ describe('Media upload integration', () => {
         const initiateRes = await request(app)
             .post('/media/upload/initiate')
             .set('Cookie', `kawaz-token=${adminToken}`)
-            .send({ title: 'My Sample', fileName: 'sample.mp4', fileSize: 1024, mimeType: 'video/mp4' });
+            .send({ title: 'My Sample', kind: 'movie', fileName: 'sample.mp4', fileSize: 1024, mimeType: 'video/mp4' });
 
         expect(initiateRes.status).toBe(200);
         expect(initiateRes.body).toMatchObject({
@@ -176,7 +176,7 @@ describe('Media upload integration', () => {
         const res = await request(app)
             .post('/media/upload/initiate')
             .set('Cookie', `kawaz-token=${adminToken}`)
-            .send({ title: 'My Sample', fileName: 'sample.mp4', fileSize: 1024, mimeType: 'video/mp4' });
+            .send({ title: 'My Sample', kind: 'movie', fileName: 'sample.mp4', fileSize: 1024, mimeType: 'video/mp4' });
 
         expect(res.status).toBe(500);
         expect(res.body.message).toContain('database connection lost');
@@ -214,7 +214,7 @@ describe('Media upload integration', () => {
         const initiateRes = await request(app)
             .post('/media/upload/initiate')
             .set('Cookie', `kawaz-token=${loginToken}`)
-            .send({ title: 'My Sample', fileName: 'sample.mp4', fileSize: 1024, mimeType: 'video/mp4' });
+            .send({ title: 'My Sample', kind: 'movie', fileName: 'sample.mp4', fileSize: 1024, mimeType: 'video/mp4' });
 
         expect(initiateRes.status).toBe(200);
         expect(initiateRes.body.mediaId).toBeDefined();
