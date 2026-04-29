@@ -15,6 +15,7 @@ import { createAuthMiddleware, requireAdmin } from "./middleware";
 import { swaggerSpec } from "./swagger";
 import { createUserRouter } from "./user";
 import { createAvatarCategoryRouter } from "./avatarCategory";
+import { createMediaGenreRouter } from "./mediaGenre";
 
 
 export const registerRoutes = (
@@ -59,5 +60,6 @@ export const registerRoutes = (
     app.use('/avatarCategory', createAvatarCategoryRouter(dals));
     app.use("/media", createMediaRouter(config.bucketsConfig, dals, amqpClient, storageClient));
     app.use("/mediaCollection", createMediaCollectionRouter(config.bucketsConfig, dals, storageClient));
+    app.use("/mediaGenre", createMediaGenreRouter(dals));
     return app;
 };

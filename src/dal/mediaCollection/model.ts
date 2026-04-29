@@ -1,5 +1,5 @@
 import { Model, MongoClient, Schema } from "@ido_kawaz/mongo-client";
-import { Coordinates, coordinatesSchema, MediaTag, MEDIA_TAGS, MediaCollectionKind, mediaCollectionKinds } from "../../utils/types";
+import { Coordinates, coordinatesSchema, MediaCollectionKind, mediaCollectionKinds } from "../../utils/types";
 
 export interface MediaCollection {
     _id: string;
@@ -7,7 +7,7 @@ export interface MediaCollection {
     description?: string;
     kind: MediaCollectionKind;
     seasonNumber?: number;
-    tags: MediaTag[];
+    genres: string[];
     thumbnailFocalPoint: Coordinates;
     collectionId?: string; // Optional field if the collection is nested within another collection in the future
 }
@@ -24,7 +24,7 @@ const mediaCollectionSchema = new Schema<MediaCollection>({
     description: { type: String, required: false },
     kind: { type: String, enum: mediaCollectionKinds, required: true },
     seasonNumber: { type: Number, required: false },
-    tags: { type: [String], enum: MEDIA_TAGS, default: [] },
+    genres: { type: [String], default: [] },
     thumbnailFocalPoint: { type: coordinatesSchema, required: true },
     collectionId: { type: String, required: false }
 });

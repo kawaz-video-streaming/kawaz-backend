@@ -10,6 +10,7 @@ import { UploadedFile } from '../../../utils/types';
 import { createMediaCollectionLogic } from '../logic';
 import { MediaCollectionUpdateRequestBody } from '../types';
 import { AvatarCategoryDal } from '../../../dal/avatarCategory';
+import { MediaGenreDal } from '../../../dal/mediaGenre';
 
 jest.mock('fs', () => ({ createReadStream: jest.fn().mockReturnValue({}) }));
 jest.mock('fs/promises', () => ({ unlink: jest.fn().mockResolvedValue(undefined) }));
@@ -35,7 +36,7 @@ const makeThumbnail = (overrides: Partial<UploadedFile> = {}): UploadedFile => (
 const makeBody = (overrides: Partial<MediaCollectionUpdateRequestBody> = {}): MediaCollectionUpdateRequestBody => ({
     title: 'My Collection',
     kind: 'collection',
-    tags: [],
+    genres: [],
     thumbnailFocalPoint: { x: 0.5, y: 0.5 },
     ...overrides,
 });
@@ -55,6 +56,7 @@ const makeDals = (overrides: Partial<Dals> = {}): Dals => ({
     userDal: {} as unknown as UserDal,
     avatarDal: {} as unknown as AvatarDal,
     avatarCategoryDal: {} as unknown as AvatarCategoryDal,
+    mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } as unknown as MediaGenreDal,
     ...overrides,
 });
 
@@ -68,7 +70,7 @@ const makeStorageClient = (): jest.Mocked<Pick<StorageClient, 'uploadObject' | '
 
 describe('createMediaCollectionLogic.createMediaCollection', () => {
     it('creates collection and uploads thumbnail to storage', async () => {
-        const collection = { _id: 'col-1', title: 'My Collection', tags: [], thumbnailFocalPoint: { x: 0.5, y: 0.5 } };
+        const collection = { _id: 'col-1', title: 'My Collection', genres: [], thumbnailFocalPoint: { x: 0.5, y: 0.5 } };
         const dals = makeDals();
         (dals.mediaCollectionDal.createCollection as jest.Mock).mockResolvedValue(collection);
         const storageClient = makeStorageClient();
@@ -91,6 +93,19 @@ describe('createMediaCollectionLogic.createMediaCollection', () => {
         const logic = createMediaCollectionLogic(makeConfig(), dals, storageClient as unknown as StorageClient);
         await expect(logic.createMediaCollection(makeBody(), makeThumbnail())).rejects.toThrow('db error');
 
+        expect(storageClient.uploadObject).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestError when a referenced genre does not exist', async () => {
+        const dals = makeDals({
+            mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(false) } as unknown as MediaGenreDal,
+        });
+        const storageClient = makeStorageClient();
+
+        const logic = createMediaCollectionLogic(makeConfig(), dals, storageClient as unknown as StorageClient);
+        await expect(logic.createMediaCollection(makeBody({ genres: ['NonExistent'] }), makeThumbnail())).rejects.toThrow('does not exist');
+
+        expect(dals.mediaCollectionDal.createCollection).not.toHaveBeenCalled();
         expect(storageClient.uploadObject).not.toHaveBeenCalled();
     });
 });

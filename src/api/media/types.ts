@@ -1,6 +1,6 @@
-import z from "zod";
 import { isNil, isNotNil } from "ramda";
-import { Coordinates, MEDIA_TAGS, MediaKind, mediaKinds, MediaTag, RequestWithIdParam, requestWithIdParamZodSchema, UploadedFile, uploadedFileZodSchema } from "../../utils/types";
+import z from "zod";
+import { Coordinates, MediaKind, mediaKinds, RequestWithIdParam, requestWithIdParamZodSchema, UploadedFile, uploadedFileZodSchema } from "../../utils/types";
 import { validateRequest } from "../../utils/zod";
 
 const refineMediaKind = (val: { kind: MediaKind; episodeNumber?: number | null }, ctx: z.RefinementCtx) => {
@@ -22,7 +22,7 @@ export interface MediaUpdateRequestBody {
     description?: string | null;
     kind: MediaKind;
     episodeNumber?: number | null;
-    tags: MediaTag[];
+    genres: string[];
     thumbnailFocalPoint: Coordinates;
     collectionId?: string | null;
 }
@@ -32,7 +32,7 @@ const mediaUpdateBodySchema = z.object({
     description: z.string().nullish(),
     kind: z.enum(mediaKinds),
     episodeNumber: z.coerce.number().nullish(),
-    tags: z.array(z.enum(MEDIA_TAGS)).default([]),
+    genres: z.array(z.string()).default([]),
     thumbnailFocalPoint: z.object({
         x: z.coerce.number(),
         y: z.coerce.number()
@@ -65,7 +65,7 @@ const initiateUploadBodySchema = z.object({
     description: z.string().nullish(),
     kind: z.enum(mediaKinds),
     episodeNumber: z.coerce.number().nullish(),
-    tags: z.array(z.enum(MEDIA_TAGS)).default([]),
+    genres: z.array(z.string()).default([]),
     thumbnailFocalPoint: z.object({
         x: z.coerce.number(),
         y: z.coerce.number()

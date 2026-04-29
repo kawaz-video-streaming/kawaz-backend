@@ -7,6 +7,8 @@ import { MediaDal } from "./media";
 import { MediaModel } from "./media/model";
 import { MediaCollectionDal } from "./mediaCollection";
 import { MediaCollectionModel } from "./mediaCollection/model";
+import { MediaGenreDal } from "./mediaGenre";
+import { MediaGenreModel } from "./mediaGenre/model";
 import { UserDal } from "./user";
 import { UserModel } from "./user/model";
 
@@ -16,6 +18,7 @@ export interface Models extends Record<string, Model<any>> {
     userModel: UserModel;
     avatarModel: AvatarModel;
     avatarCategoryModel: AvatarCategoryModel;
+    mediaGenreModel: MediaGenreModel;
 }
 
 
@@ -25,4 +28,5 @@ export interface Dals {
     userDal: UserDal;
     avatarDal: AvatarDal;
     avatarCategoryDal: AvatarCategoryDal;
+    mediaGenreDal: MediaGenreDal;
 }

@@ -1,12 +1,13 @@
 import { AmqpClient } from "@ido_kawaz/amqp-client";
-import { BadRequestError, NotFoundError } from "@ido_kawaz/server-framework";
+import { NotFoundError } from "@ido_kawaz/server-framework";
 import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
-import { isNil, isNotNil } from "ramda";
+import { isNil } from "ramda";
 import { Dals } from "../../dal/types";
 import { cleanupPath } from "../../utils/files";
 import { BucketsConfig, UploadedFile } from "../../utils/types";
 import { ConvertMessage, InitiateUploadRequestBody, InitiateUploadResponse, MediaUpdateRequestBody } from "./types";
+import { validateMediaContainingCollectionAndGenre } from "./utils";
 
 const PRESIGNED_URL_EXPIRY_SECONDS = 3600;
 
@@ -15,22 +16,14 @@ export const createMediaLogic = (
     vod: { vodStorageBucket },
     kawazPlus: { kawazStorageBucket: kawazBucket, uploadPrefix, thumbnailPrefix }
   }: BucketsConfig,
-  { mediaDal, mediaCollectionDal }: Dals,
+  { mediaDal, mediaCollectionDal, mediaGenreDal }: Dals,
   amqpClient: AmqpClient,
   storageClient: StorageClient,
 ) => ({
   initiateUpload: async (body: InitiateUploadRequestBody): Promise<InitiateUploadResponse> => {
     const { fileName, fileSize, mimeType: _mimeType, ...mediaBody } = body;
-    const { kind, collectionId: containingCollectionId } = mediaBody;
-    const containingCollection = isNil(containingCollectionId) ? null : await mediaCollectionDal.getCollection(containingCollectionId);
-    if (isNotNil(containingCollectionId) && isNil(containingCollection)) {
-      throw new BadRequestError("Parent collection not found");
-    }
-    if (kind === 'episode' && containingCollection?.kind !== "season") {
-      throw new BadRequestError("An episode must belong to a season");
-    } else if (kind === "movie" && isNotNil(containingCollection) && containingCollection.kind !== "collection") {
-      throw new BadRequestError("Movies can only be contained within a general collection if at all");
-    }
+    const { kind, genres, collectionId: containingCollectionId } = mediaBody;
+    await validateMediaContainingCollectionAndGenre(mediaCollectionDal, mediaGenreDal, genres, kind, containingCollectionId);
     await storageClient.ensureBucket(kawazBucket);
     const media = await mediaDal.createMedia({ ...mediaBody, fileName, size: fileSize });
     const videoKey = `${uploadPrefix}/${fileName}`;
@@ -61,6 +54,8 @@ export const createMediaLogic = (
     await storageClient.deleteObject(kawazBucket, `${thumbnailPrefix}/${mediaId}.jpg`);
   },
   updateMedia: async (mediaId: string, update: MediaUpdateRequestBody, thumbnail?: UploadedFile) => {
+    const { genres, kind, collectionId } = update;
+    await validateMediaContainingCollectionAndGenre(mediaCollectionDal, mediaGenreDal, genres, kind, collectionId);
     await mediaDal.updateMedia(mediaId, update);
     if (thumbnail) {
       const thumbnailData = createReadStream(thumbnail.path);

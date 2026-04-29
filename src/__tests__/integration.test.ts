@@ -51,7 +51,7 @@ describe('Media upload integration', () => {
                 _id: mediaId,
                 fileName: 'sample.mp4',
                 title: 'My Sample',
-                tags: [],
+                genres: [],
                 size: 1024,
                 status: 'pending',
             }),
@@ -59,7 +59,7 @@ describe('Media upload integration', () => {
                 _id: mediaId,
                 fileName: 'sample.mp4',
                 title: 'My Sample',
-                tags: [],
+                genres: [],
                 size: 1024,
                 status: 'pending',
             }),
@@ -102,7 +102,7 @@ describe('Media upload integration', () => {
         app.use('/media', createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'upload-bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal, mediaCollectionDal: {} } as unknown as Dals, amqpClient as unknown as AmqpClient, storageClient as unknown as StorageClient));
+        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, amqpClient as unknown as AmqpClient, storageClient as unknown as StorageClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });

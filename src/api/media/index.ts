@@ -91,7 +91,7 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, dals: Dals, amqp
    *                 enum: [movie, episode]
    *               episodeNumber:
    *                 type: number
-   *               tags:
+   *               genres:
    *                 type: array
    *                 items:
    *                   type: string
@@ -161,7 +161,7 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, dals: Dals, amqp
    * /media/{id}:
    *   put:
    *     summary: Update media metadata
-   *     description: Update the title, description, or tags of a media
+   *     description: Update the title, description, or genres of a media
    *     tags:
    *       - Media
    *     security:
@@ -190,7 +190,7 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, dals: Dals, amqp
    *                 enum: [movie, episode]
    *               episodeNumber:
    *                 type: number
-   *               tags:
+   *               genres:
    *                 type: array
    *                 items:
    *                   type: string

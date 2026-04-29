@@ -35,7 +35,7 @@ describe('POST /upload/initiate and POST /upload/complete routes', () => {
                 _id: 'media-1',
                 fileName: 'sample-upload.mp4',
                 title: 'My Upload',
-                tags: [],
+                genres: [],
                 size: 1000,
                 status: 'pending',
                 percentage: 10,
@@ -71,7 +71,7 @@ describe('POST /upload/initiate and POST /upload/complete routes', () => {
         app.use('/media', createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'upload-bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal, mediaCollectionDal: {} } as unknown as Dals, amqpClient as unknown as AmqpClient, storageClient as any));
+        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, amqpClient as unknown as AmqpClient, storageClient as any));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -99,7 +99,7 @@ describe('POST /upload/initiate and POST /upload/complete routes', () => {
         expect(mediaDal.createMedia).toHaveBeenCalledWith({
             title: 'My Upload',
             kind: 'movie',
-            tags: [],
+            genres: [],
             thumbnailFocalPoint: { x: 0.5, y: 0.5 },
             fileName: 'sample-upload.mp4',
             size: 1000,
@@ -188,7 +188,7 @@ describe('GET /media/uploading', () => {
         app.use('/media', createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal, mediaCollectionDal: {} } as unknown as Dals, {} as unknown as AmqpClient, {} as any));
+        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, {} as unknown as AmqpClient, {} as any));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -269,7 +269,7 @@ describe('GET /media/:id/progress', () => {
         app.use('/media', createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal, mediaCollectionDal: {} } as unknown as Dals, {} as unknown as AmqpClient, {} as any));
+        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, {} as unknown as AmqpClient, {} as any));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });

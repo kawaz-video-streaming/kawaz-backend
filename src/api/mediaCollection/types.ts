@@ -1,7 +1,7 @@
 import { Types } from "@ido_kawaz/mongo-client";
-import z from "zod";
 import { isNil, isNotNil } from "ramda";
-import { Coordinates, MEDIA_TAGS, MediaCollectionKind, mediaCollectionKinds, MediaTag, RequestWithIdParam, requestWithIdParamZodSchema, UploadedFile, uploadedFileZodSchema } from "../../utils/types";
+import z from "zod";
+import { Coordinates, MediaCollectionKind, mediaCollectionKinds, RequestWithIdParam, requestWithIdParamZodSchema, UploadedFile, uploadedFileZodSchema } from "../../utils/types";
 import { validateRequest } from "../../utils/zod";
 
 const refineMediaCollectionKind = (val: { kind: MediaCollectionKind; seasonNumber?: number | null }, ctx: z.RefinementCtx) => {
@@ -16,7 +16,7 @@ export interface MediaCollectionUpdateRequestBody {
     description?: string | null;
     kind: MediaCollectionKind;
     seasonNumber?: number | null;
-    tags: MediaTag[];
+    genres: string[];
     thumbnailFocalPoint: Coordinates;
     collectionId?: string | null; // Optional field if the collection is nested within another collection in the future
 }
@@ -24,7 +24,7 @@ export interface MediaCollectionUpdateRequestBody {
 const mediaCollectionUpdateBodySchema = z.object({
     title: z.string().min(1, { message: "Title is required" }),
     description: z.string().nullish(),
-    tags: z.array(z.enum(MEDIA_TAGS)).default([]),
+    genres: z.array(z.string()).default([]),
     kind: z.enum(mediaCollectionKinds),
     seasonNumber: z.coerce.number().nullish(),
     thumbnailFocalPoint: z.object({

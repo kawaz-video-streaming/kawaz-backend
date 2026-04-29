@@ -62,7 +62,7 @@ export const createMediaCollectionRouter = (bucketsConfig: BucketsConfig, dals: 
      *                 enum: [show, season, collection]
      *               seasonNumber:
      *                 type: number
-     *               tags:
+     *               genres:
      *                 type: array
      *                 items:
      *                   type: string
@@ -99,7 +99,7 @@ export const createMediaCollectionRouter = (bucketsConfig: BucketsConfig, dals: 
      * /mediaCollection/{id}:
      *   put:
      *     summary: Update media collection metadata
-     *     description: Update the title, thumbnail focal point, or tags of a media collection
+     *     description: Update the title, thumbnail focal point, or genres of a media collection
      *     tags:
      *       - MediaCollection
      *     security:
@@ -126,7 +126,7 @@ export const createMediaCollectionRouter = (bucketsConfig: BucketsConfig, dals: 
      *                 enum: [show, season, collection]
      *               seasonNumber:
      *                 type: number
-     *               tags:
+     *               genres:
      *                 type: array
      *                 items:
      *                   type: string

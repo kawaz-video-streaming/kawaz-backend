@@ -8,7 +8,7 @@ export class MediaDal extends Dal<Media> {
   }
 
   createMedia = async (mediaInfo: Omit<MediaInfo, "status" | "percentage">): Promise<Media> => {
-    const { fileName, title, description, kind, episodeNumber, tags, size, thumbnailFocalPoint, collectionId } = mediaInfo;
+    const { fileName, title, description, kind, episodeNumber, genres, size, thumbnailFocalPoint, collectionId } = mediaInfo;
     const media: Media = {
       _id: new Types.ObjectId().toString(),
       fileName,
@@ -17,7 +17,7 @@ export class MediaDal extends Dal<Media> {
       ...(isNotNil(collectionId) && { collectionId }),
       kind,
       ...(isNotNil(episodeNumber) && { episodeNumber }),
-      tags,
+      genres,
       size,
       status: PENDING,
       percentage: 10,
@@ -60,6 +60,9 @@ export class MediaDal extends Dal<Media> {
     this.model.findOne({ _id: mediaId, status: PENDING }).lean<Media>().exec();
 
   isCollectionEmpty = async (collectionId: string): Promise<boolean> =>
-    isNil(await this.model.exists({ collectionId, status: COMPLETED }).lean().exec());
+    isNil(await this.model.exists({ collectionId }).exec());
+
+  isGenreEmpty = async (genreName: string): Promise<boolean> =>
+    isNil(await this.model.exists({ "genres": genreName }).exec());
 };
 

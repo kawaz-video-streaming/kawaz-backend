@@ -1,6 +1,6 @@
 import { Model, MongoClient, Schema, Types } from "@ido_kawaz/mongo-client";
 import z from "zod";
-import { Coordinates, coordinatesSchema, MEDIA_TAGS, MediaKind, mediaKinds, MediaTag } from "../../utils/types";
+import { Coordinates, coordinatesSchema, MediaKind, mediaKinds } from "../../utils/types";
 
 export const mediaResultStatuses = ["completed", "failed"] as const;
 
@@ -121,7 +121,7 @@ export interface Media {
   description?: string;
   kind: MediaKind;
   episodeNumber?: number;
-  tags: MediaTag[];
+  genres: string[];
   size: number;
   status: MediaStatus;
   percentage: number;
@@ -144,7 +144,7 @@ const mediaSchema = new Schema<Media>(
     description: { type: String, required: false },
     kind: { type: String, enum: mediaKinds, required: true },
     episodeNumber: { type: Number, required: false },
-    tags: { type: [String], enum: MEDIA_TAGS, default: [] },
+    genres: { type: [String], default: [] },
     size: { type: Number, required: true },
     status: { type: String, enum: mediaStatuses, default: PENDING },
     percentage: { type: Number, required: true, default: 0 },
