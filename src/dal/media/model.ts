@@ -1,6 +1,7 @@
 import { Model, MongoClient, Schema, Types } from "@ido_kawaz/mongo-client";
 import z from "zod";
-import { Coordinates, coordinatesSchema, MEDIA_TAGS, MediaTag } from "../../utils/types";
+import { Coordinates, coordinatesSchema, MEDIA_TAGS, MediaKind, mediaKinds, MediaTag } from "../../utils/types";
+import { isNil, isNotNil } from "ramda";
 
 export const mediaResultStatuses = ["completed", "failed"] as const;
 
@@ -119,6 +120,8 @@ export interface Media {
   fileName: string;
   title: string;
   description?: string;
+  kind: MediaKind;
+  episodeNumber?: number;
   tags: MediaTag[];
   size: number;
   status: MediaStatus;
@@ -138,6 +141,8 @@ export const mediaZodSchema = z.object({
   fileName: z.string(),
   title: z.string(),
   description: z.string().optional(),
+  kind: z.enum(mediaKinds),
+  episodeNumber: z.coerce.number().optional(),
   tags: z.array(z.enum(MEDIA_TAGS)).default([]),
   size: z.coerce.number(),
   status: z.enum(mediaStatuses).default(PENDING),
@@ -147,6 +152,13 @@ export const mediaZodSchema = z.object({
     y: z.number()
   }),
   metadata: mediaMetadataZodSchema.optional()
+}).superRefine((val, ctx) => {
+  if (val.kind === "episode" && isNil(val.episodeNumber)) {
+    ctx.addIssue({ code: "custom", message: "episodeNumber is required for episodes" });
+  }
+  if (val.kind === "movie" && isNotNil(val.episodeNumber)) {
+    ctx.addIssue({ code: "custom", message: "episodeNumber is not valid for movies" });
+  }
 }) satisfies z.ZodType<Media>;
 
 const mediaSchema = new Schema<Media>(
@@ -155,6 +167,8 @@ const mediaSchema = new Schema<Media>(
     fileName: { type: String, required: true },
     title: { type: String, required: true },
     description: { type: String, required: false },
+    kind: { type: String, enum: mediaKinds, required: true },
+    episodeNumber: { type: Number, required: false },
     tags: { type: [String], enum: MEDIA_TAGS, default: [] },
     size: { type: Number, required: true },
     status: { type: String, enum: mediaStatuses, default: PENDING },

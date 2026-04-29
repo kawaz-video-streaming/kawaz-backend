@@ -51,6 +51,14 @@ export const AVATAR_CATEGORIES = [
 
 export type AvatarCategory = (typeof AVATAR_CATEGORIES)[number];
 
+export const mediaKinds = ["movie", "episode"] as const;
+
+export type MediaKind = typeof mediaKinds[number];
+
+export const mediaCollectionKinds = ['show', 'season', 'collection'] as const;
+
+export type MediaCollectionKind = typeof mediaCollectionKinds[number];
+
 export interface Coordinates {
   x: number;
   y: number;
