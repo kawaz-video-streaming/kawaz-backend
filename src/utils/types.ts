@@ -41,16 +41,6 @@ export const MEDIA_TAGS = [
 
 export type MediaTag = (typeof MEDIA_TAGS)[number];
 
-export const AVATAR_CATEGORIES = [
-  "United Kingdom",
-  "United States",
-  "Israel",
-  "Japan",
-  "France",
-] as const;
-
-export type AvatarCategory = (typeof AVATAR_CATEGORIES)[number];
-
 export const mediaKinds = ["movie", "episode"] as const;
 
 export type MediaKind = typeof mediaKinds[number];

@@ -9,6 +9,7 @@ Kawaz Plus media backend service.
 - Exposes admin endpoints (`GET /admin/pending`, `POST /admin/pending/:username/approve`, `POST /admin/pending/:username/deny`) — manage pending user registrations with email notifications
 - Exposes user endpoints (`GET /user/me`, `POST /user/profile`, `PUT /user/profile`, `DELETE /user/profile/:name`, `GET /user/profiles`) — per-user profile management
 - Exposes avatar endpoints (`GET /avatar`, `GET /avatar/:id`, `GET /avatar/:id/image`, `POST /avatar`, `DELETE /avatar/:id`) — avatar catalog; image streamed directly as JPEG with cache headers
+- Exposes avatar category endpoints (`GET /avatar-category`, `GET /avatar-category/:categoryId`, `POST /avatar-category`, `DELETE /avatar-category/:categoryId`) — manage avatar categories stored in MongoDB; deletion blocked when avatars still reference a category
 - Exposes media CRUD endpoints (`GET /media`, `GET /media/uploading`, `GET /media/:id`, `PUT /media/:id`, `DELETE /media/:id`) — served from MongoDB; `/uploading` returns all non-completed media
 - Exposes presigned-URL based media upload endpoints (`POST /media/upload/initiate`, `POST /media/upload/complete`) — browser uploads directly to S3 using presigned PUT URLs, then calls complete to trigger processing
 - Exposes media collection CRUD endpoints (`/media-collection`) — group media into nestable collections; thumbnail streamed directly
@@ -223,13 +224,13 @@ Returns `200 OK` if service is running.
 ### `GET /avatar`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `200 [{ "_id", "name", "category" }]`
+- Success response: `200 [{ "_id", "name", "categoryId" }]`
 - Error responses: `401`, `404` (no avatars found)
 
 ### `GET /avatar/:id`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `200 { "_id", "name", "category" }`
+- Success response: `200 { "_id", "name", "categoryId" }`
 - Error responses: `401`, `404`
 
 ### `GET /avatar/:id/image`
@@ -242,9 +243,9 @@ Returns `200 OK` if service is running.
 
 - Requires: `kawaz-token` cookie with **admin role**
 - Content type: `multipart/form-data`
-- Fields: `name` (string), `category` (one of: `United Kingdom`, `United States`, `Israel`, `Japan`, `France`), `avatar` (image file)
+- Fields: `name` (string), `categoryId` (string, ObjectId referencing an `AvatarCategory._id`), `avatar` (image file)
 - Success response: `200 { "message": "Avatar created" }`
-- Error responses: `400` (invalid body or non-image file), `401`, `403`
+- Error responses: `400` (invalid body, non-image file, or category not found), `401`, `403`
 
 ### `DELETE /avatar/:id`
 
@@ -252,6 +253,33 @@ Returns `200 OK` if service is running.
 - Deletes the avatar from the database and removes its image from storage
 - Success response: `200 { "message": "Avatar deleted" }`
 - Error responses: `400` (invalid id), `401`, `403`, `404`
+
+### `GET /avatar-category`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 [{ "_id", "name" }]`
+- Error responses: `401`
+
+### `GET /avatar-category/:categoryId`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 { "_id", "name" }`
+- Error responses: `400` (invalid id), `401`, `404`
+
+### `POST /avatar-category`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Content type: `application/json`
+- Body: `{ "name": string }`
+- Success response: `201 { "message": "Avatar category created successfully" }`
+- Error responses: `400` (missing or empty name), `401`, `403`, `409` (name already exists)
+
+### `DELETE /avatar-category/:categoryId`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Deletion is blocked if any avatars still reference this category
+- Success response: `200 { "message": "Avatar category deleted successfully" }`
+- Error responses: `400` (invalid id or category has associated avatars), `401`, `403`
 
 ### `POST /media/upload/initiate`
 
@@ -416,12 +444,14 @@ src/
 - **api/admin** - Admin panel: list/approve/deny pending users with email notifications
 - **api/user** - User info (`/me`) and profile management (`/profile`, `/profiles`)
 - **api/avatar** - Avatar catalog CRUD; image streamed directly with cache headers
+- **api/avatarCategory** - Avatar category CRUD; deletion blocked when avatars reference the category
 - **api/media** - Presigned-URL upload (initiate + complete), media CRUD, streaming
 - **api/mediaCollection** - Media collection CRUD; thumbnail streamed directly
 - **background/upload** - AMQP upload consumer (currently disabled)
 - **background/progress** - AMQP consumer for updating media status to `completed` or `failed`
 - **dal/user** - User model (name, password, email, status, role) with embedded profiles
-- **dal/avatar** - Avatar model and database operations
+- **dal/avatar** - Avatar model and database operations; includes `isCategoryEmpty`
+- **dal/avatarCategory** - AvatarCategory model and database operations
 - **dal/media** - Media model and database operations; includes `getPendingMedia`
 - **dal/mediaCollection** - MediaCollection model and database operations
 - **services/mailer.ts** - Nodemailer-based Gmail SMTP service for user approval emails
@@ -503,7 +533,16 @@ Stores avatar metadata. Avatar images are stored in object storage at `<AVATAR_P
 |-------|------|----------|-------------|
 | `_id` | String (ObjectId) | Yes | Unique identifier |
 | `name` | String | Yes | Avatar display name (e.g. `"David Ben-Gurion"`) |
-| `category` | String | Yes | One of: `United Kingdom`, `United States`, `Israel`, `Japan`, `France` |
+| `categoryId` | String (ObjectId) | Yes | Reference to an `AvatarCategory._id` |
+
+### `AvatarCategory`
+
+Stores avatar category metadata.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `_id` | String (ObjectId) | Yes | Unique identifier |
+| `name` | String | Yes | Category display name (unique) |
 
 ## Error handling
 
@@ -523,6 +562,12 @@ Tests are colocated with source files in `__tests__` directories:
 src/
 ├── api/media/__tests__/
 │   ├── index.test.ts       # Handler and integration tests
+│   ├── logic.test.ts       # Business logic tests
+│   └── types.test.ts       # Type validation tests
+├── api/avatar/__tests__/
+│   ├── logic.test.ts       # Business logic tests
+│   └── types.test.ts       # Type validation tests
+├── api/avatarCategory/__tests__/
 │   ├── logic.test.ts       # Business logic tests
 │   └── types.test.ts       # Type validation tests
 ├── background/upload/__tests__/

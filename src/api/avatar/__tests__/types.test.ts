@@ -1,4 +1,7 @@
+import { Types } from '@ido_kawaz/mongo-client';
 import { validateAvatarCreationRequest } from '../types';
+
+const makeValidCategoryId = () => new Types.ObjectId().toString();
 
 const makeFileEntry = (overrides: Record<string, unknown> = {}) => ({
     path: '/tmp/avatar.jpg',
@@ -9,16 +12,17 @@ const makeFileEntry = (overrides: Record<string, unknown> = {}) => ({
 });
 
 const makeReq = (overrides: Record<string, unknown> = {}) => ({
-    body: { name: 'lion', category: 'Israel' },
+    body: { name: 'lion', categoryId: makeValidCategoryId() },
     file: makeFileEntry(),
     ...overrides,
 });
 
 describe('validateAvatarCreationRequest', () => {
     it('returns body and avatarImage for a valid request', () => {
-        const result = validateAvatarCreationRequest(makeReq() as any);
+        const categoryId = makeValidCategoryId();
+        const result = validateAvatarCreationRequest(makeReq({ body: { name: 'lion', categoryId } }) as any);
 
-        expect(result.body).toEqual({ name: 'lion', category: 'Israel' });
+        expect(result.body).toEqual({ name: 'lion', categoryId });
         expect(result.avatarImage).toMatchObject({
             path: '/tmp/avatar.jpg',
             fileName: 'avatar.jpg',
@@ -38,20 +42,24 @@ describe('validateAvatarCreationRequest', () => {
     });
 
     it('throws when name is missing from body', () => {
-        const req = makeReq({ body: { category: 'Israel' } });
+        const categoryId = makeValidCategoryId();
+        const req = makeReq({ body: { categoryId } });
         expect(() => validateAvatarCreationRequest(req as any)).toThrow('Invalid request');
     });
 
-    it('throws when category is not a valid AVATAR_CATEGORIES value', () => {
-        const req = makeReq({ body: { name: 'lion', category: 'Antarctica' } });
+    it('throws when categoryId is not a valid ObjectId', () => {
+        const req = makeReq({ body: { name: 'lion', categoryId: 'not-an-objectid' } });
+        expect(() => validateAvatarCreationRequest(req as any)).toThrow('Invalid category ID');
+    });
+
+    it('throws when categoryId is missing', () => {
+        const req = makeReq({ body: { name: 'lion' } });
         expect(() => validateAvatarCreationRequest(req as any)).toThrow('Invalid request');
     });
 
-    it('accepts all valid avatar categories', () => {
-        const categories = ['United Kingdom', 'United States', 'Israel', 'Japan', 'France'];
-        for (const category of categories) {
-            const result = validateAvatarCreationRequest(makeReq({ body: { name: 'test', category } }) as any);
-            expect(result.body.category).toBe(category);
-        }
+    it('accepts a valid ObjectId as categoryId', () => {
+        const categoryId = makeValidCategoryId();
+        const result = validateAvatarCreationRequest(makeReq({ body: { name: 'lion', categoryId } }) as any);
+        expect(result.body.categoryId).toBe(categoryId);
     });
 });

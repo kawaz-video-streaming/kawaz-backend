@@ -9,6 +9,7 @@ import { UserDal } from '../../../dal/user';
 import { UploadedFile } from '../../../utils/types';
 import { createMediaCollectionLogic } from '../logic';
 import { MediaCollectionUpdateRequestBody } from '../types';
+import { AvatarCategoryDal } from '../../../dal/avatarCategory';
 
 jest.mock('fs', () => ({ createReadStream: jest.fn().mockReturnValue({}) }));
 jest.mock('fs/promises', () => ({ unlink: jest.fn().mockResolvedValue(undefined) }));
@@ -53,6 +54,7 @@ const makeDals = (overrides: Partial<Dals> = {}): Dals => ({
     } as unknown as MediaDal,
     userDal: {} as unknown as UserDal,
     avatarDal: {} as unknown as AvatarDal,
+    avatarCategoryDal: {} as unknown as AvatarCategoryDal,
     ...overrides,
 });
 
@@ -124,7 +126,7 @@ describe('createMediaCollectionLogic.deleteMediaCollection', () => {
             mediaCollectionDal: {
                 isCollectionEmpty: jest.fn().mockResolvedValue(false),
                 deleteCollection: jest.fn(),
-            } as unknown as MediaCollectionDal,
+            } as unknown as MediaCollectionDal
         });
         const storageClient = makeStorageClient();
 

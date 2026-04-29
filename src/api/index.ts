@@ -14,6 +14,7 @@ import { createMediaCollectionRouter } from "./mediaCollection";
 import { createAuthMiddleware, requireAdmin } from "./middleware";
 import { swaggerSpec } from "./swagger";
 import { createUserRouter } from "./user";
+import { createAvatarCategoryRouter } from "./avatarCategory";
 
 
 export const registerRoutes = (
@@ -23,7 +24,7 @@ export const registerRoutes = (
     mailer: Mailer,
     dals: Dals
 ) => (app: Application) => {
-    const { userDal, avatarDal } = dals;
+    const { userDal } = dals;
     const { authConfig } = config;
 
     /**
@@ -54,7 +55,8 @@ export const registerRoutes = (
     // API routes
     app.use('/admin', requireAdmin, createAdminRouter(mailer, userDal));
     app.use('/user', createUserRouter(userDal));
-    app.use("/avatar", createAvatarRouter(config.bucketsConfig, avatarDal, storageClient));
+    app.use("/avatar", createAvatarRouter(config.bucketsConfig, dals, storageClient));
+    app.use('/avatarCategory', createAvatarCategoryRouter(dals));
     app.use("/media", createMediaRouter(config.bucketsConfig, dals, amqpClient, storageClient));
     app.use("/mediaCollection", createMediaCollectionRouter(config.bucketsConfig, dals, storageClient));
     return app;
