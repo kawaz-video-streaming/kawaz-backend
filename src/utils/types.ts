@@ -16,45 +16,23 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
-export const MEDIA_TAGS = [
-  "Action",
-  "Fantasy",
-  "Adventure",
-  "Superhero",
-  "Anime",
-  "Animation",
-  "Comedy",
-  "Parody",
-  "Crime",
-  "Documentary",
-  "Drama",
-  "Education",
-  "Horror",
-  "Kids",
-  "Music",
-  "News",
-  "Romance",
-  "Sci-Fi",
-  "Sport",
-  "Thriller",
-] as const;
+export const mediaKinds = ["movie", "episode"] as const;
 
-export type MediaTag = (typeof MEDIA_TAGS)[number];
+export type MediaKind = typeof mediaKinds[number];
 
-export const AVATAR_CATEGORIES = [
-  "United Kingdom",
-  "United States",
-  "Israel",
-  "Japan",
-  "France",
-] as const;
+export const mediaCollectionKinds = ['show', 'season', 'collection'] as const;
 
-export type AvatarCategory = (typeof AVATAR_CATEGORIES)[number];
+export type MediaCollectionKind = typeof mediaCollectionKinds[number];
 
 export interface Coordinates {
   x: number;
   y: number;
 }
+
+export const coordinatesZodSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+}) satisfies z.ZodType<Coordinates>;
 
 export const coordinatesSchema = new Schema<Coordinates>(
   {

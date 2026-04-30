@@ -2,13 +2,13 @@ import { AmqpClient } from "@ido_kawaz/amqp-client";
 import { Router } from "@ido_kawaz/server-framework";
 import { StorageClient } from "@ido_kawaz/storage-client";
 import multer from "multer";
-import { MediaDal } from "../../dal/media";
+import { Dals } from "../../dal/types";
 import { BucketsConfig } from "../../utils/types";
 import { requireAdmin } from "../middleware";
 import { createMediaHandlers } from "./handlers";
 
-export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaDal, amqpClient: AmqpClient, storageClient: StorageClient) => {
-  const mediaHandlers = createMediaHandlers(bucketsConfig, mediaDal, amqpClient, storageClient);
+export const createMediaRouter = (bucketsConfig: BucketsConfig, dals: Dals, amqpClient: AmqpClient, storageClient: StorageClient) => {
+  const mediaHandlers = createMediaHandlers(bucketsConfig, dals, amqpClient, storageClient);
   const router = Router();
   const upload = multer({ storage: multer.diskStorage({ destination: './tmp' }) });
 
@@ -80,13 +80,18 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
    *         application/json:
    *           schema:
    *             type: object
-   *             required: [title, fileName, fileSize, mimeType]
+   *             required: [title, fileName, fileSize, mimeType, kind]
    *             properties:
    *               title:
    *                 type: string
    *               description:
    *                 type: string
-   *               tags:
+   *               kind:
+   *                 type: string
+   *                 enum: [movie, episode]
+   *               episodeNumber:
+   *                 type: number
+   *               genres:
    *                 type: array
    *                 items:
    *                   type: string
@@ -156,7 +161,7 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
    * /media/{id}:
    *   put:
    *     summary: Update media metadata
-   *     description: Update the title, description, or tags of a media
+   *     description: Update the title, description, or genres of a media
    *     tags:
    *       - Media
    *     security:
@@ -174,12 +179,18 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaDal: MediaD
    *         application/json:
    *           schema:
    *             type: object
+   *             required: [title, kind]
    *             properties:
    *               title:
    *                 type: string
    *               description:
    *                 type: string
-   *               tags:
+   *               kind:
+   *                 type: string
+   *                 enum: [movie, episode]
+   *               episodeNumber:
+   *                 type: number
+   *               genres:
    *                 type: array
    *                 items:
    *                   type: string

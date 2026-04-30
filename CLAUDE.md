@@ -42,8 +42,9 @@ This is a **media backend service** with two main processing paths:
 ### Request Flow
 
 ```
-POST /media/upload/initiate  (JSON: title, fileName, fileSize, mimeType, [description, tags, thumbnailFocalPoint, collectionId])
-  → Validate request (Zod) — requires title, fileName, fileSize, mimeType (video/*)
+POST /media/upload/initiate  (JSON: title, fileName, fileSize, mimeType, kind, [description, episodeNumber, genres, thumbnailFocalPoint, collectionId])
+  → Validate request (Zod) — requires title, fileName, fileSize, mimeType (video/*), kind ("movie"|"episode")
+  → Validate parent-kind rules: episode must be in a season; movie may only be in a generic collection
   → Save media record to MongoDB (status: "pending", thumbnailFocalPoint stored)
   → storageClient.getPutPresignedUrl for video key (<uploadPrefix>/<fileName>)
   → storageClient.getPutPresignedUrl for thumbnail key (<thumbnailPrefix>/<mediaId>.jpg)
@@ -83,13 +84,21 @@ Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
 | `GET` | `/avatar/:id/image` | Yes | Stream avatar image as `image/jpeg` with `Cache-Control: public, max-age=172800` |
 | `POST` | `/avatar` | Yes (admin only) | Create an avatar with image upload |
 | `DELETE` | `/avatar/:id` | Yes (admin only) | Delete an avatar from DB and storage |
+| `GET` | `/avatar-category` | Yes | List all avatar categories |
+| `GET` | `/avatar-category/:categoryId` | Yes | Get a single avatar category |
+| `POST` | `/avatar-category` | Yes (admin only) | Create a new avatar category |
+| `DELETE` | `/avatar-category/:categoryId` | Yes (admin only) | Delete an avatar category (must be empty) |
+| `GET` | `/mediaGenre` | Yes | List all media genres |
+| `GET` | `/mediaGenre/:genreId` | Yes | Get a single media genre |
+| `POST` | `/mediaGenre` | Yes (admin only) | Create a new media genre (name must be unique) |
+| `DELETE` | `/mediaGenre` | Yes (admin only) | Delete a media genre by name (must not be referenced by media or collections) |
 | `POST` | `/media/upload/initiate` | Yes (admin only) | Create media record; returns `{ mediaId, videoUploadUrl, thumbnailUploadUrl }` (presigned PUT URLs) |
 | `POST` | `/media/upload/complete` | Yes (admin only) | Signal browser upload done; triggers convert AMQP message, sets status to `processing` |
 | `GET` | `/media` | Yes | List all completed media from MongoDB |
 | `GET` | `/media/uploading` | Yes | List all non-completed media (pending/processing/failed) |
 | `GET` | `/media/:id` | Yes | Get a single media's metadata from MongoDB |
 | `GET` | `/media/:id/progress` | Yes | Get upload progress `{ status, percentage }` for a media item |
-| `PUT` | `/media/:id` | Yes (admin only) | Update media title, description, tags, thumbnail image, or thumbnail focal point |
+| `PUT` | `/media/:id` | Yes (admin only) | Update media title, description, genres, thumbnail image, or thumbnail focal point |
 | `DELETE` | `/media/:id` | Yes (admin only) | Delete media from DB and VOD storage |
 | `GET` | `/media/:id/thumbnail` | Yes | Stream thumbnail as `image/jpeg` with `Cache-Control: public, max-age=172800` |
 | `GET` | `/media/stream/:id/output.mpd` | Yes | Stream MPEG-DASH manifest from VOD storage bucket |
@@ -99,7 +108,7 @@ Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
 | `POST` | `/media-collection` | Yes (admin only) | Create a collection with a required thumbnail |
 | `GET` | `/media-collection` | Yes | List all media collections |
 | `GET` | `/media-collection/:id` | Yes | Get a single collection's metadata |
-| `PUT` | `/media-collection/:id` | Yes (admin only) | Update collection title, description, tags, thumbnail image, or thumbnail focal point |
+| `PUT` | `/media-collection/:id` | Yes (admin only) | Update collection title, description, genres, thumbnail image, or thumbnail focal point |
 | `DELETE` | `/media-collection/:id` | Yes (admin only) | Delete a collection (must be empty) |
 | `GET` | `/media-collection/:id/thumbnail` | Yes | Stream thumbnail as `image/jpeg` with `Cache-Control: public, max-age=172800` |
 | `GET` | `/health` | No | Health check — returns 200 OK |
@@ -113,12 +122,14 @@ interface Media {
   fileName: string;              // original filename
   title: string;                 // user-provided display title
   description?: string;
-  tags: MediaTag[];              // e.g. "Action", "Comedy", etc.
+  kind: "movie" | "episode";
+  episodeNumber?: number;        // required when kind === "episode"
+  genres: string[];              // references MediaGenre.name values
   size: number;                  // file size in bytes
   status: MediaStatus;           // "pending" | "processing" | "completed" | "failed"
   percentage: number;            // upload progress 0–100; set by upload/progress consumers
   thumbnailFocalPoint: Coordinates; // { x, y } crop anchor, defaults to { x: 0.5, y: 0.5 }
-  collectionId?: string;         // optional parent collection
+  collectionId?: string;         // episode must reference a season; movie may reference a collection
   metadata?: MediaMetadata;      // populated by progress consumer on completion; includes thumbnailsUrl
 }
 ```
@@ -130,13 +141,21 @@ interface MediaCollection {
   _id: string;
   title: string;
   description?: string;
-  tags: MediaTag[];
+  kind: "show" | "season" | "collection";
+  seasonNumber?: number;         // required when kind === "season"
+  genres: string[];              // references MediaGenre.name values
   thumbnailFocalPoint: Coordinates;
-  collectionId?: string;         // optional parent collection (nesting)
+  collectionId?: string;         // season must reference a show; show may reference a collection
 }
 ```
 
-Deletion is blocked if the collection still contains media or subcollections (`CollectionNotEmptyError`).
+Deletion is blocked if the collection still contains media or subcollections (`CollectionNotEmptyError`, now a 400).
+
+**Parent-kind rules** (enforced in `api/mediaCollection/logic.ts` and `api/media/logic.ts`):
+- `season` must have a `collectionId` pointing to a `show`
+- `show` must not have a `collectionId` pointing to a `show` or `season`
+- `episode` must have a `collectionId` pointing to a `season`
+- `movie` must not have a `collectionId` pointing to a `season` or `show`
 
 Thumbnail is uploaded to storage at key `<thumbnailPrefix>/<mediaId>.jpg` by the upload consumer. The `thumbnailFocalPoint` is stored in the DB and used downstream for cropping.
 
@@ -188,9 +207,9 @@ All `@ido_kawaz/*` packages are listed as **devDependencies** (resolved locally 
 - **Factory functions** for all modules: `createMediaHandlers(deps)`, `createUploadConsumer(deps)`, etc.
 - **Zod validation** at every boundary: HTTP requests (`validateMediaUploadRequest`), AMQP payloads (`validateUploadPayload`), and env config (`src/config.ts`). The `validateRequest(schema)` factory in `src/utils/zod.ts` parses the full `req` object (not `req.body`) — schemas must match the Express request shape (`{ body, files, params, ... }`).
 - **Nullable update fields**: `description` and `collectionId` use `z.string().nullish()` — sending `null` triggers a MongoDB `$unset`, omitting the field leaves the DB value unchanged.
-- **Shared types**: `MEDIA_TAGS`, `MediaTag`, `AVATAR_CATEGORIES`, `AvatarCategory`, `BucketsConfig`, `Coordinates`, `UploadedFile`, `RequestWithIdParam` are defined in `src/utils/types.ts` and shared across modules.
+- **Shared types**: `BucketsConfig`, `Coordinates`, `UploadedFile`, `RequestWithIdParam` are defined in `src/utils/types.ts` and shared across modules. `MEDIA_TAGS`/`MediaTag` have been removed; genres are now free-form strings referencing `MediaGenre.name`.
 - **BucketsConfig**: All storage bucket names and key prefixes are consolidated into a single `BucketsConfig` object (see `src/utils/types.ts`) passed down to media, mediaCollection, and upload consumer — no per-feature config interfaces for storage.
-- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia(MediaInfo)`, `updateMedia()`, `deleteMedia()`, `getAllMedia()`, `getMedia()`, `getPendingMedia()`, `getMediaUploadProgress()`, `getAllNoneCompletedMedia()`, `isCollectionEmpty()`. MediaCollection: `createCollection()`, `updateCollection()`, `deleteCollection()`, `getAllCollections()`, `getCollection()`, `isCollectionEmpty()`. User: `createUser(name, password, email)`, `findUser()`, `verifyUser()`, `verifyEmail()`, `approveUser()`, `denyUser()`, `removeUser()`, `getPendingUsers()`, `promoteToAdmin()`, `createPasswordResetRequestForUser(email, tokenHash)`, `findUserByPasswordResetToken(tokenHash)`, `resetUserPassword(name, newPasswordHash)`. Avatar: `createAvatar()`, `deleteAvatar()`, `getAllAvatars()`, `getAvatarById()`.
+- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia(MediaInfo)`, `updateMedia()`, `deleteMedia()`, `getAllMedia()`, `getMedia()`, `getPendingMedia()`, `getMediaUploadProgress()`, `getAllNoneCompletedMedia()`, `isCollectionEmpty()`, `isGenreEmpty(genreName)`. MediaCollection: `createCollection()`, `updateCollection()`, `deleteCollection()`, `getAllCollections()`, `getCollection()`, `isCollectionEmpty()`, `isGenreUsedInCollection(genre)`. MediaGenre: `getAllGenres()`, `getGenre(genreId)`, `verifyGenreExists(name)`, `createGenre(name)`, `deleteGenre(name)`. User: `createUser(name, password, email)`, `findUser()`, `verifyUser()`, `verifyEmail()`, `approveUser()`, `denyUser()`, `removeUser()`, `getPendingUsers()`, `promoteToAdmin()`, `createPasswordResetRequestForUser(email, tokenHash)`, `findUserByPasswordResetToken(tokenHash)`, `resetUserPassword(name, newPasswordHash)`. Avatar: `createAvatar()`, `deleteAvatar()`, `getAllAvatars()`, `getAvatarById()`, `isCategoryEmpty(categoryId)`. AvatarCategory: `getAllCategories()`, `getCategory(categoryId)`, `createCategory(name)`, `deleteCategory(categoryId)`, `verifyCategoryExists(categoryId)`.
 - **Colocated tests**: `__tests__/` directories next to the source they test.
 - **Handler decorator** from server-framework wraps route handlers for logging and error propagation.
 

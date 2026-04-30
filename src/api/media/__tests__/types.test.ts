@@ -6,8 +6,9 @@ describe('validateInitiateUploadRequest', () => {
             title: 'My Video',
             fileName: 'video.mp4',
             fileSize: 1024,
+            kind: 'movie',
             mimeType: 'video/mp4',
-            tags: [],
+            genres: [],
             thumbnailFocalPoint: { x: 0.5, y: 0.5 },
             ...overrides,
         },
@@ -39,10 +40,10 @@ describe('validateInitiateUploadRequest', () => {
         expect(() => validateInitiateUploadRequest(makeReq({ fileSize: 0 }) as any)).toThrow();
     });
 
-    it('defaults tags to empty array when omitted', () => {
-        const req = { body: { title: 'T', fileName: 'v.mp4', fileSize: 1, mimeType: 'video/mp4' } };
+    it('defaults genres to empty array when omitted', () => {
+        const req = { body: { title: 'T', fileName: 'v.mp4', kind: 'movie', fileSize: 1, mimeType: 'video/mp4' } };
         const result = validateInitiateUploadRequest(req as any);
-        expect(result.tags).toEqual([]);
+        expect(result.genres).toEqual([]);
     });
 });
 

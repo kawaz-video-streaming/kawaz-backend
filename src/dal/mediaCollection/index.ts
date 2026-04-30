@@ -23,16 +23,14 @@ export class MediaCollectionDal extends Dal<MediaCollection> {
         isNotNil(await this.model.exists({ _id: collectionId }).lean().exec());
 
     createCollection = async (mediaCollectionInfo: MediaCollectionInfo): Promise<MediaCollection> => {
-        const { title, description, tags, thumbnailFocalPoint, collectionId: containingCollectionId } = mediaCollectionInfo;
-        const doesContainingCollectionExist = isNotNil(containingCollectionId) ? await this.verifyCollectionExists(containingCollectionId) : true;
-        if (!doesContainingCollectionExist) {
-            throw new MediaCollectionDalError("Containing collection does not exist");
-        }
+        const { title, description, genres, kind, seasonNumber, thumbnailFocalPoint, collectionId: containingCollectionId } = mediaCollectionInfo;
         const collection: MediaCollection = {
             _id: new Types.ObjectId().toString(),
             title,
             ...(isNotNil(description) && { description }),
-            tags,
+            kind,
+            ...(isNotNil(seasonNumber) && { seasonNumber }),
+            genres,
             thumbnailFocalPoint,
             ...(isNotNil(containingCollectionId) && { collectionId: containingCollectionId })
         };
@@ -59,4 +57,7 @@ export class MediaCollectionDal extends Dal<MediaCollection> {
 
     isCollectionEmpty = async (collectionId: string): Promise<boolean> =>
         isNil(await this.model.exists({ collectionId }).lean().exec());
+
+    isGenreUsedInCollection = async (genre: string): Promise<boolean> =>
+        isNotNil(await this.model.exists({ genres: genre }).lean().exec());
 }
