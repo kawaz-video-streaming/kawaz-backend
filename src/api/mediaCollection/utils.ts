@@ -12,6 +12,8 @@ export const validateMediaCollectionContainingCollectionAndGenre = async (mediaC
         throw new BadRequestError("A season must be nested inside a show");
     } else if (kind === "show" && isNotNil(containingCollection) && containingCollection.kind !== "collection") {
         throw new BadRequestError("A show can only be nested inside a generic collection");
+    } else if (kind === "collection" && isNotNil(containingCollection)) {
+        throw new BadRequestError("A generic collection cannot be nested inside another collection");
     }
     await Promise.all(genres.map(async (genre) => {
         const genreExists = await mediaGenreDal.verifyGenreExists(genre);

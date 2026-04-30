@@ -60,7 +60,7 @@ export class MediaDal extends Dal<Media> {
     this.model.findOne({ _id: mediaId, status: PENDING }).lean<Media>().exec();
 
   isCollectionEmpty = async (collectionId: string): Promise<boolean> =>
-    isNil(await this.model.exists({ collectionId }).exec());
+    isNil(await this.model.exists({ collectionId }).lean().exec());
 
   isGenreEmpty = async (genreName: string): Promise<boolean> =>
     isNil(await this.model.exists({ "genres": genreName }).exec());

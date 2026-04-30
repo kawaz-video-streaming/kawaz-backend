@@ -308,7 +308,7 @@ describe('AvatarCategory integration', () => {
         app.use(parseCookies);
         app.use(express.json());
         app.use(authMiddleware);
-        app.use('/avatar-category', createAvatarCategoryRouter({
+        app.use('/avatarCategory', createAvatarCategoryRouter({
             avatarCategoryDal: avatarCategoryDal as unknown as AvatarCategoryDal,
             avatarDal: avatarDal as unknown as AvatarDal,
         } as unknown as Dals));
@@ -322,54 +322,54 @@ describe('AvatarCategory integration', () => {
         });
     });
 
-    it('GET /avatar-category returns all categories', async () => {
+    it('GET /avatarCategory returns all categories', async () => {
         const categories = [{ _id: 'cat-1', name: 'Animals' }, { _id: 'cat-2', name: 'Nature' }];
         avatarCategoryDal.getAllCategories.mockResolvedValue(categories);
 
         const res = await request(app)
-            .get('/avatar-category')
+            .get('/avatarCategory')
             .set('Cookie', `kawaz-token=${adminToken}`);
 
         expect(res.status).toBe(200);
         expect(res.body).toEqual(categories);
     });
 
-    it('GET /avatar-category/:categoryId returns a specific category', async () => {
+    it('GET /avatarCategory/:categoryId returns a specific category', async () => {
         const id = makeValidCategoryId();
         const category = { _id: id, name: 'Animals' };
         avatarCategoryDal.getCategory.mockResolvedValue(category);
 
         const res = await request(app)
-            .get(`/avatar-category/${id}`)
+            .get(`/avatarCategory/${id}`)
             .set('Cookie', `kawaz-token=${adminToken}`);
 
         expect(res.status).toBe(200);
         expect(res.body).toEqual(category);
     });
 
-    it('GET /avatar-category/:categoryId returns 404 when category does not exist', async () => {
+    it('GET /avatarCategory/:categoryId returns 404 when category does not exist', async () => {
         const id = makeValidCategoryId();
         avatarCategoryDal.getCategory.mockResolvedValue(null);
 
         const res = await request(app)
-            .get(`/avatar-category/${id}`)
+            .get(`/avatarCategory/${id}`)
             .set('Cookie', `kawaz-token=${adminToken}`);
 
         expect(res.status).toBe(404);
     });
 
-    it('GET /avatar-category/:categoryId returns 400 for invalid id', async () => {
+    it('GET /avatarCategory/:categoryId returns 400 for invalid id', async () => {
         const res = await request(app)
-            .get('/avatar-category/not-valid-id')
+            .get('/avatarCategory/not-valid-id')
             .set('Cookie', `kawaz-token=${adminToken}`);
 
         expect(res.status).toBe(400);
         expect(avatarCategoryDal.getCategory).not.toHaveBeenCalled();
     });
 
-    it('POST /avatar-category creates a category', async () => {
+    it('POST /avatarCategory creates a category', async () => {
         const res = await request(app)
-            .post('/avatar-category')
+            .post('/avatarCategory')
             .set('Cookie', `kawaz-token=${adminToken}`)
             .send({ name: 'Animals' });
 
@@ -377,9 +377,9 @@ describe('AvatarCategory integration', () => {
         expect(avatarCategoryDal.createCategory).toHaveBeenCalledWith('Animals');
     });
 
-    it('POST /avatar-category returns 400 when name is missing', async () => {
+    it('POST /avatarCategory returns 400 when name is missing', async () => {
         const res = await request(app)
-            .post('/avatar-category')
+            .post('/avatarCategory')
             .set('Cookie', `kawaz-token=${adminToken}`)
             .send({});
 
@@ -387,47 +387,47 @@ describe('AvatarCategory integration', () => {
         expect(avatarCategoryDal.createCategory).not.toHaveBeenCalled();
     });
 
-    it('POST /avatar-category returns 409 on duplicate name', async () => {
+    it('POST /avatarCategory returns 409 on duplicate name', async () => {
         avatarCategoryDal.createCategory.mockRejectedValue(new Error('duplicate key error'));
 
         const res = await request(app)
-            .post('/avatar-category')
+            .post('/avatarCategory')
             .set('Cookie', `kawaz-token=${adminToken}`)
             .send({ name: 'Animals' });
 
         expect(res.status).toBe(409);
     });
 
-    it('DELETE /avatar-category/:categoryId deletes a category', async () => {
+    it('DELETE /avatarCategory/:categoryId deletes a category', async () => {
         const id = makeValidCategoryId();
         avatarDal.isCategoryEmpty.mockResolvedValue(true);
 
         const res = await request(app)
-            .delete(`/avatar-category/${id}`)
+            .delete(`/avatarCategory/${id}`)
             .set('Cookie', `kawaz-token=${adminToken}`);
 
         expect(res.status).toBe(200);
         expect(avatarCategoryDal.deleteCategory).toHaveBeenCalledWith(id);
     });
 
-    it('DELETE /avatar-category/:categoryId returns 400 when category has avatars', async () => {
+    it('DELETE /avatarCategory/:categoryId returns 400 when category has avatars', async () => {
         const id = makeValidCategoryId();
         avatarDal.isCategoryEmpty.mockResolvedValue(false);
 
         const res = await request(app)
-            .delete(`/avatar-category/${id}`)
+            .delete(`/avatarCategory/${id}`)
             .set('Cookie', `kawaz-token=${adminToken}`);
 
         expect(res.status).toBe(400);
         expect(avatarCategoryDal.deleteCategory).not.toHaveBeenCalled();
     });
 
-    it('GET /avatar-category is accessible by non-admin users', async () => {
+    it('GET /avatarCategory is accessible by non-admin users', async () => {
         const categories = [{ _id: 'cat-1', name: 'Animals' }];
         avatarCategoryDal.getAllCategories.mockResolvedValue(categories);
 
         const res = await request(app)
-            .get('/avatar-category')
+            .get('/avatarCategory')
             .set('Cookie', `kawaz-token=${userToken}`);
 
         expect(res.status).toBe(200);
@@ -435,13 +435,13 @@ describe('AvatarCategory integration', () => {
     });
 
     it('returns 401 when accessing without token', async () => {
-        const res = await request(app).get('/avatar-category');
+        const res = await request(app).get('/avatarCategory');
         expect(res.status).toBe(401);
     });
 
     it('returns 401 when accessing with invalid token', async () => {
         const res = await request(app)
-            .get('/avatar-category')
+            .get('/avatarCategory')
             .set('Cookie', 'kawaz-token=invalid.token.here');
         expect(res.status).toBe(401);
     });

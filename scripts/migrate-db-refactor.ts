@@ -119,16 +119,19 @@ async function migrate(): Promise<void> {
         const categoryMap = new Map<string, string>();
 
         for (const name of AVATAR_CATEGORIES) {
-            let existing = await avatarCategoryColl.findOne({ name });
+            const existing = await avatarCategoryColl.findOne({ name });
+            let categoryId: string;
             if (existing) {
                 console.log(`  [SKIP] AvatarCategory "${name}" already exists (id=${existing._id})`);
+                categoryId = existing._id.toString();
             } else {
-                const doc = { _id: new Types.ObjectId(), name };
+                const id = new Types.ObjectId().toString();
+                const doc = { _id: id, name };
                 if (!isDryRun) await avatarCategoryColl.insertOne(doc as any);
                 console.log(`  [${isDryRun ? 'DRY RUN' : 'INSERT'}] AvatarCategory "${name}"`);
-                existing = doc;
+                categoryId = id;
             }
-            categoryMap.set(name, existing._id.toString());
+            categoryMap.set(name, categoryId);
         }
 
         const avatarsToMigrate = await avatarColl.find({ category: { $exists: true } }).toArray();
