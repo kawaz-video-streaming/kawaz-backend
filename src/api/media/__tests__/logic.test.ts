@@ -1,7 +1,10 @@
 import { AmqpClient } from '@ido_kawaz/amqp-client';
-import { NotFoundError } from '@ido_kawaz/server-framework';
+import { BadRequestError, NotFoundError } from '@ido_kawaz/server-framework';
 import { StorageClient } from '@ido_kawaz/storage-client';
 import { MediaDal } from '../../../dal/media';
+import { MediaCollectionDal } from '../../../dal/mediaCollection';
+import { MediaGenreDal } from '../../../dal/mediaGenre';
+import { Dals } from '../../../dal/types';
 import { createMediaLogic } from '../logic';
 import { InitiateUploadRequestBody } from '../types';
 
@@ -17,7 +20,8 @@ const makeConfig = () => ({
 
 const makeBody = (overrides: Partial<InitiateUploadRequestBody> = {}): InitiateUploadRequestBody => ({
     title: 'My Video',
-    tags: [],
+    kind: 'movie',
+    genres: [],
     thumbnailFocalPoint: { x: 0.5, y: 0.5 },
     fileName: 'video.mp4',
     fileSize: 64,
@@ -25,9 +29,17 @@ const makeBody = (overrides: Partial<InitiateUploadRequestBody> = {}): InitiateU
     ...overrides,
 });
 
+const makeMediaGenreDal = (): jest.Mocked<Pick<MediaGenreDal, 'verifyGenreExists'>> => ({
+    verifyGenreExists: jest.fn().mockResolvedValue(true),
+});
+
+const makeMediaCollectionDal = (): jest.Mocked<Pick<MediaCollectionDal, 'getCollection'>> => ({
+    getCollection: jest.fn().mockResolvedValue(null),
+});
+
 describe('createMediaLogic.initiateUpload', () => {
     it('creates media record and returns presigned URLs', async () => {
-        const media = { _id: 'm1', fileName: 'video.mp4', title: 'My Video', tags: [], size: 64, status: 'pending' };
+        const media = { _id: 'm1', fileName: 'video.mp4', title: 'My Video', genres: [], size: 64, status: 'pending' };
         const mediaDal = { createMedia: jest.fn().mockResolvedValue(media) } as unknown as MediaDal;
         const storageClient = {
             ensureBucket: jest.fn().mockResolvedValue(undefined),
@@ -36,12 +48,17 @@ describe('createMediaLogic.initiateUpload', () => {
                 .mockResolvedValueOnce('https://minio/raw/thumbnails/m1.jpg?sig=xyz'),
         } as unknown as StorageClient;
 
-        const logic = createMediaLogic(makeConfig(), mediaDal, {} as any, storageClient);
+        const logic = createMediaLogic(makeConfig(), {
+            mediaDal,
+            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
+            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
+        } as unknown as Dals, {} as any, storageClient);
         const result = await logic.initiateUpload(makeBody());
 
         expect(mediaDal.createMedia).toHaveBeenCalledWith({
             title: 'My Video',
-            tags: [],
+            kind: 'movie',
+            genres: [],
             thumbnailFocalPoint: { x: 0.5, y: 0.5 },
             fileName: 'video.mp4',
             size: 64,
@@ -56,6 +73,25 @@ describe('createMediaLogic.initiateUpload', () => {
         });
     });
 
+    it('throws BadRequestError when a referenced genre does not exist', async () => {
+        const mediaDal = { createMedia: jest.fn() } as unknown as MediaDal;
+        const mediaGenreDal = makeMediaGenreDal();
+        mediaGenreDal.verifyGenreExists.mockResolvedValue(false);
+        const storageClient = {
+            ensureBucket: jest.fn().mockResolvedValue(undefined),
+            getPutPresignedUrl: jest.fn(),
+        } as unknown as StorageClient;
+
+        const logic = createMediaLogic(makeConfig(), {
+            mediaDal,
+            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
+            mediaGenreDal: mediaGenreDal as unknown as MediaGenreDal,
+        } as unknown as Dals, {} as any, storageClient);
+
+        await expect(logic.initiateUpload(makeBody({ genres: ['NonExistent'] }))).rejects.toBeInstanceOf(BadRequestError);
+        expect(mediaDal.createMedia).not.toHaveBeenCalled();
+    });
+
     it('propagates DAL failure and never generates URLs', async () => {
         const mediaDal = { createMedia: jest.fn().mockRejectedValue(new Error('db write failed')) } as unknown as MediaDal;
         const storageClient = {
@@ -63,7 +99,11 @@ describe('createMediaLogic.initiateUpload', () => {
             getPutPresignedUrl: jest.fn(),
         } as unknown as StorageClient;
 
-        const logic = createMediaLogic(makeConfig(), mediaDal, {} as any, storageClient);
+        const logic = createMediaLogic(makeConfig(), {
+            mediaDal,
+            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
+            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
+        } as unknown as Dals, {} as any, storageClient);
 
         await expect(logic.initiateUpload(makeBody())).rejects.toThrow('db write failed');
         expect(storageClient.getPutPresignedUrl).not.toHaveBeenCalled();
@@ -72,14 +112,18 @@ describe('createMediaLogic.initiateUpload', () => {
 
 describe('createMediaLogic.completeUpload', () => {
     it('publishes convert message and sets status to processing', async () => {
-        const media = { _id: 'm1', fileName: 'video.mp4', title: 'My Video', tags: [], size: 64, status: 'pending' };
+        const media = { _id: 'm1', fileName: 'video.mp4', title: 'My Video', genres: [], size: 64, status: 'pending' };
         const mediaDal = {
             getPendingMedia: jest.fn().mockResolvedValue(media),
             updateMedia: jest.fn().mockResolvedValue(undefined),
         } as unknown as MediaDal;
         const amqpClient = { publish: jest.fn() } as unknown as AmqpClient;
 
-        const logic = createMediaLogic(makeConfig(), mediaDal, amqpClient, {} as any);
+        const logic = createMediaLogic(makeConfig(), {
+            mediaDal,
+            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
+            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
+        } as unknown as Dals, amqpClient, {} as any);
         await logic.completeUpload('m1');
 
         expect(mediaDal.getPendingMedia).toHaveBeenCalledWith('m1');
@@ -96,21 +140,29 @@ describe('createMediaLogic.completeUpload', () => {
         const mediaDal = { getPendingMedia: jest.fn().mockResolvedValue(null) } as unknown as MediaDal;
         const amqpClient = { publish: jest.fn() } as unknown as AmqpClient;
 
-        const logic = createMediaLogic(makeConfig(), mediaDal, amqpClient, {} as any);
+        const logic = createMediaLogic(makeConfig(), {
+            mediaDal,
+            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
+            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
+        } as unknown as Dals, amqpClient, {} as any);
 
         await expect(logic.completeUpload('m-missing')).rejects.toThrow(NotFoundError);
         expect(amqpClient.publish).not.toHaveBeenCalled();
     });
 
     it('never updates status when publish throws', async () => {
-        const media = { _id: 'm1', fileName: 'video.mp4', title: 'My Video', tags: [], size: 64, status: 'pending' };
+        const media = { _id: 'm1', fileName: 'video.mp4', title: 'My Video', genres: [], size: 64, status: 'pending' };
         const mediaDal = {
             getPendingMedia: jest.fn().mockResolvedValue(media),
             updateMedia: jest.fn(),
         } as unknown as MediaDal;
         const amqpClient = { publish: jest.fn().mockImplementation(() => { throw new Error('amqp down'); }) } as unknown as AmqpClient;
 
-        const logic = createMediaLogic(makeConfig(), mediaDal, amqpClient, {} as any);
+        const logic = createMediaLogic(makeConfig(), {
+            mediaDal,
+            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
+            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
+        } as unknown as Dals, amqpClient, {} as any);
 
         await expect(logic.completeUpload('m1')).rejects.toThrow('amqp down');
         expect(mediaDal.updateMedia).not.toHaveBeenCalled();

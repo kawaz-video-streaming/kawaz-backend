@@ -3,7 +3,7 @@ import { NotFoundError, Request, Response } from "@ido_kawaz/server-framework";
 import { StorageClient } from "@ido_kawaz/storage-client";
 import { StatusCodes } from "http-status-codes";
 import { isEmpty, isNil } from "ramda";
-import { MediaDal } from "../../dal/media";
+import { Dals } from "../../dal/types";
 import { requestHandlerDecorator } from "../../utils/decorator";
 import { BucketsConfig } from "../../utils/types";
 import { validateRequestWithId } from "../../utils/zod";
@@ -16,13 +16,13 @@ import {
 
 export const createMediaHandlers = (
   bucketsConfig: BucketsConfig,
-  mediaDal: MediaDal,
+  dals: Dals,
   amqpClient: AmqpClient,
   storageClient: StorageClient,
 ) => {
   const logic = createMediaLogic(
     bucketsConfig,
-    mediaDal,
+    dals,
     amqpClient,
     storageClient,
   );

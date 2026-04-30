@@ -17,10 +17,13 @@ import request from 'supertest';
 import { AmqpClient } from '@ido_kawaz/amqp-client';
 import { StorageClient } from '@ido_kawaz/storage-client';
 import { Types } from '@ido_kawaz/mongo-client';
-import { MediaDal } from '../dal/media';
 import { UserDal } from '../dal/user';
+import { AvatarCategoryDal } from '../dal/avatarCategory';
+import { AvatarDal } from '../dal/avatar';
+import { Dals } from '../dal/types';
 import { createMediaRouter } from '../api/media';
 import { createAuthRouter } from '../api/auth';
+import { createAvatarCategoryRouter } from '../api/avatarCategory';
 import { createAuthMiddleware } from '../api/middleware';
 import { Mailer } from '../services/mailer';
 
@@ -48,7 +51,7 @@ describe('Media upload integration', () => {
                 _id: mediaId,
                 fileName: 'sample.mp4',
                 title: 'My Sample',
-                tags: [],
+                genres: [],
                 size: 1024,
                 status: 'pending',
             }),
@@ -56,7 +59,7 @@ describe('Media upload integration', () => {
                 _id: mediaId,
                 fileName: 'sample.mp4',
                 title: 'My Sample',
-                tags: [],
+                genres: [],
                 size: 1024,
                 status: 'pending',
             }),
@@ -99,7 +102,7 @@ describe('Media upload integration', () => {
         app.use('/media', createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'upload-bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, mediaDal as unknown as MediaDal, amqpClient as unknown as AmqpClient, storageClient as unknown as StorageClient));
+        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, amqpClient as unknown as AmqpClient, storageClient as unknown as StorageClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -114,7 +117,7 @@ describe('Media upload integration', () => {
         const initiateRes = await request(app)
             .post('/media/upload/initiate')
             .set('Cookie', `kawaz-token=${adminToken}`)
-            .send({ title: 'My Sample', fileName: 'sample.mp4', fileSize: 1024, mimeType: 'video/mp4' });
+            .send({ title: 'My Sample', kind: 'movie', fileName: 'sample.mp4', fileSize: 1024, mimeType: 'video/mp4' });
 
         expect(initiateRes.status).toBe(200);
         expect(initiateRes.body).toMatchObject({
@@ -176,7 +179,7 @@ describe('Media upload integration', () => {
         const res = await request(app)
             .post('/media/upload/initiate')
             .set('Cookie', `kawaz-token=${adminToken}`)
-            .send({ title: 'My Sample', fileName: 'sample.mp4', fileSize: 1024, mimeType: 'video/mp4' });
+            .send({ title: 'My Sample', kind: 'movie', fileName: 'sample.mp4', fileSize: 1024, mimeType: 'video/mp4' });
 
         expect(res.status).toBe(500);
         expect(res.body.message).toContain('database connection lost');
@@ -214,7 +217,7 @@ describe('Media upload integration', () => {
         const initiateRes = await request(app)
             .post('/media/upload/initiate')
             .set('Cookie', `kawaz-token=${loginToken}`)
-            .send({ title: 'My Sample', fileName: 'sample.mp4', fileSize: 1024, mimeType: 'video/mp4' });
+            .send({ title: 'My Sample', kind: 'movie', fileName: 'sample.mp4', fileSize: 1024, mimeType: 'video/mp4' });
 
         expect(initiateRes.status).toBe(200);
         expect(initiateRes.body.mediaId).toBeDefined();
@@ -260,5 +263,186 @@ describe('Media upload integration', () => {
 
         expect(response.status).toBe(409);
         expect(userDal.createUser).not.toHaveBeenCalled();
+    });
+});
+
+describe('AvatarCategory integration', () => {
+    const AUTH_CONFIG = { jwtSecret: 'integration-test-secret', adminPromotionSecret: 'integration-admin-secret' };
+
+    let app: Application;
+    let avatarCategoryDal: { getAllCategories: jest.Mock; getCategory: jest.Mock; createCategory: jest.Mock; deleteCategory: jest.Mock; verifyCategoryExists: jest.Mock };
+    let avatarDal: { isCategoryEmpty: jest.Mock };
+    let userDal: { verifyUser: jest.Mock; findUser: jest.Mock };
+    let adminToken: string;
+    let userToken: string;
+
+    const makeValidCategoryId = () => new Types.ObjectId().toString();
+
+    beforeEach(() => {
+        avatarCategoryDal = {
+            getAllCategories: jest.fn().mockResolvedValue([]),
+            getCategory: jest.fn().mockResolvedValue(null),
+            createCategory: jest.fn().mockResolvedValue(undefined),
+            deleteCategory: jest.fn().mockResolvedValue(undefined),
+            verifyCategoryExists: jest.fn().mockResolvedValue(true),
+        };
+
+        avatarDal = {
+            isCategoryEmpty: jest.fn().mockResolvedValue(true),
+        };
+
+        userDal = {
+            verifyUser: jest.fn().mockResolvedValue(true),
+            findUser: jest.fn().mockImplementation((username: string) => {
+                if (username === 'user') return Promise.resolve({ name: 'user', password: 'hashed-password', role: 'user', status: 'approved' });
+                return Promise.resolve({ name: 'admin', password: 'hashed-password', role: 'admin', status: 'approved' });
+            }),
+        };
+
+        adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
+        userToken = jwt.sign({ username: 'user', role: 'user' }, AUTH_CONFIG.jwtSecret);
+
+        const authMiddleware = createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal);
+
+        app = express();
+        app.use(parseCookies);
+        app.use(express.json());
+        app.use(authMiddleware);
+        app.use('/avatarCategory', createAvatarCategoryRouter({
+            avatarCategoryDal: avatarCategoryDal as unknown as AvatarCategoryDal,
+            avatarDal: avatarDal as unknown as AvatarDal,
+        } as unknown as Dals));
+        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+            if (error instanceof ApiError) {
+                res.status(error.statusCode).json({ message: error.message });
+                return;
+            }
+            const message = error instanceof Error ? error.message : 'Internal server error';
+            res.status(500).json({ message });
+        });
+    });
+
+    it('GET /avatarCategory returns all categories', async () => {
+        const categories = [{ _id: 'cat-1', name: 'Animals' }, { _id: 'cat-2', name: 'Nature' }];
+        avatarCategoryDal.getAllCategories.mockResolvedValue(categories);
+
+        const res = await request(app)
+            .get('/avatarCategory')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual(categories);
+    });
+
+    it('GET /avatarCategory/:categoryId returns a specific category', async () => {
+        const id = makeValidCategoryId();
+        const category = { _id: id, name: 'Animals' };
+        avatarCategoryDal.getCategory.mockResolvedValue(category);
+
+        const res = await request(app)
+            .get(`/avatarCategory/${id}`)
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual(category);
+    });
+
+    it('GET /avatarCategory/:categoryId returns 404 when category does not exist', async () => {
+        const id = makeValidCategoryId();
+        avatarCategoryDal.getCategory.mockResolvedValue(null);
+
+        const res = await request(app)
+            .get(`/avatarCategory/${id}`)
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(res.status).toBe(404);
+    });
+
+    it('GET /avatarCategory/:categoryId returns 400 for invalid id', async () => {
+        const res = await request(app)
+            .get('/avatarCategory/not-valid-id')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(res.status).toBe(400);
+        expect(avatarCategoryDal.getCategory).not.toHaveBeenCalled();
+    });
+
+    it('POST /avatarCategory creates a category', async () => {
+        const res = await request(app)
+            .post('/avatarCategory')
+            .set('Cookie', `kawaz-token=${adminToken}`)
+            .send({ name: 'Animals' });
+
+        expect(res.status).toBe(201);
+        expect(avatarCategoryDal.createCategory).toHaveBeenCalledWith('Animals');
+    });
+
+    it('POST /avatarCategory returns 400 when name is missing', async () => {
+        const res = await request(app)
+            .post('/avatarCategory')
+            .set('Cookie', `kawaz-token=${adminToken}`)
+            .send({});
+
+        expect(res.status).toBe(400);
+        expect(avatarCategoryDal.createCategory).not.toHaveBeenCalled();
+    });
+
+    it('POST /avatarCategory returns 409 on duplicate name', async () => {
+        avatarCategoryDal.createCategory.mockRejectedValue(new Error('duplicate key error'));
+
+        const res = await request(app)
+            .post('/avatarCategory')
+            .set('Cookie', `kawaz-token=${adminToken}`)
+            .send({ name: 'Animals' });
+
+        expect(res.status).toBe(409);
+    });
+
+    it('DELETE /avatarCategory/:categoryId deletes a category', async () => {
+        const id = makeValidCategoryId();
+        avatarDal.isCategoryEmpty.mockResolvedValue(true);
+
+        const res = await request(app)
+            .delete(`/avatarCategory/${id}`)
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(res.status).toBe(200);
+        expect(avatarCategoryDal.deleteCategory).toHaveBeenCalledWith(id);
+    });
+
+    it('DELETE /avatarCategory/:categoryId returns 400 when category has avatars', async () => {
+        const id = makeValidCategoryId();
+        avatarDal.isCategoryEmpty.mockResolvedValue(false);
+
+        const res = await request(app)
+            .delete(`/avatarCategory/${id}`)
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(res.status).toBe(400);
+        expect(avatarCategoryDal.deleteCategory).not.toHaveBeenCalled();
+    });
+
+    it('GET /avatarCategory is accessible by non-admin users', async () => {
+        const categories = [{ _id: 'cat-1', name: 'Animals' }];
+        avatarCategoryDal.getAllCategories.mockResolvedValue(categories);
+
+        const res = await request(app)
+            .get('/avatarCategory')
+            .set('Cookie', `kawaz-token=${userToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual(categories);
+    });
+
+    it('returns 401 when accessing without token', async () => {
+        const res = await request(app).get('/avatarCategory');
+        expect(res.status).toBe(401);
+    });
+
+    it('returns 401 when accessing with invalid token', async () => {
+        const res = await request(app)
+            .get('/avatarCategory')
+            .set('Cookie', 'kawaz-token=invalid.token.here');
+        expect(res.status).toBe(401);
     });
 });

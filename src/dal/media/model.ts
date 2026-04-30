@@ -1,6 +1,6 @@
 import { Model, MongoClient, Schema, Types } from "@ido_kawaz/mongo-client";
 import z from "zod";
-import { Coordinates, coordinatesSchema, MEDIA_TAGS, MediaTag } from "../../utils/types";
+import { Coordinates, coordinatesSchema, MediaKind, mediaKinds } from "../../utils/types";
 
 export const mediaResultStatuses = ["completed", "failed"] as const;
 
@@ -119,7 +119,9 @@ export interface Media {
   fileName: string;
   title: string;
   description?: string;
-  tags: MediaTag[];
+  kind: MediaKind;
+  episodeNumber?: number;
+  genres: string[];
   size: number;
   status: MediaStatus;
   percentage: number;
@@ -128,26 +130,11 @@ export interface Media {
   metadata?: MediaMetadata;
 }
 
-export interface MediaInfo extends Omit<Media, "_id" | "description" | "collectionId"> {
+export interface MediaInfo extends Omit<Media, "_id" | "description" | "episodeNumber" | "collectionId"> {
   description?: string | null;
+  episodeNumber?: number | null;
   collectionId?: string | null;
 }
-
-export const mediaZodSchema = z.object({
-  _id: z.string().refine((v) => Types.ObjectId.isValid(v), { message: 'Invalid ObjectId' }),
-  fileName: z.string(),
-  title: z.string(),
-  description: z.string().optional(),
-  tags: z.array(z.enum(MEDIA_TAGS)).default([]),
-  size: z.coerce.number(),
-  status: z.enum(mediaStatuses).default(PENDING),
-  percentage: z.coerce.number().default(0),
-  thumbnailFocalPoint: z.object({
-    x: z.number(),
-    y: z.number()
-  }),
-  metadata: mediaMetadataZodSchema.optional()
-}) satisfies z.ZodType<Media>;
 
 const mediaSchema = new Schema<Media>(
   {
@@ -155,7 +142,9 @@ const mediaSchema = new Schema<Media>(
     fileName: { type: String, required: true },
     title: { type: String, required: true },
     description: { type: String, required: false },
-    tags: { type: [String], enum: MEDIA_TAGS, default: [] },
+    kind: { type: String, enum: mediaKinds, required: true },
+    episodeNumber: { type: Number, required: false },
+    genres: { type: [String], default: [] },
     size: { type: Number, required: true },
     status: { type: String, enum: mediaStatuses, default: PENDING },
     percentage: { type: Number, required: true, default: 0 },

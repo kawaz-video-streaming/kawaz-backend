@@ -9,6 +9,8 @@ Kawaz Plus media backend service.
 - Exposes admin endpoints (`GET /admin/pending`, `POST /admin/pending/:username/approve`, `POST /admin/pending/:username/deny`) — manage pending user registrations with email notifications
 - Exposes user endpoints (`GET /user/me`, `POST /user/profile`, `PUT /user/profile`, `DELETE /user/profile/:name`, `GET /user/profiles`) — per-user profile management
 - Exposes avatar endpoints (`GET /avatar`, `GET /avatar/:id`, `GET /avatar/:id/image`, `POST /avatar`, `DELETE /avatar/:id`) — avatar catalog; image streamed directly as JPEG with cache headers
+- Exposes avatar category endpoints (`GET /avatar-category`, `GET /avatar-category/:categoryId`, `POST /avatar-category`, `DELETE /avatar-category/:categoryId`) — manage avatar categories stored in MongoDB; deletion blocked when avatars still reference a category
+- Exposes media genre endpoints (`GET /mediaGenre`, `GET /mediaGenre/:genreId`, `POST /mediaGenre`, `DELETE /mediaGenre`) — manage the genre taxonomy used by media and collections; deletion blocked when genre is referenced by any media or collection
 - Exposes media CRUD endpoints (`GET /media`, `GET /media/uploading`, `GET /media/:id`, `PUT /media/:id`, `DELETE /media/:id`) — served from MongoDB; `/uploading` returns all non-completed media
 - Exposes presigned-URL based media upload endpoints (`POST /media/upload/initiate`, `POST /media/upload/complete`) — browser uploads directly to S3 using presigned PUT URLs, then calls complete to trigger processing
 - Exposes media collection CRUD endpoints (`/media-collection`) — group media into nestable collections; thumbnail streamed directly
@@ -223,13 +225,13 @@ Returns `200 OK` if service is running.
 ### `GET /avatar`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `200 [{ "_id", "name", "category" }]`
+- Success response: `200 [{ "_id", "name", "categoryId" }]`
 - Error responses: `401`, `404` (no avatars found)
 
 ### `GET /avatar/:id`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `200 { "_id", "name", "category" }`
+- Success response: `200 { "_id", "name", "categoryId" }`
 - Error responses: `401`, `404`
 
 ### `GET /avatar/:id/image`
@@ -242,9 +244,9 @@ Returns `200 OK` if service is running.
 
 - Requires: `kawaz-token` cookie with **admin role**
 - Content type: `multipart/form-data`
-- Fields: `name` (string), `category` (one of: `United Kingdom`, `United States`, `Israel`, `Japan`, `France`), `avatar` (image file)
+- Fields: `name` (string), `categoryId` (string, ObjectId referencing an `AvatarCategory._id`), `avatar` (image file)
 - Success response: `200 { "message": "Avatar created" }`
-- Error responses: `400` (invalid body or non-image file), `401`, `403`
+- Error responses: `400` (invalid body, non-image file, or category not found), `401`, `403`
 
 ### `DELETE /avatar/:id`
 
@@ -253,11 +255,67 @@ Returns `200 OK` if service is running.
 - Success response: `200 { "message": "Avatar deleted" }`
 - Error responses: `400` (invalid id), `401`, `403`, `404`
 
+### `GET /avatar-category`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 [{ "_id", "name" }]`
+- Error responses: `401`
+
+### `GET /avatar-category/:categoryId`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 { "_id", "name" }`
+- Error responses: `400` (invalid id), `401`, `404`
+
+### `POST /avatar-category`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Content type: `application/json`
+- Body: `{ "name": string }`
+- Success response: `201 { "message": "Avatar category created successfully" }`
+- Error responses: `400` (missing or empty name), `401`, `403`, `409` (name already exists)
+
+### `DELETE /avatar-category/:categoryId`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Deletion is blocked if any avatars still reference this category
+- Success response: `200 { "message": "Avatar category deleted successfully" }`
+- Error responses: `400` (invalid id or category has associated avatars), `401`, `403`
+
+### `GET /mediaGenre`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 [{ "_id", "name" }]`
+- Error responses: `401`
+
+### `GET /mediaGenre/:genreId`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Success response: `200 { "_id", "name" }`
+- Error responses: `400` (invalid id), `401`, `404`
+
+### `POST /mediaGenre`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Content type: `application/json`
+- Body: `{ "name": string }`
+- Success response: `201 { "message": "Media genre created successfully" }`
+- Error responses: `400` (missing or empty name), `401`, `403`, `409` (name already exists)
+
+### `DELETE /mediaGenre`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Content type: `application/json`
+- Body: `{ "name": string }` — genre to delete (identified by name)
+- Deletion blocked if any media or collection references this genre name
+- Success response: `200 { "message": "Media genre deleted successfully" }`
+- Error responses: `400` (missing name or genre has associated media/collections), `401`, `403`
+
 ### `POST /media/upload/initiate`
 
 - Requires: `kawaz-token` cookie with **admin role**
 - Content type: `application/json`
-- Body: `{ "title": string (required), "fileName": string (required), "fileSize": number (required), "mimeType": string (required, must start with `video/`), "description"?: string, "tags"?: string[], "thumbnailFocalPoint"?: { x, y }, "collectionId"?: string }`
+- Body: `{ "title": string (required), "fileName": string (required), "fileSize": number (required), "mimeType": string (required, must start with `video/`), "description"?: string, "genres"?: string[], "thumbnailFocalPoint"?: { x, y }, "collectionId"?: string }`
 - Success response: `200 { "mediaId": string, "videoUploadUrl": string, "thumbnailUploadUrl": string }` — presigned PUT URLs for direct browser-to-storage upload
 - Error responses: `400` (missing/invalid fields or non-video mimetype), `401`, `403`
 - Note: after calling this endpoint, the browser uploads the video file to `videoUploadUrl` and the thumbnail to `thumbnailUploadUrl` directly using HTTP `PUT`, then calls `/media/upload/complete`.
@@ -273,7 +331,7 @@ Returns `200 OK` if service is running.
 ### `GET /media`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `200 [{ "_id", "fileName", "title", "tags", "size", "status", "metadata", ... }]`
+- Success response: `200 [{ "_id", "fileName", "title", "genres", "size", "status", "metadata", ... }]`
 - Error responses: `401`, `404` (no media found)
 
 ### `GET /media/uploading`
@@ -295,14 +353,14 @@ Returns `200 OK` if service is running.
 
 - Requires: `kawaz-token` cookie with valid JWT
 - Only returns media in `completed` status
-- Success response: `200 { "_id", "fileName", "title", "tags", "size", "status", "metadata", ... }`
+- Success response: `200 { "_id", "fileName", "title", "genres", "size", "status", "metadata", ... }`
 - Error responses: `401`, `404` (media not found or not completed)
 
 ### `PUT /media/:id`
 
 - Requires: `kawaz-token` cookie with **admin role**
 - Content type: `multipart/form-data`
-- Fields: `title` (required string), `description` (optional string, send `null` to clear), `tags` (optional array), `collectionId` (optional string, send `null` to remove from collection), `thumbnailFocalPoint` (optional `{ x, y }` to reposition crop anchor), `thumbnail` (optional image to replace the thumbnail)
+- Fields: `title` (required string), `description` (optional string, send `null` to clear), `genres` (optional string array, must reference existing MediaGenre names), `collectionId` (optional string, send `null` to remove from collection), `thumbnailFocalPoint` (optional `{ x, y }` to reposition crop anchor), `thumbnail` (optional image to replace the thumbnail)
 - Success response: `200 { "message": "Media updated" }`
 - Error responses: `400` (invalid id or body), `401`, `403`
 
@@ -322,27 +380,27 @@ Returns `200 OK` if service is running.
 
 - Requires: `kawaz-token` cookie with **admin role**
 - Content type: `multipart/form-data`
-- Fields: `title` (required string), `description` (optional), `tags` (optional array), `thumbnailFocalPoint` (optional `{ x, y }`, defaults to `{ x: 0.5, y: 0.5 }`), `collectionId` (optional — parent collection for nesting), `thumbnail` (image, required)
+- Fields: `title` (required string), `description` (optional), `genres` (optional string array, must reference existing MediaGenre names), `thumbnailFocalPoint` (optional `{ x, y }`, defaults to `{ x: 0.5, y: 0.5 }`), `collectionId` (optional — parent collection for nesting), `thumbnail` (image, required)
 - Success response: `200 { "message": "Media collection created" }`
 - Error responses: `400` (invalid body or parent collection not found), `401`, `403`
 
 ### `GET /media-collection`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `200 [{ "_id", "title", "tags", "thumbnailFocalPoint", ... }]`
+- Success response: `200 [{ "_id", "title", "genres", "thumbnailFocalPoint", ... }]`
 - Error responses: `401`, `404` (no collections found)
 
 ### `GET /media-collection/:id`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `200 { "_id", "title", "tags", "thumbnailFocalPoint", ... }`
+- Success response: `200 { "_id", "title", "genres", "thumbnailFocalPoint", ... }`
 - Error responses: `401`, `404` (collection not found)
 
 ### `PUT /media-collection/:id`
 
 - Requires: `kawaz-token` cookie with **admin role**
 - Content type: `multipart/form-data`
-- Fields: `title` (required string), `description` (optional string, send `null` to clear), `tags` (optional array), `collectionId` (optional string, send `null` to remove parent), `thumbnailFocalPoint` (optional `{ x, y }` to reposition crop anchor), `thumbnail` (optional image to replace the thumbnail)
+- Fields: `title` (required string), `description` (optional string, send `null` to clear), `genres` (optional string array, must reference existing MediaGenre names), `collectionId` (optional string, send `null` to remove parent), `thumbnailFocalPoint` (optional `{ x, y }` to reposition crop anchor), `thumbnail` (optional image to replace the thumbnail)
 - Success response: `200 { "message": "Media collection updated" }`
 - Error responses: `400` (invalid id or body), `401`, `403`
 
@@ -416,14 +474,18 @@ src/
 - **api/admin** - Admin panel: list/approve/deny pending users with email notifications
 - **api/user** - User info (`/me`) and profile management (`/profile`, `/profiles`)
 - **api/avatar** - Avatar catalog CRUD; image streamed directly with cache headers
+- **api/avatarCategory** - Avatar category CRUD; deletion blocked when avatars reference the category
 - **api/media** - Presigned-URL upload (initiate + complete), media CRUD, streaming
 - **api/mediaCollection** - Media collection CRUD; thumbnail streamed directly
+- **api/mediaGenre** - Genre CRUD; deletion guarded by genre usage in media and collections
 - **background/upload** - AMQP upload consumer (currently disabled)
 - **background/progress** - AMQP consumer for updating media status to `completed` or `failed`
 - **dal/user** - User model (name, password, email, status, role) with embedded profiles
-- **dal/avatar** - Avatar model and database operations
-- **dal/media** - Media model and database operations; includes `getPendingMedia`
-- **dal/mediaCollection** - MediaCollection model and database operations
+- **dal/avatar** - Avatar model and database operations; includes `isCategoryEmpty`
+- **dal/avatarCategory** - AvatarCategory model and database operations
+- **dal/media** - Media model and database operations; includes `getPendingMedia`, `isGenreEmpty`
+- **dal/mediaCollection** - MediaCollection model and database operations; includes `isGenreUsedInCollection`
+- **dal/mediaGenre** - MediaGenre model and database operations
 - **services/mailer.ts** - Nodemailer-based Gmail SMTP service for user approval emails
 - **services/system.ts** - Initializes API server, Mailer, and starts AMQP consumers
 
@@ -441,7 +503,7 @@ Stores metadata for uploaded media files.
 | `fileName` | String | Yes | Original filename |
 | `title` | String | Yes | User-provided display title |
 | `description` | String | No | Optional description |
-| `tags` | String[] | Yes | Content tags (e.g. `"Action"`, `"Comedy"`) |
+| `genres` | String[] | Yes | Genre names referencing `MediaGenre.name` values |
 | `size` | Number | Yes | File size in bytes |
 | `status` | String | Yes | One of: `pending`, `processing`, `completed`, `failed` |
 | `thumbnailFocalPoint` | Object `{ x, y }` | Yes | Crop anchor for the thumbnail (0–1 range, defaults to `{ x: 0.5, y: 0.5 }`) |
@@ -454,7 +516,7 @@ Example document:
   "_id": "64a1f...",
   "fileName": "presentation.mp4",
   "title": "Q2 Highlights",
-  "tags": ["Education"],
+  "genres": ["Education"],
   "size": 52428800,
   "status": "completed",
   "thumbnailFocalPoint": { "x": 0.5, "y": 0.3 },
@@ -471,7 +533,7 @@ Stores metadata for media collections (groups of media).
 | `_id` | String (ObjectId) | Yes | Unique identifier |
 | `title` | String | Yes | Display title |
 | `description` | String | No | Optional description |
-| `tags` | String[] | Yes | Content tags |
+| `genres` | String[] | Yes | Genre names referencing `MediaGenre.name` values |
 | `thumbnailFocalPoint` | Object `{ x, y }` | Yes | Crop anchor for the thumbnail (0–1 range, defaults to `{ x: 0.5, y: 0.5 }`) |
 | `collectionId` | String | No | Parent collection ID (for nesting) |
 
@@ -503,7 +565,25 @@ Stores avatar metadata. Avatar images are stored in object storage at `<AVATAR_P
 |-------|------|----------|-------------|
 | `_id` | String (ObjectId) | Yes | Unique identifier |
 | `name` | String | Yes | Avatar display name (e.g. `"David Ben-Gurion"`) |
-| `category` | String | Yes | One of: `United Kingdom`, `United States`, `Israel`, `Japan`, `France` |
+| `categoryId` | String (ObjectId) | Yes | Reference to an `AvatarCategory._id` |
+
+### `AvatarCategory`
+
+Stores avatar category metadata.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `_id` | String (ObjectId) | Yes | Unique identifier |
+| `name` | String | Yes | Category display name (unique) |
+
+### `MediaGenre`
+
+Stores the genre taxonomy. Media and collections reference genres by name (free-form string stored in the `genres` array field). Deletion is blocked if any media or collection still references the genre name.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `_id` | String (ObjectId) | Yes | Unique identifier |
+| `name` | String | Yes | Genre name (unique, e.g. `"Action"`, `"Comedy"`) |
 
 ## Error handling
 
@@ -523,6 +603,12 @@ Tests are colocated with source files in `__tests__` directories:
 src/
 ├── api/media/__tests__/
 │   ├── index.test.ts       # Handler and integration tests
+│   ├── logic.test.ts       # Business logic tests
+│   └── types.test.ts       # Type validation tests
+├── api/avatar/__tests__/
+│   ├── logic.test.ts       # Business logic tests
+│   └── types.test.ts       # Type validation tests
+├── api/avatarCategory/__tests__/
 │   ├── logic.test.ts       # Business logic tests
 │   └── types.test.ts       # Type validation tests
 ├── background/upload/__tests__/

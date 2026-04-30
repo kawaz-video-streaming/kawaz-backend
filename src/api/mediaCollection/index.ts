@@ -53,10 +53,16 @@ export const createMediaCollectionRouter = (bucketsConfig: BucketsConfig, dals: 
      *         multipart/form-data:
      *           schema:
      *             type: object
+     *             required: [title, kind]
      *             properties:
      *               title:
      *                 type: string
-     *               tags:
+     *               kind:
+     *                 type: string
+     *                 enum: [show, season, collection]
+     *               seasonNumber:
+     *                 type: number
+     *               genres:
      *                 type: array
      *                 items:
      *                   type: string
@@ -73,7 +79,7 @@ export const createMediaCollectionRouter = (bucketsConfig: BucketsConfig, dals: 
      *               collectionId:
      *                 type: string
      *                 required: false
-     *                 description: Optional ID of a containing collection if this collection is nested within another collection
+     *                 description: Optional ID of a containing collection. Season must reference a show; show must reference a collection or be top-level.
      *     responses:
      *       200:
      *         description: Media collection created successfully
@@ -93,7 +99,7 @@ export const createMediaCollectionRouter = (bucketsConfig: BucketsConfig, dals: 
      * /mediaCollection/{id}:
      *   put:
      *     summary: Update media collection metadata
-     *     description: Update the title, thumbnail focal point, or tags of a media collection
+     *     description: Update the title, thumbnail focal point, or genres of a media collection
      *     tags:
      *       - MediaCollection
      *     security:
@@ -111,10 +117,16 @@ export const createMediaCollectionRouter = (bucketsConfig: BucketsConfig, dals: 
      *         application/json:
      *           schema:
      *             type: object
+     *             required: [title, kind]
      *             properties:
      *               title:
      *                 type: string
-     *               tags:
+     *               kind:
+     *                 type: string
+     *                 enum: [show, season, collection]
+     *               seasonNumber:
+     *                 type: number
+     *               genres:
      *                 type: array
      *                 items:
      *                   type: string

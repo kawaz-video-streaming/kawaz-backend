@@ -1,6 +1,14 @@
+import { isNil, isNotNil } from "ramda";
 import z from "zod";
-import { Coordinates, MEDIA_TAGS, MediaTag, RequestWithIdParam, requestWithIdParamZodSchema, UploadedFile, uploadedFileZodSchema } from "../../utils/types";
+import { Coordinates, MediaKind, mediaKinds, RequestWithIdParam, requestWithIdParamZodSchema, UploadedFile, uploadedFileZodSchema } from "../../utils/types";
 import { validateRequest } from "../../utils/zod";
+
+const refineMediaKind = (val: { kind: MediaKind; episodeNumber?: number | null }, ctx: z.RefinementCtx) => {
+    if (val.kind === "episode" && isNil(val.episodeNumber))
+        ctx.addIssue({ code: "custom", message: "episodeNumber is required for episodes" });
+    if (val.kind === "movie" && isNotNil(val.episodeNumber))
+        ctx.addIssue({ code: "custom", message: "episodeNumber is not valid for movies" });
+};
 
 export interface ConvertMessage {
     mediaId: string;
@@ -12,21 +20,25 @@ export interface ConvertMessage {
 export interface MediaUpdateRequestBody {
     title: string;
     description?: string | null;
-    tags: MediaTag[];
+    kind: MediaKind;
+    episodeNumber?: number | null;
+    genres: string[];
     thumbnailFocalPoint: Coordinates;
-    collectionId?: string | null; // Optional field if media is part of a collection in the future
+    collectionId?: string | null;
 }
 
 const mediaUpdateBodySchema = z.object({
     title: z.string().min(1, { message: "Title is required" }),
     description: z.string().nullish(),
-    tags: z.array(z.enum(MEDIA_TAGS)).default([]),
+    kind: z.enum(mediaKinds),
+    episodeNumber: z.coerce.number().nullish(),
+    genres: z.array(z.string()).default([]),
     thumbnailFocalPoint: z.object({
         x: z.coerce.number(),
         y: z.coerce.number()
     }).default({ x: 0.5, y: 0.5 }),
     collectionId: z.string().nullish()
-}) satisfies z.ZodType<MediaUpdateRequestBody>;
+}).superRefine(refineMediaKind) satisfies z.ZodType<MediaUpdateRequestBody>;
 
 export interface MediaUpdateRequest {
     thumbnail?: UploadedFile;
@@ -51,7 +63,9 @@ export interface InitiateUploadRequestBody extends MediaUpdateRequestBody {
 const initiateUploadBodySchema = z.object({
     title: z.string().min(1, { message: "Title is required" }),
     description: z.string().nullish(),
-    tags: z.array(z.enum(MEDIA_TAGS)).default([]),
+    kind: z.enum(mediaKinds),
+    episodeNumber: z.coerce.number().nullish(),
+    genres: z.array(z.string()).default([]),
     thumbnailFocalPoint: z.object({
         x: z.coerce.number(),
         y: z.coerce.number()
@@ -60,7 +74,7 @@ const initiateUploadBodySchema = z.object({
     fileName: z.string().min(1),
     fileSize: z.number().positive(),
     mimeType: z.string().refine((m) => m.startsWith('video/'), { message: 'Only video files are allowed' }),
-}) satisfies z.ZodType<InitiateUploadRequestBody>;
+}).superRefine(refineMediaKind) satisfies z.ZodType<InitiateUploadRequestBody>;
 
 export interface InitiateUploadResponse {
     mediaId: string;

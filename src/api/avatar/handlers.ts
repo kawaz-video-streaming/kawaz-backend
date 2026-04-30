@@ -2,15 +2,15 @@ import { NotFoundError, Request, Response } from "@ido_kawaz/server-framework";
 import { StorageClient } from "@ido_kawaz/storage-client";
 import { StatusCodes } from "http-status-codes";
 import { isEmpty, isNil } from 'ramda';
-import { AvatarDal } from "../../dal/avatar";
+import { Dals } from "../../dal/types";
 import { requestHandlerDecorator } from "../../utils/decorator";
 import { BucketsConfig } from "../../utils/types";
 import { validateRequestWithId } from "../../utils/zod";
 import { createAvatarLogic } from "./logic";
 import { validateAvatarCreationRequest } from "./types";
 
-export const createAvatarHandlers = (bucketsConfig: BucketsConfig, avatarDal: AvatarDal, storageClient: StorageClient) => {
-    const logic = createAvatarLogic(bucketsConfig, avatarDal, storageClient);
+export const createAvatarHandlers = (bucketsConfig: BucketsConfig, dals: Dals, storageClient: StorageClient) => {
+    const logic = createAvatarLogic(bucketsConfig, dals, storageClient);
     return {
         getAllAvatars:
             requestHandlerDecorator(
