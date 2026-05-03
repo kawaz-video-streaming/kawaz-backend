@@ -92,6 +92,67 @@ export const createAuthRouter = (authConfig: AuthConfig, mailer: Mailer, userDal
    */
   router.post("/login", authHandlers.login);
 
+
+  /**
+   * @openapi
+   * /auth/google/login:
+   *   get:
+   *     summary: Initiate Google OAuth login
+   *     description: Redirects the browser to Google's OAuth consent screen.
+   *     tags:
+   *       - Auth
+   *     responses:
+   *       302:
+   *         description: Redirect to Google's OAuth consent screen
+   */
+  router.get('/google/login', authHandlers.googleLogin);
+
+  /**
+   * @openapi
+   * /auth/google/callback:
+   *   get:
+   *     summary: Google OAuth callback
+   *     description: >
+   *       Exchanges the Google authorization code for user info.
+   *       If the user is approved, sets the auth cookie and returns 200.
+   *       If the user is new or pending, creates/awaits admin approval and returns 202.
+   *     tags:
+   *       - Auth
+   *     parameters:
+   *       - in: query
+   *         name: code
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Authorization code returned by Google
+   *     responses:
+   *       200:
+   *         description: Login successful — kawaz-token cookie set
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *                   example: Login successful
+   *       202:
+   *         description: Account created or pending — awaiting admin approval
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *                   example: Signup finished. Your account is awaiting admin approval
+   *       400:
+   *         description: Missing or invalid code parameter
+   *       401:
+   *         description: Google authentication failed or account denied
+   */
+  router.get('/google/callback', authHandlers.googleCallback);
+
   /**
    * @openapi
    * /auth/promote:

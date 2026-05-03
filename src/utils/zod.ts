@@ -8,6 +8,14 @@ export const validateSchema = <T>(schema: z.ZodType<T>) => (payload: any): paylo
     return result.success;
 }
 
+export const validateSchemaAndReturnValue = <T>(schema: z.ZodType<T>) => (payload: any): T => {
+    const result = schema.safeParse(payload);
+    if (!result.success) {
+        throw new BadRequestError(`Invalid payload: \n${result.error.issues.map(detail => detail.message).join(',\n')}`);
+    }
+    return result.data;
+}
+
 export const validateRequest = <T>(schema: z.ZodType<T>) => (req: Request): T => {
     const validationResult = schema.safeParse(req);
     if (!validationResult.success) {

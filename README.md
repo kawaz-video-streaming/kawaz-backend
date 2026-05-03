@@ -5,7 +5,7 @@ Kawaz Plus media backend service.
 ## What it does
 
 - Exposes a health endpoint (`GET /health`)
-- Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`, `POST /auth/promote`) — signup requires email and creates users in `"pending"` status awaiting admin approval; login blocked for non-approved users; JWT stored in HttpOnly cookie
+- Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`, `POST /auth/promote`, `GET /auth/google/login`, `GET /auth/google/callback`) — signup requires email and creates users in `"pending"` status awaiting admin approval; login blocked for non-approved users; JWT stored in HttpOnly cookie; Google OAuth follows the same admin-approval gate as regular signup
 - Exposes admin endpoints (`GET /admin/pending`, `POST /admin/pending/:username/approve`, `POST /admin/pending/:username/deny`) — manage pending user registrations with email notifications
 - Exposes user endpoints (`GET /user/me`, `POST /user/profile`, `PUT /user/profile`, `DELETE /user/profile/:name`, `GET /user/profiles`) — per-user profile management
 - Exposes avatar endpoints (`GET /avatar`, `GET /avatar/:id`, `GET /avatar/:id/image`, `POST /avatar`, `DELETE /avatar/:id`) — avatar catalog; image streamed directly as JPEG with cache headers
@@ -56,6 +56,9 @@ This service validates all environment variables at startup using Zod schemas. M
 - `ADMIN_PROMOTION_SECRET` - Secret required in `x-admin-secret` header to promote a user to admin
 - `GMAIL_USER` - Gmail address used as sender for Mailer (approval requests, approval/denial emails)
 - `GMAIL_APP_PASSWORD` - Gmail app password for SMTP authentication in the Mailer service
+- `APP_DOMAIN` - Public base URL of the app (e.g. `https://kawazplus.com`); used in OAuth redirect URIs and mailer links
+- `GOOGLE_CLIENT_ID` - Google OAuth 2.0 client ID
+- `GOOGLE_CLIENT_SECRET` - Google OAuth 2.0 client secret
 
 **Optional variables:**
 
@@ -71,7 +74,7 @@ This service validates all environment variables at startup using Zod schemas. M
 **Troubleshooting startup:**
 
 If the app fails to start, verify:
-1. All required variables (`KAWAZ_PLUS_BUCKET`, `UPLOAD_PREFIX`, `THUMBNAIL_PREFIX`, `AVATAR_PREFIX`, `VOD_STORAGE_BUCKET`, `JWT_SECRET`, `ADMIN_PROMOTION_SECRET`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`) are set
+1. All required variables (`KAWAZ_PLUS_BUCKET`, `UPLOAD_PREFIX`, `THUMBNAIL_PREFIX`, `AVATAR_PREFIX`, `VOD_STORAGE_BUCKET`, `JWT_SECRET`, `ADMIN_PROMOTION_SECRET`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `APP_DOMAIN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) are set
 2. Shared client environment variables are valid (MongoDB, AMQP, S3 credentials)
 3. `NODE_ENV` is one of the supported values (`development`, `local`, `test`, `production`)
  
@@ -103,6 +106,10 @@ VOD_STORAGE_BUCKET=kawaz-plus-vod
 
 GMAIL_USER=your-gmail@gmail.com
 GMAIL_APP_PASSWORD=your-app-password
+
+APP_DOMAIN=http://localhost:8080
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 ```
 
 ## Scripts
@@ -167,6 +174,19 @@ Returns `200 OK` if service is running.
 - Body: `{ "username": string }`
 - Success response: `200 { "message": "User \"<username>\" promoted to admin" }`
 - Error responses: `400` (missing header/body), `401` (wrong secret), `404` (user not found)
+
+### `GET /auth/google/login`
+
+- Redirects the browser to Google's OAuth consent screen
+- Success response: `302` redirect to `https://accounts.google.com/o/oauth2/v2/auth`
+
+### `GET /auth/google/callback`
+
+- Called by Google after the user authenticates; exchanges the `code` query param for user info
+- If the account is **approved**: `200 { "message": "Login successful" }` + sets `kawaz-token` HttpOnly cookie
+- If the user is **new or pending**: `202 { "message": "Signup finished. Your account is awaiting admin approval" }`
+- Error responses: `400` (missing code), `401` (Google auth failed or account denied), `409` (Google display name already taken as a username — sign up manually instead)
+- Note: new Google users have a random placeholder password and cannot log in via `POST /auth/login`
 
 ### `GET /admin/pending`
 
@@ -701,6 +721,10 @@ VOD_STORAGE_BUCKET=kawaz-prod-vod
 
 GMAIL_USER=your-gmail@gmail.com
 GMAIL_APP_PASSWORD=your-app-password
+
+APP_DOMAIN=https://kawazplus.com
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 ```
 
 ### Build and start

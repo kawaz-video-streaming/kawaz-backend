@@ -20,7 +20,7 @@ const parseCookies = (req: express.Request, _res: express.Response, next: expres
 };
 
 describe('POST /upload/initiate and POST /upload/complete routes', () => {
-    const AUTH_CONFIG = { jwtSecret: 'media-test-secret', adminPromotionSecret: 'admin-secret' };
+    const AUTH_CONFIG = { jwtSecret: 'media-test-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
 
     let app: Application;
     let mediaDal: { createMedia: jest.Mock; getPendingMedia: jest.Mock; updateMedia: jest.Mock; };
@@ -174,7 +174,7 @@ describe('POST /upload/initiate and POST /upload/complete routes', () => {
 });
 
 describe('GET /media/uploading', () => {
-    const AUTH_CONFIG = { jwtSecret: 'uploading-test-secret', adminPromotionSecret: 'admin-secret' };
+    const AUTH_CONFIG = { jwtSecret: 'uploading-test-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
 
     let app: Application;
     let mediaDal: { getAllNoneCompletedMedia: jest.Mock; };
@@ -244,7 +244,7 @@ describe('GET /media/uploading', () => {
 });
 
 describe('GET /media/:id/progress', () => {
-    const AUTH_CONFIG = { jwtSecret: 'progress-test-secret', adminPromotionSecret: 'admin-secret' };
+    const AUTH_CONFIG = { jwtSecret: 'progress-test-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
     const mediaId = '507f1f77bcf86cd799439011';
 
     let app: Application;

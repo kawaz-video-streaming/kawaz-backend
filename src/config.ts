@@ -35,6 +35,9 @@ const environmentVariablesSchema = z.object({
   ADMIN_PROMOTION_SECRET: z.string(),
   GMAIL_USER: z.email(),
   GMAIL_APP_PASSWORD: z.string(),
+  APP_DOMAIN: z.string(),
+  GOOGLE_CLIENT_ID: z.string(),
+  GOOGLE_CLIENT_SECRET: z.string(),
 });
 
 export interface BackendServerConfig extends ServerConfig {
@@ -84,6 +87,9 @@ export const getConfig = (env: {} = {}): SystemConfig => {
       authConfig: {
         jwtSecret: envVars.JWT_SECRET,
         adminPromotionSecret: envVars.ADMIN_PROMOTION_SECRET,
+        appDomain: envVars.APP_DOMAIN,
+        googleClientId: envVars.GOOGLE_CLIENT_ID,
+        googleClientSecret: envVars.GOOGLE_CLIENT_SECRET
       },
       bucketsConfig,
     },
@@ -99,6 +105,7 @@ export const getConfig = (env: {} = {}): SystemConfig => {
     mailerConfig: {
       gmailUser: envVars.GMAIL_USER,
       gmailAppPassword: envVars.GMAIL_APP_PASSWORD,
+      appDomain: envVars.APP_DOMAIN,
     },
   };
 };

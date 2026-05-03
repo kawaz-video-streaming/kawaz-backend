@@ -1,5 +1,7 @@
 import { Model, MongoClient, Schema } from "@ido_kawaz/mongo-client";
+import z from "zod";
 import { Role, roles, USER_ROLE } from "../../utils/types";
+import { validateSchemaAndReturnValue } from "../../utils/zod";
 
 export const PENDING_STATUS = "pending";
 export const APPROVED_STATUS = "approved";
@@ -34,6 +36,13 @@ export interface User {
 }
 
 export type UserProjection = Pick<User, "name" | "email">;
+
+const userProjectionZodSchema: z.ZodType<UserProjection> = z.object({
+  name: z.string(),
+  email: z.email(),
+});
+
+export const validateUserProjection = validateSchemaAndReturnValue(userProjectionZodSchema);
 
 const profileSchema = new Schema<Profile>({
   name: { type: String, required: true },
