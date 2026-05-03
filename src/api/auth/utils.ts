@@ -10,7 +10,7 @@ export const fetchGoogleAccessToken = async (code: string, googleClientId: strin
             code,
             client_id: googleClientId,
             client_secret: googleClientSecret,
-            redirect_uri: `${appDomain}/auth/google/callback`,
+            redirect_uri: `${appDomain}/api/auth/google/callback`,
             grant_type: "authorization_code",
         }),
     });
