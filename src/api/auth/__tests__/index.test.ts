@@ -408,24 +408,25 @@ describe('GET /auth/google/callback', () => {
         app.use(makeErrorHandler());
     });
 
-    it('returns 200 with cookie for an approved existing user', async () => {
+    it('redirects to /auth/callback with cookie for an approved existing user', async () => {
         userDal.findUserByEmail.mockResolvedValue({ name: 'John Doe', email: 'john@gmail.com', role: 'user', status: 'approved' });
         mockedSign.mockReturnValue('signed-token');
 
         const response = await request(app).get('/auth/google/callback?code=auth-code');
 
-        expect(response.status).toBe(200);
-        expect(response.body).toEqual({ message: 'Login successful' });
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toBe(`${AUTH_CONFIG.appDomain}/auth/callback`);
         expect(response.headers['set-cookie'][0]).toContain('kawaz-token=signed-token');
     });
 
-    it('returns 202 for a new user', async () => {
+    it('redirects to /auth/callback?pending=true for a new user', async () => {
         userDal.findUserByEmail.mockResolvedValue(null);
         mockedBcrypt.hash.mockResolvedValue('placeholder-hash' as never);
 
         const response = await request(app).get('/auth/google/callback?code=auth-code');
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toBe(`${AUTH_CONFIG.appDomain}/auth/callback?pending=true`);
         expect(userDal.createUser).toHaveBeenCalledWith('John Doe', 'placeholder-hash', 'john@gmail.com');
     });
 

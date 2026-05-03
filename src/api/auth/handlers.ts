@@ -68,13 +68,13 @@ export const createAuthHandlers = (
         }
         const token = await logic.googleCallback(code);
         if (token === null) {
-          res.status(StatusCodes.ACCEPTED).json({ message: "Signup finished. Your account is awaiting admin approval" });
+          res.redirect(`${authConfig.appDomain}/auth/callback?pending=true`);
         } else {
-          res.status(StatusCodes.OK).cookie("kawaz-token", token, {
+          res.cookie("kawaz-token", token, {
             httpOnly: true,
             sameSite: "strict",
             maxAge: 2 * 24 * 60 * 60 * 1000
-          }).json({ message: "Login successful" });
+          }).redirect(`${authConfig.appDomain}/auth/callback`);
         }
       },
     ),
