@@ -50,7 +50,7 @@ export const createAuthHandlers = (
       async (_req: Request, res: Response) => {
         const params = new URLSearchParams({
           client_id: authConfig.googleClientId,
-          redirect_uri: `${authConfig.appDomain}/auth/google/callback`,
+          redirect_uri: `${authConfig.appDomain}/api/auth/google/callback`,
           response_type: "code",
           scope: "openid email profile",
         });
