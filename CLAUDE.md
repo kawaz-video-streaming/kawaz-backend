@@ -68,6 +68,8 @@ Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
 |---|---|---|---|
 | `POST` | `/auth/signup` | No | Register a new user (requires email); returns 202, account awaits admin approval |
 | `POST` | `/auth/login` | No | Login; sets `kawaz-token` HttpOnly cookie (maxAge: 2 days). Blocked if status is `pending` or `denied` |
+| `GET` | `/auth/google/login` | No | Redirect browser to Google OAuth consent screen |
+| `GET` | `/auth/google/callback` | No | Google OAuth callback — exchanges code, finds/creates user; sets cookie on approval or returns 202 if new/pending. New users require admin approval same as regular signup. Throws 409 if Google display name is already taken as a username |
 | `POST` | `/auth/promote` | No (x-admin-secret header) | Promote a user to admin role |
 | `POST` | `/auth/forgot-password` | No | Request password reset; emails raw token if email is registered. Always returns 200 (no email enumeration) |
 | `POST` | `/auth/reset-password` | No | Reset password using a valid reset token; token is SHA-256 hashed before DB lookup; clears reset request on success |
@@ -231,6 +233,9 @@ Service-specific env vars validated in `src/config.ts`:
 | `ADMIN_PROMOTION_SECRET` | Yes | Secret required in `x-admin-secret` header to promote a user to admin |
 | `GMAIL_USER` | Yes | Gmail address used as the Mailer sender/recipient for approval request emails |
 | `GMAIL_APP_PASSWORD` | Yes | Gmail app password for SMTP authentication in the Mailer service |
+| `APP_DOMAIN` | Yes | Public base URL of the app (e.g. `https://kawazplus.com`); used in OAuth redirect URIs and mailer links |
+| `GOOGLE_CLIENT_ID` | Yes | Google OAuth 2.0 client ID |
+| `GOOGLE_CLIENT_SECRET` | Yes | Google OAuth 2.0 client secret |
 
 Additional env vars are consumed by the internal packages (`createServerConfig()`, `createMongoConfig()`, `createAmqpConfig()`, `createStorageConfig()`) — refer to each package's documentation for their required variables.
 

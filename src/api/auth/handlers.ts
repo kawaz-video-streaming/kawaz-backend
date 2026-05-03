@@ -30,7 +30,7 @@ export const createAuthHandlers = (
       async (req: Request, res: Response) => {
         const { username, password, email } = validateAuthSignupRequest(req);
         await logic.signUp(username, password, email);
-        res.status(StatusCodes.ACCEPTED).json({ message: "signup finished. Your account is awaiting admin approval" });
+        res.status(StatusCodes.ACCEPTED).json({ message: "Signup finished. Your account is awaiting admin approval" });
       },
     ),
     login: requestHandlerDecorator(
@@ -43,6 +43,39 @@ export const createAuthHandlers = (
           sameSite: "strict",
           maxAge: 2 * 24 * 60 * 60 * 1000
         }).json({ message: "Login successful" });
+      },
+    ),
+    googleLogin: requestHandlerDecorator(
+      "google login",
+      async (_req: Request, res: Response) => {
+        const params = new URLSearchParams({
+          client_id: authConfig.googleClientId,
+          redirect_uri: `${authConfig.appDomain}/auth/google/callback`,
+          response_type: "code",
+          scope: "openid email profile",
+        });
+        const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+        res.redirect(redirectUrl);
+      },
+    ),
+    googleCallback: requestHandlerDecorator(
+      "google callback",
+      async (req: Request, res: Response) => {
+        const code = req.query.code;
+        if (typeof code !== "string") {
+          res.status(StatusCodes.BAD_REQUEST).json({ message: "Invalid code" });
+          return;
+        }
+        const token = await logic.googleCallback(code);
+        if (token === null) {
+          res.status(StatusCodes.ACCEPTED).json({ message: "Signup finished. Your account is awaiting admin approval" });
+        } else {
+          res.status(StatusCodes.OK).cookie("kawaz-token", token, {
+            httpOnly: true,
+            sameSite: "strict",
+            maxAge: 2 * 24 * 60 * 60 * 1000
+          }).json({ message: "Login successful" });
+        }
       },
     ),
     promoteAdmin: requestHandlerDecorator(

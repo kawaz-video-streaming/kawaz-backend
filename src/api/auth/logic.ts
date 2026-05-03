@@ -8,6 +8,7 @@ import { APPROVED_STATUS } from "../../dal/user/model";
 import { Mailer } from "../../services/mailer";
 import { Role, USER_ROLE } from "../../utils/types";
 import { AuthConfig, TokenPayload } from "./types";
+import { fetchGoogleAccessToken, fetchGoogleUserInfo } from "./utils";
 
 const createUserTokenPayload = (
   username: string,
@@ -15,7 +16,7 @@ const createUserTokenPayload = (
 ): TokenPayload => ({ username, role });
 
 export const createAuthLogic = (
-  { jwtSecret, adminPromotionSecret }: AuthConfig,
+  { jwtSecret, adminPromotionSecret, googleClientId, googleClientSecret, appDomain }: AuthConfig,
   mailer: Mailer,
   userDal: UserDal,
 ) => ({
@@ -41,6 +42,32 @@ export const createAuthLogic = (
       { expiresIn: "2d" },
     );
     return token;
+  },
+
+  googleCallback: async (code: string): Promise<string | null> => {
+    const accessToken = await fetchGoogleAccessToken(code, googleClientId, googleClientSecret, appDomain);
+    const { name, email } = await fetchGoogleUserInfo(accessToken);
+    const existingUser = await userDal.findUserByEmail(email);
+    if (isNotNil(existingUser)) {
+      if (existingUser.status !== APPROVED_STATUS) {
+        throw new UnauthorizedError("Your account is awaiting admin approval");
+      } else {
+        const token = sign(
+          createUserTokenPayload(existingUser.name, existingUser.role),
+          jwtSecret,
+          { expiresIn: "2d" },
+        );
+        return token;
+      }
+    } else {
+      if (await userDal.verifyUser(name)) {
+        throw new ConflictError("An account with this Google display name already exists. Please sign up manually with a different username.");
+      }
+      const placeholderPasswordHash = await bycrpt.hash(randomBytes(32).toString("hex"), 12);
+      await userDal.createUser(name, placeholderPasswordHash, email);
+      await mailer.sendApprovalRequestEmail(name, email);
+      return null;
+    }
   },
 
   promoteAdmin: async (secret: string, username: string) => {

@@ -17,6 +17,9 @@ export class UserDal extends Dal<User> {
   findUser = (name: string): Promise<User | null> =>
     this.model.findOne({ name }).lean<User>().exec();
 
+  findUserByEmail = (email: string): Promise<User | null> =>
+    this.model.findOne({ email }).lean<User>().exec();
+
   verifyUser = async (name: string): Promise<boolean> =>
     isNotNil(await this.model.exists({ name }));
 

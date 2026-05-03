@@ -9,11 +9,22 @@ import { createAuthRouter } from '../index';
 
 jest.mock('bcrypt');
 jest.mock('jsonwebtoken');
+jest.mock('../utils');
 
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 const mockedSign = jsonwebtoken.sign as jest.Mock;
 
-const AUTH_CONFIG = { jwtSecret: 'test-secret', adminPromotionSecret: 'test-admin-secret' };
+import { fetchGoogleAccessToken, fetchGoogleUserInfo } from '../utils';
+const mockedFetchGoogleAccessToken = fetchGoogleAccessToken as jest.Mock;
+const mockedFetchGoogleUserInfo = fetchGoogleUserInfo as jest.Mock;
+
+const AUTH_CONFIG = {
+    jwtSecret: 'test-secret',
+    adminPromotionSecret: 'test-admin-secret',
+    googleClientId: 'test-google-client-id',
+    googleClientSecret: 'test-google-client-secret',
+    appDomain: 'http://localhost:3000',
+};
 
 const makeMailer = (): jest.Mocked<Mailer> =>
     ({
@@ -60,7 +71,7 @@ describe('POST /auth/signup', () => {
             .send({ username: 'ido', password: 'strongpassword123', email: 'ido@example.com' });
 
         expect(response.status).toBe(202);
-        expect(response.body).toEqual({ message: 'signup finished. Your account is awaiting admin approval' });
+        expect(response.body).toEqual({ message: 'Signup finished. Your account is awaiting admin approval' });
         expect(response.headers['set-cookie']).toBeUndefined();
         expect(userDal.createUser).toHaveBeenCalledWith('ido', 'hashed-password', 'ido@example.com');
     });
@@ -352,6 +363,91 @@ describe('POST /auth/reset-password', () => {
         const response = await request(app)
             .post('/auth/reset-password')
             .send({});
+
+        expect(response.status).toBe(400);
+    });
+});
+
+describe('GET /auth/google/login', () => {
+    let app: Application;
+
+    beforeEach(() => {
+        app = express();
+        app.use(express.json());
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, makeMailer(), {} as unknown as UserDal));
+        app.use(makeErrorHandler());
+    });
+
+    it('redirects to Google OAuth consent screen', async () => {
+        const response = await request(app).get('/auth/google/login');
+
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toContain('https://accounts.google.com/o/oauth2/v2/auth');
+        expect(response.headers['location']).toContain('client_id=test-google-client-id');
+        expect(response.headers['location']).toContain('scope=openid+email+profile');
+    });
+});
+
+describe('GET /auth/google/callback', () => {
+    let app: Application;
+    let userDal: { findUserByEmail: jest.Mock; verifyUser: jest.Mock; createUser: jest.Mock };
+
+    beforeEach(() => {
+        mockedFetchGoogleAccessToken.mockResolvedValue('access-token');
+        mockedFetchGoogleUserInfo.mockResolvedValue({ name: 'John Doe', email: 'john@gmail.com' });
+
+        userDal = {
+            findUserByEmail: jest.fn(),
+            verifyUser: jest.fn().mockResolvedValue(false),
+            createUser: jest.fn().mockResolvedValue(undefined),
+        };
+
+        app = express();
+        app.use(express.json());
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, makeMailer(), userDal as unknown as UserDal));
+        app.use(makeErrorHandler());
+    });
+
+    it('returns 200 with cookie for an approved existing user', async () => {
+        userDal.findUserByEmail.mockResolvedValue({ name: 'John Doe', email: 'john@gmail.com', role: 'user', status: 'approved' });
+        mockedSign.mockReturnValue('signed-token');
+
+        const response = await request(app).get('/auth/google/callback?code=auth-code');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ message: 'Login successful' });
+        expect(response.headers['set-cookie'][0]).toContain('kawaz-token=signed-token');
+    });
+
+    it('returns 202 for a new user', async () => {
+        userDal.findUserByEmail.mockResolvedValue(null);
+        mockedBcrypt.hash.mockResolvedValue('placeholder-hash' as never);
+
+        const response = await request(app).get('/auth/google/callback?code=auth-code');
+
+        expect(response.status).toBe(202);
+        expect(userDal.createUser).toHaveBeenCalledWith('John Doe', 'placeholder-hash', 'john@gmail.com');
+    });
+
+    it('returns 401 for a pending existing user', async () => {
+        userDal.findUserByEmail.mockResolvedValue({ name: 'John Doe', email: 'john@gmail.com', role: 'user', status: 'pending' });
+
+        const response = await request(app).get('/auth/google/callback?code=auth-code');
+
+        expect(response.status).toBe(401);
+    });
+
+    it('returns 409 when the Google display name is already taken', async () => {
+        userDal.findUserByEmail.mockResolvedValue(null);
+        userDal.verifyUser.mockResolvedValue(true);
+
+        const response = await request(app).get('/auth/google/callback?code=auth-code');
+
+        expect(response.status).toBe(409);
+    });
+
+    it('returns 400 when code is missing', async () => {
+        const response = await request(app).get('/auth/google/callback');
 
         expect(response.status).toBe(400);
     });

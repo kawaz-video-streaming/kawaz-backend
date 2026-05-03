@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 export interface MailerConfig {
   gmailUser: string;
   gmailAppPassword: string;
+  appDomain: string;
 }
 
 export class Mailer {
@@ -31,7 +32,7 @@ export class Mailer {
         `  Username: ${username}`,
         `  Email:    ${email}`,
         ``,
-        `Review pending users: https://kawazplus.com`,
+        `Review pending users: ${this.config.appDomain}`,
       ].join("\n"),
     });
   };
@@ -44,7 +45,7 @@ export class Mailer {
       text: [
         `Hi ${username},`,
         ``,
-        `Your account has been approved. You can now log in at https://kawazplus.com`,
+        `Your account has been approved. You can now log in at ${this.config.appDomain}`,
         ``,
         `Welcome aboard!`,
       ].join("\n"),
@@ -74,7 +75,7 @@ export class Mailer {
         `Hi,`,
         ``,
         `You requested a password reset. You can reset your password at the following link:`,
-        ` https://kawazplus.com/reset-password?token=${token}`,
+        ` ${this.config.appDomain}/reset-password?token=${token}`,
         ``,
         `If you did not request this, please ignore this email.`,
       ].join("\n"),

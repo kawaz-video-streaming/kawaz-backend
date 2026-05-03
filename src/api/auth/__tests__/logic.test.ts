@@ -13,13 +13,21 @@ import { USER_ROLE } from "../../../utils/types";
 
 jest.mock("bcrypt");
 jest.mock("jsonwebtoken");
+jest.mock("../utils");
 
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 const mockedSign = jsonwebtoken.sign as jest.Mock;
 
+import { fetchGoogleAccessToken, fetchGoogleUserInfo } from "../utils";
+const mockedFetchGoogleAccessToken = fetchGoogleAccessToken as jest.Mock;
+const mockedFetchGoogleUserInfo = fetchGoogleUserInfo as jest.Mock;
+
 const AUTH_CONFIG = {
   jwtSecret: "test-secret",
   adminPromotionSecret: "test-admin-secret",
+  googleClientId: "test-google-client-id",
+  googleClientSecret: "test-google-client-secret",
+  appDomain: "http://localhost:3000",
 };
 
 const makeUserDal = (
@@ -29,6 +37,7 @@ const makeUserDal = (
     verifyUser: jest.fn(),
     createUser: jest.fn(),
     findUser: jest.fn(),
+    findUserByEmail: jest.fn(),
     promoteToAdmin: jest.fn(),
     createPasswordResetRequestForUser: jest.fn(),
     findUserByPasswordResetToken: jest.fn(),
@@ -225,6 +234,66 @@ describe("createAuthLogic.forgotPassword", () => {
     expect(rawToken).not.toBe(storedHash);
     expect(storedHash).toHaveLength(64); // SHA-256 hex
     expect(rawToken).toHaveLength(64);   // 32 randomBytes as hex
+  });
+});
+
+describe("createAuthLogic.googleCallback", () => {
+  beforeEach(() => {
+    mockedFetchGoogleAccessToken.mockResolvedValue("access-token");
+    mockedFetchGoogleUserInfo.mockResolvedValue({ name: "John Doe", email: "john@gmail.com" });
+  });
+
+  it("returns token for an approved existing user", async () => {
+    const userDal = makeUserDal({
+      findUserByEmail: jest.fn().mockResolvedValue({ name: "John Doe", email: "john@gmail.com", role: USER_ROLE, status: "approved" }),
+    });
+    mockedSign.mockReturnValue("signed-token");
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+    const token = await logic.googleCallback("auth-code");
+
+    expect(token).toBe("signed-token");
+    expect(mockedSign).toHaveBeenCalledWith({ username: "John Doe", role: USER_ROLE }, AUTH_CONFIG.jwtSecret, { expiresIn: "2d" });
+  });
+
+  it("throws UnauthorizedError for a non-approved existing user", async () => {
+    const userDal = makeUserDal({
+      findUserByEmail: jest.fn().mockResolvedValue({ name: "John Doe", email: "john@gmail.com", role: USER_ROLE, status: "pending" }),
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+
+    await expect(logic.googleCallback("auth-code")).rejects.toThrow(UnauthorizedError);
+    expect(mockedSign).not.toHaveBeenCalled();
+  });
+
+  it("throws ConflictError when the Google display name is already taken", async () => {
+    const userDal = makeUserDal({
+      findUserByEmail: jest.fn().mockResolvedValue(null),
+      verifyUser: jest.fn().mockResolvedValue(true),
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+
+    await expect(logic.googleCallback("auth-code")).rejects.toThrow(ConflictError);
+    expect(userDal.createUser).not.toHaveBeenCalled();
+  });
+
+  it("creates user with a placeholder password and sends approval email for a new user", async () => {
+    const mailer = makeMailer();
+    const userDal = makeUserDal({
+      findUserByEmail: jest.fn().mockResolvedValue(null),
+      verifyUser: jest.fn().mockResolvedValue(false),
+      createUser: jest.fn().mockResolvedValue(undefined),
+    });
+    mockedBcrypt.hash.mockResolvedValue("placeholder-hash" as never);
+
+    const logic = createAuthLogic(AUTH_CONFIG, mailer, userDal);
+    const result = await logic.googleCallback("auth-code");
+
+    expect(result).toBeNull();
+    expect(userDal.createUser).toHaveBeenCalledWith("John Doe", "placeholder-hash", "john@gmail.com");
+    expect(mailer.sendApprovalRequestEmail).toHaveBeenCalledWith("John Doe", "john@gmail.com");
   });
 });
 
