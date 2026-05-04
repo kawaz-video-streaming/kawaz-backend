@@ -5,6 +5,7 @@ import { MediaDal } from '../../../dal/media';
 import { MediaCollectionDal } from '../../../dal/mediaCollection';
 import { MediaGenreDal } from '../../../dal/mediaGenre';
 import { Dals } from '../../../dal/types';
+import { TmdbClient } from '../../../services/tmdbClient';
 import { createMediaLogic } from '../logic';
 import { InitiateUploadRequestBody } from '../types';
 
@@ -37,6 +38,10 @@ const makeMediaCollectionDal = (): jest.Mocked<Pick<MediaCollectionDal, 'getColl
     getCollection: jest.fn().mockResolvedValue(null),
 });
 
+const makeTmdbClient = (): jest.Mocked<Pick<TmdbClient, 'getMovieDetails'>> => ({
+    getMovieDetails: jest.fn(),
+});
+
 describe('createMediaLogic.initiateUpload', () => {
     it('creates media record and returns presigned URLs', async () => {
         const media = { _id: 'm1', fileName: 'video.mp4', title: 'My Video', genres: [], size: 64, status: 'pending' };
@@ -52,7 +57,7 @@ describe('createMediaLogic.initiateUpload', () => {
             mediaDal,
             mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
             mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, {} as any, storageClient);
+        } as unknown as Dals, {} as any, storageClient, makeTmdbClient() as unknown as TmdbClient);
         const result = await logic.initiateUpload(makeBody());
 
         expect(mediaDal.createMedia).toHaveBeenCalledWith({
@@ -86,7 +91,7 @@ describe('createMediaLogic.initiateUpload', () => {
             mediaDal,
             mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
             mediaGenreDal: mediaGenreDal as unknown as MediaGenreDal,
-        } as unknown as Dals, {} as any, storageClient);
+        } as unknown as Dals, {} as any, storageClient, makeTmdbClient() as unknown as TmdbClient);
 
         await expect(logic.initiateUpload(makeBody({ genres: ['NonExistent'] }))).rejects.toBeInstanceOf(BadRequestError);
         expect(mediaDal.createMedia).not.toHaveBeenCalled();
@@ -103,7 +108,7 @@ describe('createMediaLogic.initiateUpload', () => {
             mediaDal,
             mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
             mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, {} as any, storageClient);
+        } as unknown as Dals, {} as any, storageClient, makeTmdbClient() as unknown as TmdbClient);
 
         await expect(logic.initiateUpload(makeBody())).rejects.toThrow('db write failed');
         expect(storageClient.getPutPresignedUrl).not.toHaveBeenCalled();
@@ -123,7 +128,7 @@ describe('createMediaLogic.completeUpload', () => {
             mediaDal,
             mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
             mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, amqpClient, {} as any);
+        } as unknown as Dals, amqpClient, {} as any, makeTmdbClient() as unknown as TmdbClient);
         await logic.completeUpload('m1');
 
         expect(mediaDal.getPendingMedia).toHaveBeenCalledWith('m1');
@@ -144,7 +149,7 @@ describe('createMediaLogic.completeUpload', () => {
             mediaDal,
             mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
             mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, amqpClient, {} as any);
+        } as unknown as Dals, amqpClient, {} as any, makeTmdbClient() as unknown as TmdbClient);
 
         await expect(logic.completeUpload('m-missing')).rejects.toThrow(NotFoundError);
         expect(amqpClient.publish).not.toHaveBeenCalled();
@@ -162,9 +167,56 @@ describe('createMediaLogic.completeUpload', () => {
             mediaDal,
             mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
             mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, amqpClient, {} as any);
+        } as unknown as Dals, amqpClient, {} as any, makeTmdbClient() as unknown as TmdbClient);
 
         await expect(logic.completeUpload('m1')).rejects.toThrow('amqp down');
         expect(mediaDal.updateMedia).not.toHaveBeenCalled();
+    });
+});
+
+describe('createMediaLogic.getMovieMediaTmdbDetails', () => {
+    const movieDetails = {
+        id: 27205,
+        title: 'Inception',
+        overview: 'A thief who steals corporate secrets.',
+        release_date: '2010-07-16',
+        poster_url: 'https://image.tmdb.org/t/p/original/poster.jpg',
+        backdrop_url: null,
+        genres: [{ id: 28, name: 'Action' }],
+        vote_average: 8.4,
+        vote_count: 35000,
+        runtime: 148,
+        tagline: 'Your mind is the scene of the crime.',
+        imdb_id: 'tt1375666',
+        belongs_to_collection: null,
+    };
+
+    it('returns movie details from tmdbClient', async () => {
+        const tmdbClient = makeTmdbClient();
+        tmdbClient.getMovieDetails.mockResolvedValue(movieDetails as any);
+
+        const logic = createMediaLogic(makeConfig(), {
+            mediaDal: {} as unknown as MediaDal,
+            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
+            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
+        } as unknown as Dals, {} as any, {} as any, tmdbClient as unknown as TmdbClient);
+
+        const result = await logic.getMovieMediaTmdbDetails('Inception', 2010);
+
+        expect(tmdbClient.getMovieDetails).toHaveBeenCalledWith('Inception', 2010);
+        expect(result).toEqual(movieDetails);
+    });
+
+    it('propagates NotFoundError from tmdbClient', async () => {
+        const tmdbClient = makeTmdbClient();
+        tmdbClient.getMovieDetails.mockRejectedValue(new NotFoundError('No movie found on TMDB'));
+
+        const logic = createMediaLogic(makeConfig(), {
+            mediaDal: {} as unknown as MediaDal,
+            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
+            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
+        } as unknown as Dals, {} as any, {} as any, tmdbClient as unknown as TmdbClient);
+
+        await expect(logic.getMovieMediaTmdbDetails('Unknown', 1900)).rejects.toThrow(NotFoundError);
     });
 });

@@ -10,21 +10,25 @@ import { validateRequestWithId } from "../../utils/zod";
 import { createMediaLogic } from "./logic";
 import {
   validateCompleteUploadRequest,
+  validateGetMovieTmdbDetailsRequest,
   validateInitiateUploadRequest,
   validateMediaUpdateRequest,
 } from "./types";
+import { TmdbClient } from "../../services/tmdbClient";
 
 export const createMediaHandlers = (
   bucketsConfig: BucketsConfig,
   dals: Dals,
   amqpClient: AmqpClient,
   storageClient: StorageClient,
+  tmdbClient: TmdbClient
 ) => {
   const logic = createMediaLogic(
     bucketsConfig,
     dals,
     amqpClient,
     storageClient,
+    tmdbClient
   );
   return {
     getAllMedia: requestHandlerDecorator(
@@ -93,6 +97,14 @@ export const createMediaHandlers = (
           throw new NotFoundError("Media not found");
         }
         res.status(StatusCodes.OK).json(media);
+      },
+    ),
+    getMovieMediaTmdbDetails: requestHandlerDecorator(
+      "get media movie info details",
+      async (req: Request, res: Response) => {
+        const { title, year } = validateGetMovieTmdbDetailsRequest(req);
+        const details = await logic.getMovieMediaTmdbDetails(title, year);
+        res.status(StatusCodes.OK).json(details);
       },
     ),
     getMediaUploadProgress: requestHandlerDecorator(

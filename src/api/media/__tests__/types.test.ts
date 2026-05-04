@@ -1,4 +1,4 @@
-import { validateInitiateUploadRequest, validateCompleteUploadRequest } from '../types';
+import { validateInitiateUploadRequest, validateCompleteUploadRequest, validateGetMovieTmdbDetailsRequest } from '../types';
 
 describe('validateInitiateUploadRequest', () => {
     const makeReq = (overrides: Record<string, unknown> = {}) => ({
@@ -59,5 +59,33 @@ describe('validateCompleteUploadRequest', () => {
 
     it('throws when mediaId is empty string', () => {
         expect(() => validateCompleteUploadRequest({ body: { mediaId: '' } } as any)).toThrow();
+    });
+});
+
+describe('validateGetMovieTmdbDetailsRequest', () => {
+    it('returns parsed query for valid params', () => {
+        const result = validateGetMovieTmdbDetailsRequest({ query: { title: 'Breaking Bad', year: '2008' } } as any);
+        expect(result).toEqual({ title: 'Breaking Bad', year: 2008 });
+    });
+
+    it('coerces year string to number', () => {
+        const result = validateGetMovieTmdbDetailsRequest({ query: { title: 'Inception', year: '2010' } } as any);
+        expect(result.year).toBe(2010);
+    });
+
+    it('throws when title is missing', () => {
+        expect(() => validateGetMovieTmdbDetailsRequest({ query: { year: '2010' } } as any)).toThrow();
+    });
+
+    it('throws when title is empty', () => {
+        expect(() => validateGetMovieTmdbDetailsRequest({ query: { title: '', year: '2010' } } as any)).toThrow();
+    });
+
+    it('throws when year is missing', () => {
+        expect(() => validateGetMovieTmdbDetailsRequest({ query: { title: 'Inception' } } as any)).toThrow();
+    });
+
+    it('throws when year is not a positive integer', () => {
+        expect(() => validateGetMovieTmdbDetailsRequest({ query: { title: 'Inception', year: '-1' } } as any)).toThrow();
     });
 });

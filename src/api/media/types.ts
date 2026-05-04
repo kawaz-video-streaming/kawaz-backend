@@ -98,3 +98,15 @@ const mediaUpdateRequestWithIdSchema: z.ZodType<mediaUpdateRequestWithId> =
     requestWithIdParamZodSchema.extend(mediaUpdateRawSchema.shape).transform(({ params, files, body }) => ({ params, body, thumbnail: files.thumbnail[0] }));
 
 export const validateMediaUpdateRequest = validateRequest(mediaUpdateRequestWithIdSchema);
+
+// --- TMDB details query ---
+
+export interface TmdbMovieDetailsQuery {
+    title: string;
+    year: number;
+}
+
+export const validateGetMovieTmdbDetailsRequest = validateRequest(
+    z.object({ query: z.object({ title: z.string().min(1), year: z.coerce.number().int().positive() }) })
+     .transform(({ query }) => query as TmdbMovieDetailsQuery)
+);

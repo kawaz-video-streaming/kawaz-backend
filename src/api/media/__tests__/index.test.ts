@@ -1,11 +1,12 @@
 import { AmqpClient } from '@ido_kawaz/amqp-client';
 import type { Application } from '@ido_kawaz/server-framework';
-import { ApiError } from '@ido_kawaz/server-framework';
+import { ApiError, NotFoundError } from '@ido_kawaz/server-framework';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import { UserDal } from '../../../dal/user';
 import { Dals } from '../../../dal/types';
+import { TmdbClient } from '../../../services/tmdbClient';
 import { createAuthMiddleware } from '../../middleware';
 import { createMediaRouter } from '../index';
 
@@ -71,7 +72,7 @@ describe('POST /upload/initiate and POST /upload/complete routes', () => {
         app.use('/media', createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'upload-bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, amqpClient as unknown as AmqpClient, storageClient as any));
+        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, amqpClient as unknown as AmqpClient, storageClient as any, { getMovieDetails: jest.fn() } as unknown as TmdbClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -188,7 +189,7 @@ describe('GET /media/uploading', () => {
         app.use('/media', createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, {} as unknown as AmqpClient, {} as any));
+        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, {} as unknown as AmqpClient, {} as any, { getMovieDetails: jest.fn() } as unknown as TmdbClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -269,7 +270,7 @@ describe('GET /media/:id/progress', () => {
         app.use('/media', createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, {} as unknown as AmqpClient, {} as any));
+        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, {} as unknown as AmqpClient, {} as any, { getMovieDetails: jest.fn() } as unknown as TmdbClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -323,6 +324,107 @@ describe('GET /media/:id/progress', () => {
 
     it('returns 401 when not authenticated', async () => {
         const response = await request(app).get(`/media/${mediaId}/progress`);
+
+        expect(response.status).toBe(401);
+    });
+});
+
+describe('GET /media/tmdb/movie', () => {
+    const AUTH_CONFIG = { jwtSecret: 'tmdb-test-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+
+    let app: Application;
+    let tmdbClient: { getMovieDetails: jest.Mock };
+    let userDal: { findUser: jest.Mock };
+    let adminToken: string;
+
+    const movieDetails = {
+        id: 27205,
+        title: 'Inception',
+        overview: 'A thief who steals corporate secrets.',
+        release_date: '2010-07-16',
+        poster_url: 'https://image.tmdb.org/t/p/original/poster.jpg',
+        backdrop_url: null,
+        genres: [{ id: 878, name: 'Science Fiction' }],
+        vote_average: 8.4,
+        vote_count: 35000,
+        runtime: 148,
+        tagline: 'Your mind is the scene of the crime.',
+        imdb_id: 'tt1375666',
+        belongs_to_collection: null,
+    };
+
+    beforeEach(() => {
+        tmdbClient = { getMovieDetails: jest.fn().mockResolvedValue(movieDetails) };
+        userDal = { findUser: jest.fn().mockResolvedValue({ name: 'admin', password: 'hash', role: 'admin' }) };
+        adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
+
+        app = express();
+        app.use(parseCookies);
+        app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use('/media', createMediaRouter({
+            kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
+            vod: { vodStorageBucket: 'vod-bucket' },
+        }, { mediaDal: {}, mediaCollectionDal: {}, mediaGenreDal: {} } as unknown as Dals, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
+        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+            if (error instanceof ApiError) {
+                res.status(error.statusCode).json({ message: error.message });
+                return;
+            }
+            const message = error instanceof Error ? error.message : 'Internal server error';
+            res.status(500).json({ message });
+        });
+    });
+
+    it('returns 200 with movie details for valid title and year', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/movie?title=Inception&year=2010')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(movieDetails);
+        expect(tmdbClient.getMovieDetails).toHaveBeenCalledWith('Inception', 2010);
+    });
+
+    it('returns 400 when title is missing', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/movie?year=2010')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(400);
+        expect(tmdbClient.getMovieDetails).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when year is missing', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/movie?title=Inception')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(400);
+        expect(tmdbClient.getMovieDetails).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when tmdbClient throws NotFoundError', async () => {
+        tmdbClient.getMovieDetails.mockRejectedValueOnce(new NotFoundError('No movie found'));
+
+        const response = await request(app)
+            .get('/media/tmdb/movie?title=Unknown&year=1900')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(404);
+    });
+
+    it('returns 401 when not authenticated', async () => {
+        const response = await request(app).get('/media/tmdb/movie?title=Inception&year=2010');
+        expect(response.status).toBe(401);
+    });
+
+    it('returns 403 for non-admin users', async () => {
+        userDal.findUser.mockResolvedValueOnce({ name: 'user', password: 'hash', role: 'user' });
+        const userToken = jwt.sign({ username: 'user', role: 'user' }, AUTH_CONFIG.jwtSecret);
+
+        const response = await request(app)
+            .get('/media/tmdb/movie?title=Inception&year=2010')
+            .set('Cookie', `kawaz-token=${userToken}`);
 
         expect(response.status).toBe(401);
     });

@@ -6,9 +6,10 @@ import { Dals } from "../../dal/types";
 import { BucketsConfig } from "../../utils/types";
 import { requireAdmin } from "../middleware";
 import { createMediaHandlers } from "./handlers";
+import { TmdbClient } from "../../services/tmdbClient";
 
-export const createMediaRouter = (bucketsConfig: BucketsConfig, dals: Dals, amqpClient: AmqpClient, storageClient: StorageClient) => {
-  const mediaHandlers = createMediaHandlers(bucketsConfig, dals, amqpClient, storageClient);
+export const createMediaRouter = (bucketsConfig: BucketsConfig, dals: Dals, amqpClient: AmqpClient, storageClient: StorageClient, tmdbClient: TmdbClient) => {
+  const mediaHandlers = createMediaHandlers(bucketsConfig, dals, amqpClient, storageClient, tmdbClient);
   const router = Router();
   const upload = multer({ storage: multer.diskStorage({ destination: './tmp' }) });
 
@@ -245,6 +246,43 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, dals: Dals, amqp
    *         description: Internal server error
    */
   router.delete("/:id", requireAdmin, mediaHandlers.deleteMedia);
+
+  /**
+   * @openapi
+   * /media/tmdb/movie:
+   *   get:
+   *     summary: Get movie details from TMDB
+   *     description: Fetches movie metadata from TMDB by title and release year
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: title
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Movie title
+   *       - in: query
+   *         name: year
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: Release year
+   *     responses:
+   *       200:
+   *         description: TMDB movie details
+   *       400:
+   *         description: Missing or invalid query parameters
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       404:
+   *         description: Movie not found on TMDB
+   */
+  router.get("/tmdb/movie", requireAdmin, mediaHandlers.getMovieMediaTmdbDetails);
 
   /**
   * @openapi
