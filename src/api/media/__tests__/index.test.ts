@@ -1,11 +1,12 @@
 import { AmqpClient } from '@ido_kawaz/amqp-client';
 import type { Application } from '@ido_kawaz/server-framework';
-import { ApiError } from '@ido_kawaz/server-framework';
+import { ApiError, NotFoundError } from '@ido_kawaz/server-framework';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import { UserDal } from '../../../dal/user';
 import { Dals } from '../../../dal/types';
+import { TmdbClient } from '../../../services/tmdbClient';
 import { createAuthMiddleware } from '../../middleware';
 import { createMediaRouter } from '../index';
 
@@ -71,7 +72,7 @@ describe('POST /upload/initiate and POST /upload/complete routes', () => {
         app.use('/media', createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'upload-bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, amqpClient as unknown as AmqpClient, storageClient as any));
+        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, amqpClient as unknown as AmqpClient, storageClient as any, { getMovieDetails: jest.fn() } as unknown as TmdbClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -188,7 +189,7 @@ describe('GET /media/uploading', () => {
         app.use('/media', createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, {} as unknown as AmqpClient, {} as any));
+        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, {} as unknown as AmqpClient, {} as any, { getMovieDetails: jest.fn() } as unknown as TmdbClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -269,7 +270,7 @@ describe('GET /media/:id/progress', () => {
         app.use('/media', createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, {} as unknown as AmqpClient, {} as any));
+        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, {} as unknown as AmqpClient, {} as any, { getMovieDetails: jest.fn() } as unknown as TmdbClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -324,6 +325,390 @@ describe('GET /media/:id/progress', () => {
     it('returns 401 when not authenticated', async () => {
         const response = await request(app).get(`/media/${mediaId}/progress`);
 
+        expect(response.status).toBe(401);
+    });
+});
+
+describe('GET /media/tmdb/movie', () => {
+    const AUTH_CONFIG = { jwtSecret: 'tmdb-test-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+
+    let app: Application;
+    let tmdbClient: { getMovieDetails: jest.Mock };
+    let userDal: { findUser: jest.Mock };
+    let adminToken: string;
+
+    const movieDetails = {
+        id: 27205,
+        title: 'Inception',
+        overview: 'A thief who steals corporate secrets.',
+        release_date: '2010-07-16',
+        poster_url: 'https://image.tmdb.org/t/p/original/poster.jpg',
+        backdrop_url: null,
+        genres: [{ id: 878, name: 'Science Fiction' }],
+        vote_average: 8.4,
+        vote_count: 35000,
+        runtime: 148,
+        tagline: 'Your mind is the scene of the crime.',
+        imdb_id: 'tt1375666',
+        belongs_to_collection: null,
+    };
+
+    beforeEach(() => {
+        tmdbClient = { getMovieDetails: jest.fn().mockResolvedValue(movieDetails) };
+        userDal = { findUser: jest.fn().mockResolvedValue({ name: 'admin', password: 'hash', role: 'admin' }) };
+        adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
+
+        app = express();
+        app.use(parseCookies);
+        app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use('/media', createMediaRouter({
+            kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
+            vod: { vodStorageBucket: 'vod-bucket' },
+        }, { mediaDal: {}, mediaCollectionDal: {}, mediaGenreDal: {} } as unknown as Dals, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
+        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+            if (error instanceof ApiError) {
+                res.status(error.statusCode).json({ message: error.message });
+                return;
+            }
+            const message = error instanceof Error ? error.message : 'Internal server error';
+            res.status(500).json({ message });
+        });
+    });
+
+    it('returns 200 with movie details for valid title and year', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/movie?title=Inception&year=2010')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(movieDetails);
+        expect(tmdbClient.getMovieDetails).toHaveBeenCalledWith('Inception', 2010);
+    });
+
+    it('returns 400 when title is missing', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/movie?year=2010')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(400);
+        expect(tmdbClient.getMovieDetails).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when year is missing', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/movie?title=Inception')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(400);
+        expect(tmdbClient.getMovieDetails).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when tmdbClient throws NotFoundError', async () => {
+        tmdbClient.getMovieDetails.mockRejectedValueOnce(new NotFoundError('No movie found'));
+
+        const response = await request(app)
+            .get('/media/tmdb/movie?title=Unknown&year=1900')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(404);
+    });
+
+    it('returns 401 when not authenticated', async () => {
+        const response = await request(app).get('/media/tmdb/movie?title=Inception&year=2010');
+        expect(response.status).toBe(401);
+    });
+
+    it('returns 401 for non-admin users', async () => {
+        userDal.findUser.mockResolvedValueOnce({ name: 'user', password: 'hash', role: 'user' });
+        const userToken = jwt.sign({ username: 'user', role: 'user' }, AUTH_CONFIG.jwtSecret);
+
+        const response = await request(app)
+            .get('/media/tmdb/movie?title=Inception&year=2010')
+            .set('Cookie', `kawaz-token=${userToken}`);
+
+        expect(response.status).toBe(401);
+    });
+});
+
+describe('GET /media/tmdb/collection', () => {
+    const AUTH_CONFIG = { jwtSecret: 'tmdb-collection-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+
+    let app: Application;
+    let tmdbClient: { getMovieDetails: jest.Mock; getCollectionDetails: jest.Mock };
+    let userDal: { findUser: jest.Mock };
+    let adminToken: string;
+
+    const collectionDetails = {
+        id: 263,
+        name: 'The Dark Knight Collection',
+        overview: 'Christopher Nolan\'s dark, gritty portrayal of Bruce Wayne.',
+        poster_url: 'https://image.tmdb.org/t/p/original/poster.jpg',
+        backdrop_url: null,
+        genres: [{ id: 28, name: 'Action' }, { id: 80, name: 'Crime' }],
+    };
+
+    beforeEach(() => {
+        tmdbClient = { getMovieDetails: jest.fn(), getCollectionDetails: jest.fn().mockResolvedValue(collectionDetails) };
+        userDal = { findUser: jest.fn().mockResolvedValue({ name: 'admin', password: 'hash', role: 'admin' }) };
+        adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
+
+        app = express();
+        app.use(parseCookies);
+        app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use('/media', createMediaRouter({
+            kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
+            vod: { vodStorageBucket: 'vod-bucket' },
+        }, { mediaDal: {}, mediaCollectionDal: {}, mediaGenreDal: {} } as unknown as Dals, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
+        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+            if (error instanceof ApiError) {
+                res.status(error.statusCode).json({ message: error.message });
+                return;
+            }
+            const message = error instanceof Error ? error.message : 'Internal server error';
+            res.status(500).json({ message });
+        });
+    });
+
+    it('returns 200 with collection details for valid id', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/collection?id=263')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(collectionDetails);
+        expect(tmdbClient.getCollectionDetails).toHaveBeenCalledWith(263);
+    });
+
+    it('returns 400 when id is missing', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/collection')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(400);
+        expect(tmdbClient.getCollectionDetails).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when id is not a number', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/collection?id=abc')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(400);
+        expect(tmdbClient.getCollectionDetails).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 when not authenticated', async () => {
+        const response = await request(app).get('/media/tmdb/collection?id=263');
+        expect(response.status).toBe(401);
+    });
+});
+
+describe('GET /media/tmdb/poster', () => {
+    const AUTH_CONFIG = { jwtSecret: 'tmdb-poster-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+
+    let app: Application;
+    let userDal: { findUser: jest.Mock };
+    let adminToken: string;
+
+    beforeEach(() => {
+        userDal = { findUser: jest.fn().mockResolvedValue({ name: 'admin', password: 'hash', role: 'admin' }) };
+        adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
+
+        app = express();
+        app.use(parseCookies);
+        app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use('/media', createMediaRouter({
+            kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
+            vod: { vodStorageBucket: 'vod-bucket' },
+        }, { mediaDal: {}, mediaCollectionDal: {}, mediaGenreDal: {} } as unknown as Dals, {} as unknown as AmqpClient, {} as any, { getMovieDetails: jest.fn(), getCollectionDetails: jest.fn() } as unknown as TmdbClient));
+        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+            if (error instanceof ApiError) {
+                res.status(error.statusCode).json({ message: error.message });
+                return;
+            }
+            const message = error instanceof Error ? error.message : 'Internal server error';
+            res.status(500).json({ message });
+        });
+    });
+
+    it('returns 400 when url is missing', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/poster')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(400);
+    });
+
+    it('returns 400 when url is not from image.tmdb.org', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/poster?url=https://evil.com/image.jpg')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(400);
+    });
+
+    it('returns 401 when not authenticated', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/poster?url=https://image.tmdb.org/t/p/original/poster.jpg');
+        expect(response.status).toBe(401);
+    });
+});
+
+describe('GET /media/tmdb/show', () => {
+    const AUTH_CONFIG = { jwtSecret: 'tmdb-show-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+
+    let app: Application;
+    let tmdbClient: { getMovieDetails: jest.Mock; getCollectionDetails: jest.Mock; getShowDetails: jest.Mock; getEpisodeDetails: jest.Mock };
+    let userDal: { findUser: jest.Mock };
+    let adminToken: string;
+
+    const showDetails = {
+        id: 1399,
+        name: 'Game of Thrones',
+        overview: 'Seven noble families fight for control.',
+        first_air_date: '2011-04-17',
+        poster_url: 'https://image.tmdb.org/t/p/original/poster.jpg',
+        backdrop_url: null,
+        genres: [{ id: 10759, name: 'Action & Adventure' }],
+        vote_average: 8.4,
+        vote_count: 22000,
+        number_of_seasons: 8,
+        tagline: 'Winter is coming.',
+    };
+
+    beforeEach(() => {
+        tmdbClient = { getMovieDetails: jest.fn(), getCollectionDetails: jest.fn(), getShowDetails: jest.fn().mockResolvedValue(showDetails), getEpisodeDetails: jest.fn() };
+        userDal = { findUser: jest.fn().mockResolvedValue({ name: 'admin', password: 'hash', role: 'admin' }) };
+        adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
+
+        app = express();
+        app.use(parseCookies);
+        app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use('/media', createMediaRouter({
+            kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
+            vod: { vodStorageBucket: 'vod-bucket' },
+        }, { mediaDal: {}, mediaCollectionDal: {}, mediaGenreDal: {} } as unknown as Dals, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
+        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+            if (error instanceof ApiError) { res.status(error.statusCode).json({ message: error.message }); return; }
+            res.status(500).json({ message: error instanceof Error ? error.message : 'Internal server error' });
+        });
+    });
+
+    it('returns 200 with show details for valid title and year', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/show?title=Game+of+Thrones&year=2011')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(showDetails);
+        expect(tmdbClient.getShowDetails).toHaveBeenCalledWith('Game of Thrones', 2011);
+    });
+
+    it('returns 400 when title is missing', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/show?year=2011')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(400);
+        expect(tmdbClient.getShowDetails).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when year is missing', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/show?title=Game+of+Thrones')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(400);
+        expect(tmdbClient.getShowDetails).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when tmdbClient throws NotFoundError', async () => {
+        tmdbClient.getShowDetails.mockRejectedValueOnce(new NotFoundError('No TV show found'));
+
+        const response = await request(app)
+            .get('/media/tmdb/show?title=Unknown&year=1900')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(404);
+    });
+
+    it('returns 401 when not authenticated', async () => {
+        const response = await request(app).get('/media/tmdb/show?title=Game+of+Thrones&year=2011');
+        expect(response.status).toBe(401);
+    });
+});
+
+describe('GET /media/tmdb/episode', () => {
+    const AUTH_CONFIG = { jwtSecret: 'tmdb-episode-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+
+    let app: Application;
+    let tmdbClient: { getMovieDetails: jest.Mock; getCollectionDetails: jest.Mock; getShowDetails: jest.Mock; getEpisodeDetails: jest.Mock };
+    let userDal: { findUser: jest.Mock };
+    let adminToken: string;
+
+    const episodeDetails = {
+        id: 63056,
+        name: 'Winter Is Coming',
+        overview: 'Jon Arryn, the Hand of the King, is dead.',
+        air_date: '2011-04-17',
+        episode_number: 1,
+        season_number: 1,
+        still_url: 'https://image.tmdb.org/t/p/original/still.jpg',
+        vote_average: 8.1,
+        vote_count: 1200,
+        runtime: 62,
+    };
+
+    beforeEach(() => {
+        tmdbClient = { getMovieDetails: jest.fn(), getCollectionDetails: jest.fn(), getShowDetails: jest.fn(), getEpisodeDetails: jest.fn().mockResolvedValue(episodeDetails) };
+        userDal = { findUser: jest.fn().mockResolvedValue({ name: 'admin', password: 'hash', role: 'admin' }) };
+        adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
+
+        app = express();
+        app.use(parseCookies);
+        app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use('/media', createMediaRouter({
+            kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
+            vod: { vodStorageBucket: 'vod-bucket' },
+        }, { mediaDal: {}, mediaCollectionDal: {}, mediaGenreDal: {} } as unknown as Dals, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
+        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+            if (error instanceof ApiError) { res.status(error.statusCode).json({ message: error.message }); return; }
+            res.status(500).json({ message: error instanceof Error ? error.message : 'Internal server error' });
+        });
+    });
+
+    it('returns 200 with episode details for valid params', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/episode?showTitle=Game+of+Thrones&showYear=2011&seasonNumber=1&episodeNumber=1')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(episodeDetails);
+        expect(tmdbClient.getEpisodeDetails).toHaveBeenCalledWith('Game of Thrones', 2011, 1, 1);
+    });
+
+    it('returns 400 when any required param is missing', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/episode?showTitle=Game+of+Thrones&showYear=2011&seasonNumber=1')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(400);
+        expect(tmdbClient.getEpisodeDetails).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when tmdbClient throws NotFoundError', async () => {
+        tmdbClient.getEpisodeDetails.mockRejectedValueOnce(new NotFoundError('No TV show found'));
+
+        const response = await request(app)
+            .get('/media/tmdb/episode?showTitle=Unknown&showYear=1900&seasonNumber=1&episodeNumber=1')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(404);
+    });
+
+    it('returns 401 when not authenticated', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/episode?showTitle=Game+of+Thrones&showYear=2011&seasonNumber=1&episodeNumber=1');
         expect(response.status).toBe(401);
     });
 });

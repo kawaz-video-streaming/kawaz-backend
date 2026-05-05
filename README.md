@@ -13,6 +13,7 @@ Kawaz Plus media backend service.
 - Exposes media genre endpoints (`GET /mediaGenre`, `GET /mediaGenre/:genreId`, `POST /mediaGenre`, `DELETE /mediaGenre`) — manage the genre taxonomy used by media and collections; deletion blocked when genre is referenced by any media or collection
 - Exposes media CRUD endpoints (`GET /media`, `GET /media/uploading`, `GET /media/:id`, `PUT /media/:id`, `DELETE /media/:id`) — served from MongoDB; `/uploading` returns all non-completed media
 - Exposes presigned-URL based media upload endpoints (`POST /media/upload/initiate`, `POST /media/upload/complete`) — browser uploads directly to S3 using presigned PUT URLs, then calls complete to trigger processing
+- Exposes TMDB metadata lookup endpoint (`GET /media/tmdb/movie?title=&year=`) — admin-only; fetches movie details from The Movie Database API
 - Exposes media collection CRUD endpoints (`/media-collection`) — group media into nestable collections; thumbnail streamed directly
 - Exposes MPEG-DASH streaming endpoints (`/media/stream/:id/output.mpd`, `*.m4s`, `*.vtt`, `thumbnails.jpg`) — all streamed directly from VOD storage with cache headers
 - Persists media metadata and status in MongoDB
@@ -59,6 +60,7 @@ This service validates all environment variables at startup using Zod schemas. M
 - `APP_DOMAIN` - Public base URL of the app (e.g. `https://kawazplus.com`); used in OAuth redirect URIs and mailer links
 - `GOOGLE_CLIENT_ID` - Google OAuth 2.0 client ID
 - `GOOGLE_CLIENT_SECRET` - Google OAuth 2.0 client secret
+- `TMDB_READ_ACCESS_TOKEN` - TMDB API v4 read access token for movie/show/episode metadata lookups
 
 **Optional variables:**
 
@@ -330,6 +332,46 @@ Returns `200 OK` if service is running.
 - Deletion blocked if any media or collection references this genre name
 - Success response: `200 { "message": "Media genre deleted successfully" }`
 - Error responses: `400` (missing name or genre has associated media/collections), `401`, `403`
+
+### `GET /media/tmdb/movie`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Query params: `title` (string, required), `year` (integer, required)
+- Fetches movie metadata from The Movie Database (TMDB) by title and release year
+- Success response: `200 { id, title, overview, release_date, poster_url, backdrop_url, genres, vote_average, vote_count, runtime, tagline, imdb_id, belongs_to_collection }`
+- Error responses: `400` (missing/invalid query params), `401`, `404` (movie not found on TMDB)
+
+### `GET /media/tmdb/collection`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Query params: `id` (integer, required) — TMDB collection ID
+- Fetches collection metadata from TMDB; genres are the intersection of all movies' genre sets
+- Success response: `200 { id, name, overview, poster_url, backdrop_url, genres }`
+- Error responses: `400` (missing/invalid id), `401`
+
+### `GET /media/tmdb/show`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Query params: `title` (string, required), `year` (integer, required)
+- Fetches TV show metadata from TMDB by title and first air year
+- Success response: `200 { id, name, overview, first_air_date, poster_url, backdrop_url, genres, vote_average, vote_count, number_of_seasons, tagline }`
+- Error responses: `400` (missing/invalid query params), `401`, `404` (show not found on TMDB)
+
+### `GET /media/tmdb/episode`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Query params: `showTitle` (string, required), `showYear` (integer, required), `seasonNumber` (integer, required), `episodeNumber` (integer, required)
+- Fetches episode metadata from TMDB by show title, year, season, and episode number
+- Success response: `200 { id, name, overview, air_date, episode_number, season_number, still_url, vote_average, vote_count, runtime }`
+- Error responses: `400` (missing/invalid query params), `401`, `404` (show or episode not found on TMDB)
+
+### `GET /media/tmdb/poster`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Query params: `url` (string, required) — must start with `https://image.tmdb.org/`
+- Proxies a TMDB poster image server-side to avoid browser CORS restrictions; streams the image with `Cache-Control: public, max-age=172800`
+- Success response: `200` image binary (`image/jpeg` or matching content-type)
+- Error responses: `400` (missing or non-TMDB URL), `401`, `404` (image not found)
 
 ### `POST /media/upload/initiate`
 

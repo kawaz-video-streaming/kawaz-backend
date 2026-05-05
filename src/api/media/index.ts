@@ -6,9 +6,10 @@ import { Dals } from "../../dal/types";
 import { BucketsConfig } from "../../utils/types";
 import { requireAdmin } from "../middleware";
 import { createMediaHandlers } from "./handlers";
+import { TmdbClient } from "../../services/tmdbClient";
 
-export const createMediaRouter = (bucketsConfig: BucketsConfig, dals: Dals, amqpClient: AmqpClient, storageClient: StorageClient) => {
-  const mediaHandlers = createMediaHandlers(bucketsConfig, dals, amqpClient, storageClient);
+export const createMediaRouter = (bucketsConfig: BucketsConfig, dals: Dals, amqpClient: AmqpClient, storageClient: StorageClient, tmdbClient: TmdbClient) => {
+  const mediaHandlers = createMediaHandlers(bucketsConfig, dals, amqpClient, storageClient, tmdbClient);
   const router = Router();
   const upload = multer({ storage: multer.diskStorage({ destination: './tmp' }) });
 
@@ -245,6 +246,220 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, dals: Dals, amqp
    *         description: Internal server error
    */
   router.delete("/:id", requireAdmin, mediaHandlers.deleteMedia);
+
+  /**
+   * @openapi
+   * /media/tmdb/movie:
+   *   get:
+   *     summary: Get movie details from TMDB
+   *     description: Fetches movie metadata from TMDB by title and release year
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: title
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Movie title
+   *       - in: query
+   *         name: year
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: Release year
+   *     responses:
+   *       200:
+   *         description: TMDB movie details
+   *       400:
+   *         description: Missing or invalid query parameters
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       404:
+   *         description: Movie not found on TMDB
+   */
+  router.get("/tmdb/movie", requireAdmin, mediaHandlers.getMovieMediaTmdbDetails);
+
+  /**
+   * @openapi
+   * /media/tmdb/collection:
+   *   get:
+   *     summary: Get collection details from TMDB
+   *     description: Fetches collection metadata from TMDB by collection ID. Genres are the intersection of all movies in the collection.
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: TMDB collection ID
+   *     responses:
+   *       200:
+   *         description: TMDB collection details
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 id:
+   *                   type: integer
+   *                 name:
+   *                   type: string
+   *                 overview:
+   *                   type: string
+   *                 poster_url:
+   *                   type: string
+   *                   nullable: true
+   *                 backdrop_url:
+   *                   type: string
+   *                   nullable: true
+   *                 genres:
+   *                   type: array
+   *                   items:
+   *                     type: object
+   *                     properties:
+   *                       id:
+   *                         type: integer
+   *                       name:
+   *                         type: string
+   *       400:
+   *         description: Missing or invalid query parameters
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   */
+  router.get("/tmdb/collection", requireAdmin, mediaHandlers.getCollectionMediaTmdbDetails);
+
+  /**
+   * @openapi
+   * /media/tmdb/show:
+   *   get:
+   *     summary: Get TV show details from TMDB
+   *     description: Fetches TV show metadata from TMDB by title and first air year
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: title
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Show title
+   *       - in: query
+   *         name: year
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: First air year
+   *     responses:
+   *       200:
+   *         description: TMDB show details
+   *       400:
+   *         description: Missing or invalid query parameters
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       404:
+   *         description: Show not found on TMDB
+   */
+  router.get("/tmdb/show", requireAdmin, mediaHandlers.getShowMediaTmdbDetails);
+
+  /**
+   * @openapi
+   * /media/tmdb/episode:
+   *   get:
+   *     summary: Get TV episode details from TMDB
+   *     description: Fetches episode metadata from TMDB by show title, year, season number, and episode number
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: showTitle
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Show title
+   *       - in: query
+   *         name: showYear
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: Show first air year
+   *       - in: query
+   *         name: seasonNumber
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: Season number
+   *       - in: query
+   *         name: episodeNumber
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: Episode number
+   *     responses:
+   *       200:
+   *         description: TMDB episode details
+   *       400:
+   *         description: Missing or invalid query parameters
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       404:
+   *         description: Show or episode not found on TMDB
+   */
+  router.get("/tmdb/episode", requireAdmin, mediaHandlers.getEpisodeMediaTmdbDetails);
+
+  /**
+   * @openapi
+   * /media/tmdb/poster:
+   *   get:
+   *     summary: Proxy a TMDB poster image
+   *     description: Fetches and proxies a TMDB image URL server-side to avoid CORS restrictions on the frontend.
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: url
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Full TMDB image URL (must start with https://image.tmdb.org/)
+   *     responses:
+   *       200:
+   *         description: Image binary data
+   *         content:
+   *           image/jpeg:
+   *             schema:
+   *               type: string
+   *               format: binary
+   *       400:
+   *         description: Missing or invalid URL
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       404:
+   *         description: Image not found on TMDB
+   */
+  router.get("/tmdb/poster", requireAdmin, mediaHandlers.getTmdbPoster);
 
   /**
   * @openapi
