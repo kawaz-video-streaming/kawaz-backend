@@ -89,7 +89,7 @@ jobs:
             --from-literal=GMAIL_APP_PASSWORD="${{ secrets.GMAIL_APP_PASSWORD }}" \
             --from-literal=GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} \
             --from-literal=GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} \
-            --from-literal=TMDB_READ_ACESS_TOKEN=${{ secrets.TMDB_READ_ACESS_TOKEN }} \
+            --from-literal=TMDB_READ_ACCESS_TOKEN=${{ secrets.TMDB_READ_ACCESS_TOKEN }} \
             --namespace kawaz \
             --dry-run=client -o yaml | kubectl apply -f -
 
