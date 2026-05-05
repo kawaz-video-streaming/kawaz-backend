@@ -1,6 +1,6 @@
 import { NotFoundError } from "@ido_kawaz/server-framework";
-import { TmdbCollectionDetails, TmdbEpisodeDetails, TmdbEpisodeDetailsRaw, TmdbMovieDetails, TmdbMovieDetailsRaw, TmdbShowDetails, TmdbShowDetailsRaw, validateTmdbCollectionDetailsRaw, validateTmdbEpisodeDetailsRaw, validateTmdbGenreList, validateTmdbMovieDetailsRaw, validateTmdbSearchMovieResponse, validateTmdbSearchShowResponse, validateTmdbShowDetailsRaw } from "./types";
-import { isNil, isNotNil } from "ramda";
+import { isEmpty, isNil, isNotNil } from "ramda";
+import { TmdbCollectionDetails, TmdbCollectionDetailsRaw, TmdbEpisodeDetails, TmdbEpisodeDetailsRaw, TmdbGenre, TmdbMovieDetails, TmdbMovieDetailsRaw, TmdbShowDetails, TmdbShowDetailsRaw, validateTmdbCollectionDetailsRaw, validateTmdbEpisodeDetailsRaw, validateTmdbGenreList, validateTmdbMovieDetailsRaw, validateTmdbSearchMovieResponse, validateTmdbSearchShowResponse, validateTmdbShowDetailsRaw } from "./types";
 
 export interface TmdbConfig {
     readAccessToken: string;
@@ -34,6 +34,20 @@ export class TmdbClient {
             ...rest,
             poster_url: this.toImageUrl(poster_path),
             backdrop_url: this.toImageUrl(backdrop_path),
+        };
+    }
+
+    private toCollectionDetails = (raw: TmdbCollectionDetailsRaw, allGenres: TmdbGenre[]): TmdbCollectionDetails => {
+        const { poster_path, backdrop_path, parts, ...rest } = raw;
+        const genreIdSets = parts.map(part => new Set(part.genre_ids));
+        const intersectedIds = isEmpty(genreIdSets) ? [] : [...genreIdSets[0]].filter(id => genreIdSets.every(set => set.has(id)));
+        const genreMap = new Map(allGenres.map(g => [g.id, g.name]));
+        const genres = intersectedIds.map((id): TmdbGenre => ({ id, name: genreMap.get(id) ?? '' })).filter(g => g.name !== '');
+        return {
+            ...rest,
+            poster_url: this.toImageUrl(poster_path),
+            backdrop_url: this.toImageUrl(backdrop_path),
+            genres
         };
     }
 
@@ -101,25 +115,7 @@ export class TmdbClient {
         ]);
         const raw = validateTmdbCollectionDetailsRaw(collectionJson);
         const { genres: allGenres } = validateTmdbGenreList(genreListJson);
-
-        const genreIdSets = raw.parts.map(part => new Set(part.genre_ids));
-        const intersectedIds = genreIdSets.length === 0
-            ? []
-            : [...genreIdSets[0]].filter(id => genreIdSets.every(set => set.has(id)));
-
-        const genreMap = new Map(allGenres.map(g => [g.id, g.name]));
-        const genres = intersectedIds
-            .map(id => ({ id, name: genreMap.get(id) ?? '' }))
-            .filter(g => g.name !== '');
-
-        return {
-            id: raw.id,
-            name: raw.name,
-            overview: raw.overview,
-            poster_url: this.toImageUrl(raw.poster_path),
-            backdrop_url: this.toImageUrl(raw.backdrop_path),
-            genres,
-        };
+        return this.toCollectionDetails(raw, allGenres);
     }
 
     getEpisodeDetails = async (showTitle: string, showYear: number, seasonNumber: number, episodeNumber: number): Promise<TmdbEpisodeDetails> => {
