@@ -341,6 +341,38 @@ Returns `200 OK` if service is running.
 - Success response: `200 { id, title, overview, release_date, poster_url, backdrop_url, genres, vote_average, vote_count, runtime, tagline, imdb_id, belongs_to_collection }`
 - Error responses: `400` (missing/invalid query params), `401`, `404` (movie not found on TMDB)
 
+### `GET /media/tmdb/collection`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Query params: `id` (integer, required) — TMDB collection ID
+- Fetches collection metadata from TMDB; genres are the intersection of all movies' genre sets
+- Success response: `200 { id, name, overview, poster_url, backdrop_url, genres }`
+- Error responses: `400` (missing/invalid id), `401`
+
+### `GET /media/tmdb/show`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Query params: `title` (string, required), `year` (integer, required)
+- Fetches TV show metadata from TMDB by title and first air year
+- Success response: `200 { id, name, overview, first_air_date, poster_url, backdrop_url, genres, vote_average, vote_count, number_of_seasons, tagline }`
+- Error responses: `400` (missing/invalid query params), `401`, `404` (show not found on TMDB)
+
+### `GET /media/tmdb/episode`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Query params: `showTitle` (string, required), `showYear` (integer, required), `seasonNumber` (integer, required), `episodeNumber` (integer, required)
+- Fetches episode metadata from TMDB by show title, year, season, and episode number
+- Success response: `200 { id, name, overview, air_date, episode_number, season_number, still_url, vote_average, vote_count, runtime }`
+- Error responses: `400` (missing/invalid query params), `401`, `404` (show or episode not found on TMDB)
+
+### `GET /media/tmdb/poster`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Query params: `url` (string, required) — must start with `https://image.tmdb.org/`
+- Proxies a TMDB poster image server-side to avoid browser CORS restrictions; streams the image with `Cache-Control: public, max-age=172800`
+- Success response: `200` image binary (`image/jpeg` or matching content-type)
+- Error responses: `400` (missing or non-TMDB URL), `401`, `404` (image not found)
+
 ### `POST /media/upload/initiate`
 
 - Requires: `kawaz-token` cookie with **admin role**

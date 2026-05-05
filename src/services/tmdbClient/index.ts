@@ -9,7 +9,7 @@ export interface TmdbConfig {
 export class TmdbClient {
     private baseUrl: string;
     private imageBaseUrl: string;
-    private requestHeaders: {};
+    private requestHeaders: Record<string, string>;
 
     constructor({ readAccessToken }: TmdbConfig) {
         this.baseUrl = "https://api.themoviedb.org/3";
@@ -66,11 +66,14 @@ export class TmdbClient {
         };
     }
 
-    private getRequest = async (endpoint: string, params?: URLSearchParams): Promise<any> => {
+    private getRequest = async (endpoint: string, params?: URLSearchParams): Promise<unknown> => {
         const response = await fetch(`${this.baseUrl}${endpoint}${isNotNil(params) ? `?${params.toString()}` : ''}`, {
             method: "GET",
             headers: this.requestHeaders
         });
+        if (!response.ok) {
+            throw new Error(`TMDB API error: ${response.status} ${response.statusText}`);
+        }
         return response.json();
     }
 
@@ -82,7 +85,7 @@ export class TmdbClient {
         });
         const searchJson = await this.getRequest("/search/movie", searchParams);
         const searchResults = validateTmdbSearchMovieResponse(searchJson);
-        const topResult = searchResults.results.find(movie => movie.vote_count > 10);
+        const topResult = searchResults.results[0];
         if (isNil(topResult)) {
             throw new NotFoundError(`No movie found on TMDB for title "${title}" and year ${year}`);
         }
@@ -99,7 +102,7 @@ export class TmdbClient {
         });
         const searchJson = await this.getRequest("/search/tv", searchParams);
         const searchResults = validateTmdbSearchShowResponse(searchJson);
-        const topResult = searchResults.results.find(show => show.vote_count > 10);
+        const topResult = searchResults.results[0];
         if (isNil(topResult)) {
             throw new NotFoundError(`No TV show found on TMDB for title "${title}" and year ${year}`);
         }
@@ -126,7 +129,7 @@ export class TmdbClient {
         });
         const searchJson = await this.getRequest("/search/tv", searchParams);
         const searchResults = validateTmdbSearchShowResponse(searchJson);
-        const topResult = searchResults.results.find(show => show.vote_count > 10);
+        const topResult = searchResults.results[0];
         if (isNil(topResult)) {
             throw new NotFoundError(`No TV show found on TMDB for title "${showTitle}" and year ${showYear}`);
         }

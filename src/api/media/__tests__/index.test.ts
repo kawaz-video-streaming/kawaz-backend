@@ -418,7 +418,7 @@ describe('GET /media/tmdb/movie', () => {
         expect(response.status).toBe(401);
     });
 
-    it('returns 403 for non-admin users', async () => {
+    it('returns 401 for non-admin users', async () => {
         userDal.findUser.mockResolvedValueOnce({ name: 'user', password: 'hash', role: 'user' });
         const userToken = jwt.sign({ username: 'user', role: 'user' }, AUTH_CONFIG.jwtSecret);
 

@@ -101,14 +101,14 @@ export const validateMediaUpdateRequest = validateRequest(mediaUpdateRequestWith
 
 // --- TMDB details query ---
 
-export interface TmdbMovieDetailsQuery {
+export interface TmdbTitleYearQuery {
     title: string;
     year: number;
 }
 
 export const validateGetMovieTmdbDetailsRequest = validateRequest(
     z.object({ query: z.object({ title: z.string().min(1), year: z.coerce.number().int().positive() }) })
-        .transform(({ query }) => query as TmdbMovieDetailsQuery)
+        .transform(({ query }) => query as TmdbTitleYearQuery)
 );
 
 export const validateGetCollectionTmdbDetailsRequest = validateRequest(
@@ -118,7 +118,7 @@ export const validateGetCollectionTmdbDetailsRequest = validateRequest(
 
 export const validateGetShowTmdbDetailsRequest = validateRequest(
     z.object({ query: z.object({ title: z.string().min(1), year: z.coerce.number().int().positive() }) })
-     .transform(({ query }) => query as TmdbMovieDetailsQuery)
+     .transform(({ query }) => query as TmdbTitleYearQuery)
 );
 
 export const validateGetEpisodeTmdbDetailsRequest = validateRequest(

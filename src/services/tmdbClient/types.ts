@@ -42,7 +42,6 @@ export interface TmdbSearchMovieResult {
     vote_average: number;
     vote_count: number;
     adult: boolean;
-    softcore: boolean;
     video: boolean;
     original_language: string;
 }
@@ -102,7 +101,6 @@ const TmdbMovieZodSchema: z.ZodType<TmdbSearchMovieResult> = z.object({
     vote_average: z.number(),
     vote_count: z.number(),
     adult: z.boolean(),
-    softcore: z.boolean(),
     video: z.boolean(),
     original_language: z.string()
 });
@@ -146,7 +144,6 @@ export interface TmdbSearchShowResult {
     vote_average: number;
     vote_count: number;
     adult: boolean;
-    softcore: boolean;
     origin_country: string[];
     original_language: string;
 }
@@ -199,7 +196,6 @@ const TmdbShowZodSchema: z.ZodType<TmdbSearchShowResult> = z.object({
     vote_average: z.number(),
     vote_count: z.number(),
     adult: z.boolean(),
-    softcore: z.boolean(),
     origin_country: z.array(z.string()),
     original_language: z.string(),
 });
@@ -282,7 +278,7 @@ export interface TmdbEpisodeDetailsRaw {
     id: number;
     name: string;
     overview: string;
-    air_date: string;
+    air_date: string | null;
     episode_number: number;
     season_number: number;
     still_path: string | null;
@@ -295,7 +291,7 @@ export interface TmdbEpisodeDetails {
     id: number;
     name: string;
     overview: string;
-    air_date: string;
+    air_date: string | null;
     episode_number: number;
     season_number: number;
     still_url: string | null;
@@ -308,7 +304,7 @@ const TmdbEpisodeDetailsRawZodSchema: z.ZodType<TmdbEpisodeDetailsRaw> = z.objec
     id: z.number(),
     name: z.string(),
     overview: z.string(),
-    air_date: z.string(),
+    air_date: z.string().nullable(),
     episode_number: z.number(),
     season_number: z.number(),
     still_path: z.string().nullable(),

@@ -1,5 +1,6 @@
 import { AmqpClient } from "@ido_kawaz/amqp-client";
 import { NotFoundError, Request, Response } from "@ido_kawaz/server-framework";
+import { Readable } from "stream";
 import { StorageClient } from "@ido_kawaz/storage-client";
 import { StatusCodes } from "http-status-codes";
 import { isEmpty, isNil } from "ramda";
@@ -140,13 +141,12 @@ export const createMediaHandlers = (
       async (req: Request, res: Response) => {
         const url = validateGetTmdbPosterRequest(req);
         const imageResponse = await fetch(url);
-        if (!imageResponse.ok) {
+        if (!imageResponse.ok || !imageResponse.body) {
           throw new NotFoundError("TMDB poster not found");
         }
         res.setHeader("Content-Type", imageResponse.headers.get("content-type") ?? "image/jpeg");
         res.setHeader("Cache-Control", "public, max-age=172800");
-        const buffer = await imageResponse.arrayBuffer();
-        res.end(Buffer.from(buffer));
+        Readable.fromWeb(imageResponse.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res);
       },
     ),
     getMediaUploadProgress: requestHandlerDecorator(
