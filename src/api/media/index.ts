@@ -341,6 +341,92 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, dals: Dals, amqp
 
   /**
    * @openapi
+   * /media/tmdb/show:
+   *   get:
+   *     summary: Get TV show details from TMDB
+   *     description: Fetches TV show metadata from TMDB by title and first air year
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: title
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Show title
+   *       - in: query
+   *         name: year
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: First air year
+   *     responses:
+   *       200:
+   *         description: TMDB show details
+   *       400:
+   *         description: Missing or invalid query parameters
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       404:
+   *         description: Show not found on TMDB
+   */
+  router.get("/tmdb/show", requireAdmin, mediaHandlers.getShowMediaTmdbDetails);
+
+  /**
+   * @openapi
+   * /media/tmdb/episode:
+   *   get:
+   *     summary: Get TV episode details from TMDB
+   *     description: Fetches episode metadata from TMDB by show title, year, season number, and episode number
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: showTitle
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Show title
+   *       - in: query
+   *         name: showYear
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: Show first air year
+   *       - in: query
+   *         name: seasonNumber
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: Season number
+   *       - in: query
+   *         name: episodeNumber
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: Episode number
+   *     responses:
+   *       200:
+   *         description: TMDB episode details
+   *       400:
+   *         description: Missing or invalid query parameters
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       404:
+   *         description: Show or episode not found on TMDB
+   */
+  router.get("/tmdb/episode", requireAdmin, mediaHandlers.getEpisodeMediaTmdbDetails);
+
+  /**
+   * @openapi
    * /media/tmdb/poster:
    *   get:
    *     summary: Proxy a TMDB poster image

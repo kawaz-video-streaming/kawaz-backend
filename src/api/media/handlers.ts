@@ -11,7 +11,9 @@ import { createMediaLogic } from "./logic";
 import {
   validateCompleteUploadRequest,
   validateGetCollectionTmdbDetailsRequest,
+  validateGetEpisodeTmdbDetailsRequest,
   validateGetMovieTmdbDetailsRequest,
+  validateGetShowTmdbDetailsRequest,
   validateGetTmdbPosterRequest,
   validateInitiateUploadRequest,
   validateMediaUpdateRequest,
@@ -114,6 +116,22 @@ export const createMediaHandlers = (
       async (req: Request, res: Response) => {
         const id = validateGetCollectionTmdbDetailsRequest(req);
         const details = await logic.getCollectionMediaTmdbDetails(id);
+        res.status(StatusCodes.OK).json(details);
+      },
+    ),
+    getShowMediaTmdbDetails: requestHandlerDecorator(
+      "get media show info details",
+      async (req: Request, res: Response) => {
+        const { title, year } = validateGetShowTmdbDetailsRequest(req);
+        const details = await logic.getShowMediaTmdbDetails(title, year);
+        res.status(StatusCodes.OK).json(details);
+      },
+    ),
+    getEpisodeMediaTmdbDetails: requestHandlerDecorator(
+      "get media episode info details",
+      async (req: Request, res: Response) => {
+        const { showTitle, showYear, seasonNumber, episodeNumber } = validateGetEpisodeTmdbDetailsRequest(req);
+        const details = await logic.getEpisodeMediaTmdbDetails(showTitle, showYear, seasonNumber, episodeNumber);
         res.status(StatusCodes.OK).json(details);
       },
     ),

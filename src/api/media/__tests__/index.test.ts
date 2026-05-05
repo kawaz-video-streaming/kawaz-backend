@@ -553,3 +553,162 @@ describe('GET /media/tmdb/poster', () => {
         expect(response.status).toBe(401);
     });
 });
+
+describe('GET /media/tmdb/show', () => {
+    const AUTH_CONFIG = { jwtSecret: 'tmdb-show-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+
+    let app: Application;
+    let tmdbClient: { getMovieDetails: jest.Mock; getCollectionDetails: jest.Mock; getShowDetails: jest.Mock; getEpisodeDetails: jest.Mock };
+    let userDal: { findUser: jest.Mock };
+    let adminToken: string;
+
+    const showDetails = {
+        id: 1399,
+        name: 'Game of Thrones',
+        overview: 'Seven noble families fight for control.',
+        first_air_date: '2011-04-17',
+        poster_url: 'https://image.tmdb.org/t/p/original/poster.jpg',
+        backdrop_url: null,
+        genres: [{ id: 10759, name: 'Action & Adventure' }],
+        vote_average: 8.4,
+        vote_count: 22000,
+        number_of_seasons: 8,
+        tagline: 'Winter is coming.',
+    };
+
+    beforeEach(() => {
+        tmdbClient = { getMovieDetails: jest.fn(), getCollectionDetails: jest.fn(), getShowDetails: jest.fn().mockResolvedValue(showDetails), getEpisodeDetails: jest.fn() };
+        userDal = { findUser: jest.fn().mockResolvedValue({ name: 'admin', password: 'hash', role: 'admin' }) };
+        adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
+
+        app = express();
+        app.use(parseCookies);
+        app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use('/media', createMediaRouter({
+            kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
+            vod: { vodStorageBucket: 'vod-bucket' },
+        }, { mediaDal: {}, mediaCollectionDal: {}, mediaGenreDal: {} } as unknown as Dals, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
+        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+            if (error instanceof ApiError) { res.status(error.statusCode).json({ message: error.message }); return; }
+            res.status(500).json({ message: error instanceof Error ? error.message : 'Internal server error' });
+        });
+    });
+
+    it('returns 200 with show details for valid title and year', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/show?title=Game+of+Thrones&year=2011')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(showDetails);
+        expect(tmdbClient.getShowDetails).toHaveBeenCalledWith('Game of Thrones', 2011);
+    });
+
+    it('returns 400 when title is missing', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/show?year=2011')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(400);
+        expect(tmdbClient.getShowDetails).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when year is missing', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/show?title=Game+of+Thrones')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(400);
+        expect(tmdbClient.getShowDetails).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when tmdbClient throws NotFoundError', async () => {
+        tmdbClient.getShowDetails.mockRejectedValueOnce(new NotFoundError('No TV show found'));
+
+        const response = await request(app)
+            .get('/media/tmdb/show?title=Unknown&year=1900')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(404);
+    });
+
+    it('returns 401 when not authenticated', async () => {
+        const response = await request(app).get('/media/tmdb/show?title=Game+of+Thrones&year=2011');
+        expect(response.status).toBe(401);
+    });
+});
+
+describe('GET /media/tmdb/episode', () => {
+    const AUTH_CONFIG = { jwtSecret: 'tmdb-episode-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+
+    let app: Application;
+    let tmdbClient: { getMovieDetails: jest.Mock; getCollectionDetails: jest.Mock; getShowDetails: jest.Mock; getEpisodeDetails: jest.Mock };
+    let userDal: { findUser: jest.Mock };
+    let adminToken: string;
+
+    const episodeDetails = {
+        id: 63056,
+        name: 'Winter Is Coming',
+        overview: 'Jon Arryn, the Hand of the King, is dead.',
+        air_date: '2011-04-17',
+        episode_number: 1,
+        season_number: 1,
+        still_url: 'https://image.tmdb.org/t/p/original/still.jpg',
+        vote_average: 8.1,
+        vote_count: 1200,
+        runtime: 62,
+    };
+
+    beforeEach(() => {
+        tmdbClient = { getMovieDetails: jest.fn(), getCollectionDetails: jest.fn(), getShowDetails: jest.fn(), getEpisodeDetails: jest.fn().mockResolvedValue(episodeDetails) };
+        userDal = { findUser: jest.fn().mockResolvedValue({ name: 'admin', password: 'hash', role: 'admin' }) };
+        adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
+
+        app = express();
+        app.use(parseCookies);
+        app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use('/media', createMediaRouter({
+            kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
+            vod: { vodStorageBucket: 'vod-bucket' },
+        }, { mediaDal: {}, mediaCollectionDal: {}, mediaGenreDal: {} } as unknown as Dals, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
+        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+            if (error instanceof ApiError) { res.status(error.statusCode).json({ message: error.message }); return; }
+            res.status(500).json({ message: error instanceof Error ? error.message : 'Internal server error' });
+        });
+    });
+
+    it('returns 200 with episode details for valid params', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/episode?showTitle=Game+of+Thrones&showYear=2011&seasonNumber=1&episodeNumber=1')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(episodeDetails);
+        expect(tmdbClient.getEpisodeDetails).toHaveBeenCalledWith('Game of Thrones', 2011, 1, 1);
+    });
+
+    it('returns 400 when any required param is missing', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/episode?showTitle=Game+of+Thrones&showYear=2011&seasonNumber=1')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(400);
+        expect(tmdbClient.getEpisodeDetails).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when tmdbClient throws NotFoundError', async () => {
+        tmdbClient.getEpisodeDetails.mockRejectedValueOnce(new NotFoundError('No TV show found'));
+
+        const response = await request(app)
+            .get('/media/tmdb/episode?showTitle=Unknown&showYear=1900&seasonNumber=1&episodeNumber=1')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(404);
+    });
+
+    it('returns 401 when not authenticated', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/episode?showTitle=Game+of+Thrones&showYear=2011&seasonNumber=1&episodeNumber=1');
+        expect(response.status).toBe(401);
+    });
+});

@@ -38,9 +38,11 @@ const makeMediaCollectionDal = (): jest.Mocked<Pick<MediaCollectionDal, 'getColl
     getCollection: jest.fn().mockResolvedValue(null),
 });
 
-const makeTmdbClient = (): jest.Mocked<Pick<TmdbClient, 'getMovieDetails' | 'getCollectionDetails'>> => ({
+const makeTmdbClient = (): jest.Mocked<Pick<TmdbClient, 'getMovieDetails' | 'getCollectionDetails' | 'getShowDetails' | 'getEpisodeDetails'>> => ({
     getMovieDetails: jest.fn(),
     getCollectionDetails: jest.fn(),
+    getShowDetails: jest.fn(),
+    getEpisodeDetails: jest.fn(),
 });
 
 describe('createMediaLogic.initiateUpload', () => {
@@ -246,5 +248,94 @@ describe('createMediaLogic.getCollectionMediaTmdbDetails', () => {
 
         expect(tmdbClient.getCollectionDetails).toHaveBeenCalledWith(263);
         expect(result).toEqual(collectionDetails);
+    });
+});
+
+describe('createMediaLogic.getShowMediaTmdbDetails', () => {
+    const showDetails = {
+        id: 1399,
+        name: 'Game of Thrones',
+        overview: 'Seven noble families fight for control of Mythical Westeros.',
+        first_air_date: '2011-04-17',
+        poster_url: 'https://image.tmdb.org/t/p/original/poster.jpg',
+        backdrop_url: null,
+        genres: [{ id: 10759, name: 'Action & Adventure' }],
+        vote_average: 8.4,
+        vote_count: 22000,
+        number_of_seasons: 8,
+        tagline: 'Winter is coming.',
+    };
+
+    it('returns show details from tmdbClient', async () => {
+        const tmdbClient = makeTmdbClient();
+        tmdbClient.getShowDetails.mockResolvedValue(showDetails as any);
+
+        const logic = createMediaLogic(makeConfig(), {
+            mediaDal: {} as unknown as MediaDal,
+            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
+            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
+        } as unknown as Dals, {} as any, {} as any, tmdbClient as unknown as TmdbClient);
+
+        const result = await logic.getShowMediaTmdbDetails('Game of Thrones', 2011);
+
+        expect(tmdbClient.getShowDetails).toHaveBeenCalledWith('Game of Thrones', 2011);
+        expect(result).toEqual(showDetails);
+    });
+
+    it('propagates NotFoundError from tmdbClient', async () => {
+        const tmdbClient = makeTmdbClient();
+        tmdbClient.getShowDetails.mockRejectedValue(new NotFoundError('No TV show found on TMDB'));
+
+        const logic = createMediaLogic(makeConfig(), {
+            mediaDal: {} as unknown as MediaDal,
+            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
+            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
+        } as unknown as Dals, {} as any, {} as any, tmdbClient as unknown as TmdbClient);
+
+        await expect(logic.getShowMediaTmdbDetails('Unknown', 1900)).rejects.toThrow(NotFoundError);
+    });
+});
+
+describe('createMediaLogic.getEpisodeMediaTmdbDetails', () => {
+    const episodeDetails = {
+        id: 63056,
+        name: 'Winter Is Coming',
+        overview: 'Jon Arryn, the Hand of the King, is dead.',
+        air_date: '2011-04-17',
+        episode_number: 1,
+        season_number: 1,
+        still_url: 'https://image.tmdb.org/t/p/original/still.jpg',
+        vote_average: 8.1,
+        vote_count: 1200,
+        runtime: 62,
+    };
+
+    it('returns episode details from tmdbClient', async () => {
+        const tmdbClient = makeTmdbClient();
+        tmdbClient.getEpisodeDetails.mockResolvedValue(episodeDetails as any);
+
+        const logic = createMediaLogic(makeConfig(), {
+            mediaDal: {} as unknown as MediaDal,
+            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
+            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
+        } as unknown as Dals, {} as any, {} as any, tmdbClient as unknown as TmdbClient);
+
+        const result = await logic.getEpisodeMediaTmdbDetails('Game of Thrones', 2011, 1, 1);
+
+        expect(tmdbClient.getEpisodeDetails).toHaveBeenCalledWith('Game of Thrones', 2011, 1, 1);
+        expect(result).toEqual(episodeDetails);
+    });
+
+    it('propagates NotFoundError from tmdbClient', async () => {
+        const tmdbClient = makeTmdbClient();
+        tmdbClient.getEpisodeDetails.mockRejectedValue(new NotFoundError('No TV show found on TMDB'));
+
+        const logic = createMediaLogic(makeConfig(), {
+            mediaDal: {} as unknown as MediaDal,
+            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
+            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
+        } as unknown as Dals, {} as any, {} as any, tmdbClient as unknown as TmdbClient);
+
+        await expect(logic.getEpisodeMediaTmdbDetails('Unknown', 1900, 1, 1)).rejects.toThrow(NotFoundError);
     });
 });

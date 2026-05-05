@@ -116,6 +116,20 @@ export const validateGetCollectionTmdbDetailsRequest = validateRequest(
      .transform(({ query }) => query.id)
 );
 
+export const validateGetShowTmdbDetailsRequest = validateRequest(
+    z.object({ query: z.object({ title: z.string().min(1), year: z.coerce.number().int().positive() }) })
+     .transform(({ query }) => query as TmdbMovieDetailsQuery)
+);
+
+export const validateGetEpisodeTmdbDetailsRequest = validateRequest(
+    z.object({ query: z.object({
+        showTitle: z.string().min(1),
+        showYear: z.coerce.number().int().positive(),
+        seasonNumber: z.coerce.number().int().positive(),
+        episodeNumber: z.coerce.number().int().positive(),
+    }) }).transform(({ query }) => query)
+);
+
 export const validateGetTmdbPosterRequest = validateRequest(
     z.object({ query: z.object({ url: z.url().refine(u => u.startsWith('https://image.tmdb.org/'), { message: 'URL must be from image.tmdb.org' }) }) })
         .transform(({ query }) => query.url)
