@@ -10,7 +10,9 @@ import { validateRequestWithId } from "../../utils/zod";
 import { createMediaLogic } from "./logic";
 import {
   validateCompleteUploadRequest,
+  validateGetCollectionTmdbDetailsRequest,
   validateGetMovieTmdbDetailsRequest,
+  validateGetTmdbPosterRequest,
   validateInitiateUploadRequest,
   validateMediaUpdateRequest,
 } from "./types";
@@ -105,6 +107,28 @@ export const createMediaHandlers = (
         const { title, year } = validateGetMovieTmdbDetailsRequest(req);
         const details = await logic.getMovieMediaTmdbDetails(title, year);
         res.status(StatusCodes.OK).json(details);
+      },
+    ),
+    getCollectionMediaTmdbDetails: requestHandlerDecorator(
+      "get media collection info details",
+      async (req: Request, res: Response) => {
+        const id = validateGetCollectionTmdbDetailsRequest(req);
+        const details = await logic.getCollectionMediaTmdbDetails(id);
+        res.status(StatusCodes.OK).json(details);
+      },
+    ),
+    getTmdbPoster: requestHandlerDecorator(
+      "get tmdb poster image",
+      async (req: Request, res: Response) => {
+        const url = validateGetTmdbPosterRequest(req);
+        const imageResponse = await fetch(url);
+        if (!imageResponse.ok) {
+          throw new NotFoundError("TMDB poster not found");
+        }
+        res.setHeader("Content-Type", imageResponse.headers.get("content-type") ?? "image/jpeg");
+        res.setHeader("Cache-Control", "public, max-age=172800");
+        const buffer = await imageResponse.arrayBuffer();
+        res.end(Buffer.from(buffer));
       },
     ),
     getMediaUploadProgress: requestHandlerDecorator(

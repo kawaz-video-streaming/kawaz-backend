@@ -228,6 +228,56 @@ const TmdbShowDetailsRawZodSchema: z.ZodType<TmdbShowDetailsRaw> = z.object({
 export const validateTmdbSearchShowResponse = validateSchemaAndReturnValue(TmdbSearchShowResponseZodSchema);
 export const validateTmdbShowDetailsRaw = validateSchemaAndReturnValue(TmdbShowDetailsRawZodSchema);
 
+// --- Collection details ---
+
+interface TmdbCollectionPart {
+    id: number;
+    genre_ids: number[];
+}
+
+export interface TmdbCollectionDetailsRaw {
+    id: number;
+    name: string;
+    overview: string;
+    poster_path: string | null;
+    backdrop_path: string | null;
+    parts: TmdbCollectionPart[];
+}
+
+export interface TmdbCollectionDetails {
+    id: number;
+    name: string;
+    overview: string;
+    poster_url: string | null;
+    backdrop_url: string | null;
+    genres: TmdbGenre[];
+}
+
+interface TmdbGenreListRaw {
+    genres: TmdbGenre[];
+}
+
+const TmdbCollectionPartZodSchema: z.ZodType<TmdbCollectionPart> = z.object({
+    id: z.number(),
+    genre_ids: z.array(z.number()),
+});
+
+const TmdbCollectionDetailsRawZodSchema: z.ZodType<TmdbCollectionDetailsRaw> = z.object({
+    id: z.number(),
+    name: z.string(),
+    overview: z.string(),
+    poster_path: z.string().nullable(),
+    backdrop_path: z.string().nullable(),
+    parts: z.array(TmdbCollectionPartZodSchema),
+});
+
+const TmdbGenreListRawZodSchema: z.ZodType<TmdbGenreListRaw> = z.object({
+    genres: z.array(TmdbGenreZodSchema),
+});
+
+export const validateTmdbCollectionDetailsRaw = validateSchemaAndReturnValue(TmdbCollectionDetailsRawZodSchema);
+export const validateTmdbGenreList = validateSchemaAndReturnValue(TmdbGenreListRawZodSchema);
+
 export interface TmdbEpisodeDetailsRaw {
     id: number;
     name: string;

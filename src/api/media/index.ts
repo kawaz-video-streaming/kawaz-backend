@@ -285,6 +285,97 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, dals: Dals, amqp
   router.get("/tmdb/movie", requireAdmin, mediaHandlers.getMovieMediaTmdbDetails);
 
   /**
+   * @openapi
+   * /media/tmdb/collection:
+   *   get:
+   *     summary: Get collection details from TMDB
+   *     description: Fetches collection metadata from TMDB by collection ID. Genres are the intersection of all movies in the collection.
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: TMDB collection ID
+   *     responses:
+   *       200:
+   *         description: TMDB collection details
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 id:
+   *                   type: integer
+   *                 name:
+   *                   type: string
+   *                 overview:
+   *                   type: string
+   *                 poster_url:
+   *                   type: string
+   *                   nullable: true
+   *                 backdrop_url:
+   *                   type: string
+   *                   nullable: true
+   *                 genres:
+   *                   type: array
+   *                   items:
+   *                     type: object
+   *                     properties:
+   *                       id:
+   *                         type: integer
+   *                       name:
+   *                         type: string
+   *       400:
+   *         description: Missing or invalid query parameters
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   */
+  router.get("/tmdb/collection", requireAdmin, mediaHandlers.getCollectionMediaTmdbDetails);
+
+  /**
+   * @openapi
+   * /media/tmdb/poster:
+   *   get:
+   *     summary: Proxy a TMDB poster image
+   *     description: Fetches and proxies a TMDB image URL server-side to avoid CORS restrictions on the frontend.
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: url
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Full TMDB image URL (must start with https://image.tmdb.org/)
+   *     responses:
+   *       200:
+   *         description: Image binary data
+   *         content:
+   *           image/jpeg:
+   *             schema:
+   *               type: string
+   *               format: binary
+   *       400:
+   *         description: Missing or invalid URL
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       404:
+   *         description: Image not found on TMDB
+   */
+  router.get("/tmdb/poster", requireAdmin, mediaHandlers.getTmdbPoster);
+
+  /**
   * @openapi
   * /media/{id}:
   *   get:

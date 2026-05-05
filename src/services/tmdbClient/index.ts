@@ -1,5 +1,5 @@
 import { NotFoundError } from "@ido_kawaz/server-framework";
-import { TmdbEpisodeDetails, TmdbEpisodeDetailsRaw, TmdbMovieDetails, TmdbMovieDetailsRaw, TmdbShowDetails, TmdbShowDetailsRaw, validateTmdbEpisodeDetailsRaw, validateTmdbMovieDetailsRaw, validateTmdbSearchMovieResponse, validateTmdbSearchShowResponse, validateTmdbShowDetailsRaw } from "./types";
+import { TmdbCollectionDetails, TmdbEpisodeDetails, TmdbEpisodeDetailsRaw, TmdbMovieDetails, TmdbMovieDetailsRaw, TmdbShowDetails, TmdbShowDetailsRaw, validateTmdbCollectionDetailsRaw, validateTmdbEpisodeDetailsRaw, validateTmdbGenreList, validateTmdbMovieDetailsRaw, validateTmdbSearchMovieResponse, validateTmdbSearchShowResponse, validateTmdbShowDetailsRaw } from "./types";
 import { isNil, isNotNil } from "ramda";
 
 export interface TmdbConfig {
@@ -92,6 +92,34 @@ export class TmdbClient {
         const detailsJson = await this.getRequest(`/tv/${topResult.id}`);
         const rawDetails = validateTmdbShowDetailsRaw(detailsJson);
         return this.toShowDetails(rawDetails);
+    }
+
+    getCollectionDetails = async (id: number): Promise<TmdbCollectionDetails> => {
+        const [collectionJson, genreListJson] = await Promise.all([
+            this.getRequest(`/collection/${id}`),
+            this.getRequest('/genre/movie/list'),
+        ]);
+        const raw = validateTmdbCollectionDetailsRaw(collectionJson);
+        const { genres: allGenres } = validateTmdbGenreList(genreListJson);
+
+        const genreIdSets = raw.parts.map(part => new Set(part.genre_ids));
+        const intersectedIds = genreIdSets.length === 0
+            ? []
+            : [...genreIdSets[0]].filter(id => genreIdSets.every(set => set.has(id)));
+
+        const genreMap = new Map(allGenres.map(g => [g.id, g.name]));
+        const genres = intersectedIds
+            .map(id => ({ id, name: genreMap.get(id) ?? '' }))
+            .filter(g => g.name !== '');
+
+        return {
+            id: raw.id,
+            name: raw.name,
+            overview: raw.overview,
+            poster_url: this.toImageUrl(raw.poster_path),
+            backdrop_url: this.toImageUrl(raw.backdrop_path),
+            genres,
+        };
     }
 
     getEpisodeDetails = async (showTitle: string, showYear: number, seasonNumber: number, episodeNumber: number): Promise<TmdbEpisodeDetails> => {

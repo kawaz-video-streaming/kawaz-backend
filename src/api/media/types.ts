@@ -108,5 +108,15 @@ export interface TmdbMovieDetailsQuery {
 
 export const validateGetMovieTmdbDetailsRequest = validateRequest(
     z.object({ query: z.object({ title: z.string().min(1), year: z.coerce.number().int().positive() }) })
-     .transform(({ query }) => query as TmdbMovieDetailsQuery)
+        .transform(({ query }) => query as TmdbMovieDetailsQuery)
+);
+
+export const validateGetCollectionTmdbDetailsRequest = validateRequest(
+    z.object({ query: z.object({ id: z.coerce.number().int().positive() }) })
+     .transform(({ query }) => query.id)
+);
+
+export const validateGetTmdbPosterRequest = validateRequest(
+    z.object({ query: z.object({ url: z.url().refine(u => u.startsWith('https://image.tmdb.org/'), { message: 'URL must be from image.tmdb.org' }) }) })
+        .transform(({ query }) => query.url)
 );

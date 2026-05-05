@@ -38,8 +38,9 @@ const makeMediaCollectionDal = (): jest.Mocked<Pick<MediaCollectionDal, 'getColl
     getCollection: jest.fn().mockResolvedValue(null),
 });
 
-const makeTmdbClient = (): jest.Mocked<Pick<TmdbClient, 'getMovieDetails'>> => ({
+const makeTmdbClient = (): jest.Mocked<Pick<TmdbClient, 'getMovieDetails' | 'getCollectionDetails'>> => ({
     getMovieDetails: jest.fn(),
+    getCollectionDetails: jest.fn(),
 });
 
 describe('createMediaLogic.initiateUpload', () => {
@@ -218,5 +219,32 @@ describe('createMediaLogic.getMovieMediaTmdbDetails', () => {
         } as unknown as Dals, {} as any, {} as any, tmdbClient as unknown as TmdbClient);
 
         await expect(logic.getMovieMediaTmdbDetails('Unknown', 1900)).rejects.toThrow(NotFoundError);
+    });
+});
+
+describe('createMediaLogic.getCollectionMediaTmdbDetails', () => {
+    const collectionDetails = {
+        id: 263,
+        name: 'The Dark Knight Collection',
+        overview: 'Christopher Nolan\'s dark, gritty portrayal of Bruce Wayne.',
+        poster_url: 'https://image.tmdb.org/t/p/original/poster.jpg',
+        backdrop_url: null,
+        genres: [{ id: 28, name: 'Action' }, { id: 80, name: 'Crime' }],
+    };
+
+    it('returns collection details from tmdbClient', async () => {
+        const tmdbClient = makeTmdbClient();
+        tmdbClient.getCollectionDetails.mockResolvedValue(collectionDetails as any);
+
+        const logic = createMediaLogic(makeConfig(), {
+            mediaDal: {} as unknown as MediaDal,
+            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
+            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
+        } as unknown as Dals, {} as any, {} as any, tmdbClient as unknown as TmdbClient);
+
+        const result = await logic.getCollectionMediaTmdbDetails(263);
+
+        expect(tmdbClient.getCollectionDetails).toHaveBeenCalledWith(263);
+        expect(result).toEqual(collectionDetails);
     });
 });

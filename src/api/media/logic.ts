@@ -69,6 +69,9 @@ export const createMediaLogic = (
   getMovieMediaTmdbDetails: async (title: string, year: number) => {
     return tmdbClient.getMovieDetails(title, year);
   },
+  getCollectionMediaTmdbDetails: async (id: number) => {
+    return tmdbClient.getCollectionDetails(id);
+  },
   getAllMedia: () => mediaDal.getAllMedia(),
   getAllNoneCompletedMedia: () => mediaDal.getAllNoneCompletedMedia(),
   getMedia: (mediaId: string) => mediaDal.getMedia(mediaId),
