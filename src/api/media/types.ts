@@ -98,3 +98,39 @@ const mediaUpdateRequestWithIdSchema: z.ZodType<mediaUpdateRequestWithId> =
     requestWithIdParamZodSchema.extend(mediaUpdateRawSchema.shape).transform(({ params, files, body }) => ({ params, body, thumbnail: files.thumbnail[0] }));
 
 export const validateMediaUpdateRequest = validateRequest(mediaUpdateRequestWithIdSchema);
+
+// --- TMDB details query ---
+
+export interface TmdbTitleYearQuery {
+    title: string;
+    year: number;
+}
+
+export const validateGetMovieTmdbDetailsRequest = validateRequest(
+    z.object({ query: z.object({ title: z.string().min(1), year: z.coerce.number().int().positive() }) })
+        .transform(({ query }) => query as TmdbTitleYearQuery)
+);
+
+export const validateGetCollectionTmdbDetailsRequest = validateRequest(
+    z.object({ query: z.object({ id: z.coerce.number().int().positive() }) })
+     .transform(({ query }) => query.id)
+);
+
+export const validateGetShowTmdbDetailsRequest = validateRequest(
+    z.object({ query: z.object({ title: z.string().min(1), year: z.coerce.number().int().positive() }) })
+     .transform(({ query }) => query as TmdbTitleYearQuery)
+);
+
+export const validateGetEpisodeTmdbDetailsRequest = validateRequest(
+    z.object({ query: z.object({
+        showTitle: z.string().min(1),
+        showYear: z.coerce.number().int().positive(),
+        seasonNumber: z.coerce.number().int().positive(),
+        episodeNumber: z.coerce.number().int().positive(),
+    }) }).transform(({ query }) => query)
+);
+
+export const validateGetTmdbPosterRequest = validateRequest(
+    z.object({ query: z.object({ url: z.url().refine(u => u.startsWith('https://image.tmdb.org/'), { message: 'URL must be from image.tmdb.org' }) }) })
+        .transform(({ query }) => query.url)
+);

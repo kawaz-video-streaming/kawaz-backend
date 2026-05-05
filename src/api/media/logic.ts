@@ -8,6 +8,7 @@ import { cleanupPath } from "../../utils/files";
 import { BucketsConfig, UploadedFile } from "../../utils/types";
 import { ConvertMessage, InitiateUploadRequestBody, InitiateUploadResponse, MediaUpdateRequestBody } from "./types";
 import { validateMediaContainingCollectionAndGenre } from "./utils";
+import { TmdbClient } from "../../services/tmdbClient";
 
 const PRESIGNED_URL_EXPIRY_SECONDS = 3600;
 
@@ -19,6 +20,7 @@ export const createMediaLogic = (
   { mediaDal, mediaCollectionDal, mediaGenreDal }: Dals,
   amqpClient: AmqpClient,
   storageClient: StorageClient,
+  tmdbClient: TmdbClient
 ) => ({
   initiateUpload: async (body: InitiateUploadRequestBody): Promise<InitiateUploadResponse> => {
     const { fileName, fileSize, mimeType: _mimeType, ...mediaBody } = body;
@@ -63,6 +65,18 @@ export const createMediaLogic = (
       await storageClient.uploadObject(kawazBucket, thumbnailObject);
       await cleanupPath(thumbnail.path);
     }
+  },
+  getMovieMediaTmdbDetails: async (title: string, year: number) => {
+    return tmdbClient.getMovieDetails(title, year);
+  },
+  getCollectionMediaTmdbDetails: async (id: number) => {
+    return tmdbClient.getCollectionDetails(id);
+  },
+  getShowMediaTmdbDetails: async (title: string, year: number) => {
+    return tmdbClient.getShowDetails(title, year);
+  },
+  getEpisodeMediaTmdbDetails: async (showTitle: string, showYear: number, seasonNumber: number, episodeNumber: number) => {
+    return tmdbClient.getEpisodeDetails(showTitle, showYear, seasonNumber, episodeNumber);
   },
   getAllMedia: () => mediaDal.getAllMedia(),
   getAllNoneCompletedMedia: () => mediaDal.getAllNoneCompletedMedia(),

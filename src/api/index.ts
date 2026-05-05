@@ -6,16 +6,17 @@ import swaggerUi from "swagger-ui-express";
 import { BackendServerConfig } from "../config";
 import { Dals } from "../dal/types";
 import { Mailer } from "../services/mailer";
+import { TmdbClient } from "../services/tmdbClient";
 import { createAdminRouter } from "./admin";
 import { createAuthRouter } from "./auth";
 import { createAvatarRouter } from "./avatar";
+import { createAvatarCategoryRouter } from "./avatarCategory";
 import { createMediaRouter } from "./media";
 import { createMediaCollectionRouter } from "./mediaCollection";
+import { createMediaGenreRouter } from "./mediaGenre";
 import { createAuthMiddleware, requireAdmin } from "./middleware";
 import { swaggerSpec } from "./swagger";
 import { createUserRouter } from "./user";
-import { createAvatarCategoryRouter } from "./avatarCategory";
-import { createMediaGenreRouter } from "./mediaGenre";
 
 
 export const registerRoutes = (
@@ -23,6 +24,7 @@ export const registerRoutes = (
     storageClient: StorageClient,
     amqpClient: AmqpClient,
     mailer: Mailer,
+    tmdbClient: TmdbClient,
     dals: Dals
 ) => (app: Application) => {
     const { userDal } = dals;
@@ -58,7 +60,7 @@ export const registerRoutes = (
     app.use('/user', createUserRouter(userDal));
     app.use("/avatar", createAvatarRouter(config.bucketsConfig, dals, storageClient));
     app.use('/avatarCategory', createAvatarCategoryRouter(dals));
-    app.use("/media", createMediaRouter(config.bucketsConfig, dals, amqpClient, storageClient));
+    app.use("/media", createMediaRouter(config.bucketsConfig, dals, amqpClient, storageClient, tmdbClient));
     app.use("/mediaCollection", createMediaCollectionRouter(config.bucketsConfig, dals, storageClient));
     app.use("/mediaGenre", createMediaGenreRouter(dals));
     return app;

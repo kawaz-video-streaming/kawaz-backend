@@ -1,5 +1,6 @@
 import { AmqpClient } from "@ido_kawaz/amqp-client";
 import { NotFoundError, Request, Response } from "@ido_kawaz/server-framework";
+import { Readable } from "stream";
 import { StorageClient } from "@ido_kawaz/storage-client";
 import { StatusCodes } from "http-status-codes";
 import { isEmpty, isNil } from "ramda";
@@ -10,21 +11,29 @@ import { validateRequestWithId } from "../../utils/zod";
 import { createMediaLogic } from "./logic";
 import {
   validateCompleteUploadRequest,
+  validateGetCollectionTmdbDetailsRequest,
+  validateGetEpisodeTmdbDetailsRequest,
+  validateGetMovieTmdbDetailsRequest,
+  validateGetShowTmdbDetailsRequest,
+  validateGetTmdbPosterRequest,
   validateInitiateUploadRequest,
   validateMediaUpdateRequest,
 } from "./types";
+import { TmdbClient } from "../../services/tmdbClient";
 
 export const createMediaHandlers = (
   bucketsConfig: BucketsConfig,
   dals: Dals,
   amqpClient: AmqpClient,
   storageClient: StorageClient,
+  tmdbClient: TmdbClient
 ) => {
   const logic = createMediaLogic(
     bucketsConfig,
     dals,
     amqpClient,
     storageClient,
+    tmdbClient
   );
   return {
     getAllMedia: requestHandlerDecorator(
@@ -93,6 +102,51 @@ export const createMediaHandlers = (
           throw new NotFoundError("Media not found");
         }
         res.status(StatusCodes.OK).json(media);
+      },
+    ),
+    getMovieMediaTmdbDetails: requestHandlerDecorator(
+      "get media movie info details",
+      async (req: Request, res: Response) => {
+        const { title, year } = validateGetMovieTmdbDetailsRequest(req);
+        const details = await logic.getMovieMediaTmdbDetails(title, year);
+        res.status(StatusCodes.OK).json(details);
+      },
+    ),
+    getCollectionMediaTmdbDetails: requestHandlerDecorator(
+      "get media collection info details",
+      async (req: Request, res: Response) => {
+        const id = validateGetCollectionTmdbDetailsRequest(req);
+        const details = await logic.getCollectionMediaTmdbDetails(id);
+        res.status(StatusCodes.OK).json(details);
+      },
+    ),
+    getShowMediaTmdbDetails: requestHandlerDecorator(
+      "get media show info details",
+      async (req: Request, res: Response) => {
+        const { title, year } = validateGetShowTmdbDetailsRequest(req);
+        const details = await logic.getShowMediaTmdbDetails(title, year);
+        res.status(StatusCodes.OK).json(details);
+      },
+    ),
+    getEpisodeMediaTmdbDetails: requestHandlerDecorator(
+      "get media episode info details",
+      async (req: Request, res: Response) => {
+        const { showTitle, showYear, seasonNumber, episodeNumber } = validateGetEpisodeTmdbDetailsRequest(req);
+        const details = await logic.getEpisodeMediaTmdbDetails(showTitle, showYear, seasonNumber, episodeNumber);
+        res.status(StatusCodes.OK).json(details);
+      },
+    ),
+    getTmdbPoster: requestHandlerDecorator(
+      "get tmdb poster image",
+      async (req: Request, res: Response) => {
+        const url = validateGetTmdbPosterRequest(req);
+        const imageResponse = await fetch(url);
+        if (!imageResponse.ok || !imageResponse.body) {
+          throw new NotFoundError("TMDB poster not found");
+        }
+        res.setHeader("Content-Type", imageResponse.headers.get("content-type") ?? "image/jpeg");
+        res.setHeader("Cache-Control", "public, max-age=172800");
+        Readable.fromWeb(imageResponse.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res);
       },
     ),
     getMediaUploadProgress: requestHandlerDecorator(

@@ -6,6 +6,7 @@ import { createConsumers } from "../background";
 import { SERVICE_NAME, SystemConfig } from "../config";
 import { initializeDB } from "./db";
 import { Mailer } from "./mailer";
+import { TmdbClient } from "./tmdbClient";
 
 export const startSystem = async ({
     storageConfig,
@@ -13,10 +14,12 @@ export const startSystem = async ({
     consumersConfig,
     dbConfig,
     serverConfig,
-    mailerConfig
+    mailerConfig,
+    tmdbConfig
 }: SystemConfig
 ) => {
     const mailer = new Mailer(mailerConfig);
+    const tmdbClient = new TmdbClient(tmdbConfig);
     const storageClient = new StorageClient(storageConfig);
     const amqpClient = new AmqpClient(amqpConfig);
     const dals = await initializeDB(dbConfig);
@@ -24,5 +27,5 @@ export const startSystem = async ({
     amqpClient.registerConsumers(consumers);
     await amqpClient.start(SERVICE_NAME);
     const server = createServer(serverConfig, registerRoutes);
-    await server.start(serverConfig, storageClient, amqpClient, mailer, dals);
+    await server.start(serverConfig, storageClient, amqpClient, mailer, tmdbClient, dals);
 };

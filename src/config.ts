@@ -8,8 +8,9 @@ import { mergeDeepRight } from "ramda";
 import { z } from "zod";
 import { AuthConfig } from "./api/auth/types";
 import { ConsumersConfig } from "./background/config";
-import { BucketsConfig } from "./utils/types";
 import { MailerConfig } from "./services/mailer";
+import { TmdbConfig } from "./services/tmdbClient";
+import { BucketsConfig } from "./utils/types";
 
 class InvalidConfigError extends Error {
   constructor(error: z.ZodError) {
@@ -38,6 +39,7 @@ const environmentVariablesSchema = z.object({
   APP_DOMAIN: z.string(),
   GOOGLE_CLIENT_ID: z.string(),
   GOOGLE_CLIENT_SECRET: z.string(),
+  TMDB_READ_ACCESS_TOKEN: z.string(),
 });
 
 export interface BackendServerConfig extends ServerConfig {
@@ -53,6 +55,7 @@ export interface SystemConfig {
   serverConfig: BackendServerConfig;
   dbConfig: MongoConfig;
   mailerConfig: MailerConfig;
+  tmdbConfig: TmdbConfig;
 }
 
 export const getConfig = (env: {} = {}): SystemConfig => {
@@ -106,6 +109,9 @@ export const getConfig = (env: {} = {}): SystemConfig => {
       gmailUser: envVars.GMAIL_USER,
       gmailAppPassword: envVars.GMAIL_APP_PASSWORD,
       appDomain: envVars.APP_DOMAIN,
+    },
+    tmdbConfig: {
+      readAccessToken: envVars.TMDB_READ_ACCESS_TOKEN,
     },
   };
 };

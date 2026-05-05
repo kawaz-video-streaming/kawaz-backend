@@ -94,6 +94,9 @@ Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
 | `GET` | `/mediaGenre/:genreId` | Yes | Get a single media genre |
 | `POST` | `/mediaGenre` | Yes (admin only) | Create a new media genre (name must be unique) |
 | `DELETE` | `/mediaGenre` | Yes (admin only) | Delete a media genre by name (must not be referenced by media or collections) |
+| `GET` | `/media/tmdb/movie` | Yes (admin only) | Fetch movie metadata from TMDB by `?title=` and `?year=` query params |
+| `GET` | `/media/tmdb/collection` | Yes (admin only) | Fetch TMDB collection metadata by `?id=`; genres are the intersection of all parts' genres |
+| `GET` | `/media/tmdb/poster` | Yes (admin only) | Proxy a TMDB image URL (`?url=`, must start with `https://image.tmdb.org/`) to avoid browser CORS |
 | `POST` | `/media/upload/initiate` | Yes (admin only) | Create media record; returns `{ mediaId, videoUploadUrl, thumbnailUploadUrl }` (presigned PUT URLs) |
 | `POST` | `/media/upload/complete` | Yes (admin only) | Signal browser upload done; triggers convert AMQP message, sets status to `processing` |
 | `GET` | `/media` | Yes | List all completed media from MongoDB |
@@ -224,6 +227,7 @@ Service-specific env vars validated in `src/config.ts`:
 | Variable | Required | Description |
 |---|---|---|
 | `NODE_ENV` | No (default: `"development"`) | `"development"` \| `"local"` \| `"test"` \| `"production"` |
+| `TMDB_READ_ACCESS_TOKEN` | Yes | TMDB API v4 read access token; used by `TmdbClient` for movie/show/episode metadata lookups |
 | `KAWAZ_PLUS_BUCKET` | Yes | S3 bucket name for kawaz-plus uploads (media, thumbnails, avatars) |
 | `UPLOAD_PREFIX` | Yes | Key prefix for raw media uploads within kawaz-plus bucket |
 | `THUMBNAIL_PREFIX` | Yes | Key prefix for thumbnails within kawaz-plus bucket |
