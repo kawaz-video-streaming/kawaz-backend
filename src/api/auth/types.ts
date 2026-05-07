@@ -10,6 +10,7 @@ export interface AuthConfig {
   googleClientId: string;
   googleClientSecret: string;
   appDomain: string;
+  isProduction: boolean;
 }
 
 export interface TokenPayload {

@@ -92,7 +92,8 @@ export const getConfig = (env: {} = {}): SystemConfig => {
         adminPromotionSecret: envVars.ADMIN_PROMOTION_SECRET,
         appDomain: envVars.APP_DOMAIN,
         googleClientId: envVars.GOOGLE_CLIENT_ID,
-        googleClientSecret: envVars.GOOGLE_CLIENT_SECRET
+        googleClientSecret: envVars.GOOGLE_CLIENT_SECRET,
+        isProduction: envVars.NODE_ENV === 'production',
       },
       bucketsConfig,
     },
