@@ -28,6 +28,7 @@ const AUTH_CONFIG = {
   googleClientId: "test-google-client-id",
   googleClientSecret: "test-google-client-secret",
   appDomain: "http://localhost:3000",
+  isProduction: false,
 };
 
 const makeUserDal = (

@@ -21,7 +21,7 @@ const parseCookies = (req: express.Request, _res: express.Response, next: expres
 };
 
 describe('POST /upload/initiate and POST /upload/complete routes', () => {
-    const AUTH_CONFIG = { jwtSecret: 'media-test-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+    const AUTH_CONFIG = { jwtSecret: 'media-test-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000', isProduction: false };
 
     let app: Application;
     let mediaDal: { createMedia: jest.Mock; getPendingMedia: jest.Mock; updateMedia: jest.Mock; };
@@ -175,7 +175,7 @@ describe('POST /upload/initiate and POST /upload/complete routes', () => {
 });
 
 describe('GET /media/uploading', () => {
-    const AUTH_CONFIG = { jwtSecret: 'uploading-test-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+    const AUTH_CONFIG = { jwtSecret: 'uploading-test-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000', isProduction: false };
 
     let app: Application;
     let mediaDal: { getAllNoneCompletedMedia: jest.Mock; };
@@ -245,7 +245,7 @@ describe('GET /media/uploading', () => {
 });
 
 describe('GET /media/:id/progress', () => {
-    const AUTH_CONFIG = { jwtSecret: 'progress-test-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+    const AUTH_CONFIG = { jwtSecret: 'progress-test-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000', isProduction: false };
     const mediaId = '507f1f77bcf86cd799439011';
 
     let app: Application;
@@ -330,7 +330,7 @@ describe('GET /media/:id/progress', () => {
 });
 
 describe('GET /media/tmdb/movie', () => {
-    const AUTH_CONFIG = { jwtSecret: 'tmdb-test-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+    const AUTH_CONFIG = { jwtSecret: 'tmdb-test-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000', isProduction: false };
 
     let app: Application;
     let tmdbClient: { getMovieDetails: jest.Mock };
@@ -431,7 +431,7 @@ describe('GET /media/tmdb/movie', () => {
 });
 
 describe('GET /media/tmdb/collection', () => {
-    const AUTH_CONFIG = { jwtSecret: 'tmdb-collection-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+    const AUTH_CONFIG = { jwtSecret: 'tmdb-collection-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000', isProduction: false };
 
     let app: Application;
     let tmdbClient: { getMovieDetails: jest.Mock; getCollectionDetails: jest.Mock };
@@ -504,7 +504,7 @@ describe('GET /media/tmdb/collection', () => {
 });
 
 describe('GET /media/tmdb/poster', () => {
-    const AUTH_CONFIG = { jwtSecret: 'tmdb-poster-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+    const AUTH_CONFIG = { jwtSecret: 'tmdb-poster-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000', isProduction: false };
 
     let app: Application;
     let userDal: { findUser: jest.Mock };
@@ -555,7 +555,7 @@ describe('GET /media/tmdb/poster', () => {
 });
 
 describe('GET /media/tmdb/show', () => {
-    const AUTH_CONFIG = { jwtSecret: 'tmdb-show-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+    const AUTH_CONFIG = { jwtSecret: 'tmdb-show-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000', isProduction: false };
 
     let app: Application;
     let tmdbClient: { getMovieDetails: jest.Mock; getCollectionDetails: jest.Mock; getShowDetails: jest.Mock; getEpisodeDetails: jest.Mock };
@@ -639,7 +639,7 @@ describe('GET /media/tmdb/show', () => {
 });
 
 describe('GET /media/tmdb/episode', () => {
-    const AUTH_CONFIG = { jwtSecret: 'tmdb-episode-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000' };
+    const AUTH_CONFIG = { jwtSecret: 'tmdb-episode-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000', isProduction: false };
 
     let app: Application;
     let tmdbClient: { getMovieDetails: jest.Mock; getCollectionDetails: jest.Mock; getShowDetails: jest.Mock; getEpisodeDetails: jest.Mock };
