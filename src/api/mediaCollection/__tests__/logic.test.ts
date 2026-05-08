@@ -171,8 +171,9 @@ describe('createMediaCollectionLogic.updateMediaCollection', () => {
 });
 
 describe('createMediaCollectionLogic.getThumbnail', () => {
-    it('returns presigned URL for the collection thumbnail', async () => {
-        const mediaCollectionDal = makeMediaCollectionDal();
+    it('returns thumbnail stream when collection exists in pool', async () => {
+        const collection = { _id: 'col-1', title: 'My Collection', genres: [] };
+        const mediaCollectionDal = makeMediaCollectionDal({ getCollection: jest.fn().mockResolvedValue(collection) });
         const mediaDal = makeMediaDal();
         const storageClient = makeStorageClient();
 
@@ -181,5 +182,16 @@ describe('createMediaCollectionLogic.getThumbnail', () => {
 
         expect(storageClient.downloadObject).toHaveBeenCalledWith('upload-bucket', 'raw/thumbnails/col-1.jpg');
         expect(stream).toBe(objectStream);
+    });
+
+    it('throws NotFoundError and does not hit storage when collection is not in pool', async () => {
+        const mediaCollectionDal = makeMediaCollectionDal();
+        const mediaDal = makeMediaDal();
+        const storageClient = makeStorageClient();
+
+        const logic = createMediaCollectionLogic(makeConfig(), makeMediaGenreDal(), storageClient as unknown as StorageClient)(mediaCollectionDal, mediaDal);
+        await expect(logic.getThumbnail('col-1')).rejects.toThrow('Media collection not found');
+
+        expect(storageClient.downloadObject).not.toHaveBeenCalled();
     });
 });

@@ -1,6 +1,7 @@
 import { AmqpClient } from '@ido_kawaz/amqp-client';
 import { BadRequestError, NotFoundError } from '@ido_kawaz/server-framework';
 import { StorageClient } from '@ido_kawaz/storage-client';
+import { Readable } from 'stream';
 import { MediaDal } from '../../../dal/media';
 import { MediaCollectionDal } from '../../../dal/mediaCollection';
 import { MediaGenreDal } from '../../../dal/mediaGenre';
@@ -290,5 +291,119 @@ describe('createMediaLogic.getEpisodeMediaTmdbDetails', () => {
         const logic = createMediaLogic(makeConfig(), makeMediaGenreDal() as unknown as MediaGenreDal, {} as any, {} as any, tmdbClient as unknown as TmdbClient)({} as unknown as MediaDal, makeMediaCollectionDal() as unknown as MediaCollectionDal);
 
         await expect(logic.getEpisodeMediaTmdbDetails('Unknown', 1900, 1, 1)).rejects.toThrow(NotFoundError);
+    });
+});
+
+const objectStream = Readable.from('stream');
+
+const makeStreamingMediaDal = (media: object | null = null): jest.Mocked<Pick<MediaDal, 'getMedia'>> => ({
+    getMedia: jest.fn().mockResolvedValue(media),
+});
+
+const makeStreamingStorageClient = (): jest.Mocked<Pick<StorageClient, 'downloadObject'>> => ({
+    downloadObject: jest.fn().mockResolvedValue(objectStream),
+});
+
+const makeStreamingLogic = (mediaDal: jest.Mocked<Pick<MediaDal, 'getMedia'>>, storageClient: jest.Mocked<Pick<StorageClient, 'downloadObject'>>) =>
+    createMediaLogic(makeConfig(), makeMediaGenreDal() as unknown as MediaGenreDal, {} as any, storageClient as unknown as StorageClient, {} as any)(mediaDal as unknown as MediaDal, makeMediaCollectionDal() as unknown as MediaCollectionDal);
+
+describe('createMediaLogic.getManifest', () => {
+    it('returns manifest stream when media exists in pool', async () => {
+        const mediaDal = makeStreamingMediaDal({ _id: 'm1' });
+        const storageClient = makeStreamingStorageClient();
+
+        const stream = await makeStreamingLogic(mediaDal, storageClient).getManifest('m1');
+
+        expect(mediaDal.getMedia).toHaveBeenCalledWith('m1');
+        expect(storageClient.downloadObject).toHaveBeenCalledWith('vod-bucket', 'm1/output.mpd');
+        expect(stream).toBe(objectStream);
+    });
+
+    it('throws NotFoundError and does not hit storage when media is not in pool', async () => {
+        const mediaDal = makeStreamingMediaDal(null);
+        const storageClient = makeStreamingStorageClient();
+
+        await expect(makeStreamingLogic(mediaDal, storageClient).getManifest('m1')).rejects.toThrow(NotFoundError);
+
+        expect(storageClient.downloadObject).not.toHaveBeenCalled();
+    });
+});
+
+describe('createMediaLogic.getThumbnail', () => {
+    it('returns thumbnail stream when media exists in pool', async () => {
+        const mediaDal = makeStreamingMediaDal({ _id: 'm1' });
+        const storageClient = makeStreamingStorageClient();
+
+        const stream = await makeStreamingLogic(mediaDal, storageClient).getThumbnail('m1');
+
+        expect(mediaDal.getMedia).toHaveBeenCalledWith('m1');
+        expect(storageClient.downloadObject).toHaveBeenCalledWith('upload-bucket', 'raw/thumbnails/m1.jpg');
+        expect(stream).toBe(objectStream);
+    });
+
+    it('throws NotFoundError and does not hit storage when media is not in pool', async () => {
+        const mediaDal = makeStreamingMediaDal(null);
+        const storageClient = makeStreamingStorageClient();
+
+        await expect(makeStreamingLogic(mediaDal, storageClient).getThumbnail('m1')).rejects.toThrow(NotFoundError);
+
+        expect(storageClient.downloadObject).not.toHaveBeenCalled();
+    });
+});
+
+describe('createMediaLogic.getTiles', () => {
+    it('returns tiles stream when media exists in pool', async () => {
+        const mediaDal = makeStreamingMediaDal({ _id: 'm1' });
+        const storageClient = makeStreamingStorageClient();
+
+        const stream = await makeStreamingLogic(mediaDal, storageClient).getTiles('m1');
+
+        expect(mediaDal.getMedia).toHaveBeenCalledWith('m1');
+        expect(storageClient.downloadObject).toHaveBeenCalledWith('vod-bucket', 'm1/thumbnails.jpg');
+        expect(stream).toBe(objectStream);
+    });
+
+    it('throws NotFoundError and does not hit storage when media is not in pool', async () => {
+        const mediaDal = makeStreamingMediaDal(null);
+        const storageClient = makeStreamingStorageClient();
+
+        await expect(makeStreamingLogic(mediaDal, storageClient).getTiles('m1')).rejects.toThrow(NotFoundError);
+
+        expect(storageClient.downloadObject).not.toHaveBeenCalled();
+    });
+});
+
+describe('createMediaLogic.getVtt', () => {
+    it('returns vtt stream when media exists in pool', async () => {
+        const mediaDal = makeStreamingMediaDal({ _id: 'm1' });
+        const storageClient = makeStreamingStorageClient();
+
+        const stream = await makeStreamingLogic(mediaDal, storageClient).getVtt('m1', 'subtitles.vtt');
+
+        expect(mediaDal.getMedia).toHaveBeenCalledWith('m1');
+        expect(storageClient.downloadObject).toHaveBeenCalledWith('vod-bucket', 'm1/subtitles.vtt');
+        expect(stream).toBe(objectStream);
+    });
+
+    it('throws NotFoundError and does not hit storage when media is not in pool', async () => {
+        const mediaDal = makeStreamingMediaDal(null);
+        const storageClient = makeStreamingStorageClient();
+
+        await expect(makeStreamingLogic(mediaDal, storageClient).getVtt('m1', 'subtitles.vtt')).rejects.toThrow(NotFoundError);
+
+        expect(storageClient.downloadObject).not.toHaveBeenCalled();
+    });
+});
+
+describe('createMediaLogic.getSegment', () => {
+    it('fetches segment directly from storage without a DB check', async () => {
+        const mediaDal = makeStreamingMediaDal(null);
+        const storageClient = makeStreamingStorageClient();
+
+        const stream = await makeStreamingLogic(mediaDal, storageClient).getSegment('m1', 'chunk-0.m4s');
+
+        expect(mediaDal.getMedia).not.toHaveBeenCalled();
+        expect(storageClient.downloadObject).toHaveBeenCalledWith('vod-bucket', 'm1/chunk-0.m4s');
+        expect(stream).toBe(objectStream);
     });
 });

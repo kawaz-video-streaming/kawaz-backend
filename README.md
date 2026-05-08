@@ -196,12 +196,13 @@ Returns `200 OK` if service is running.
 - Success response: `200 [{ "name": string, "email": string }]` — users with `status: "pending"`
 - Error responses: `401`, `403`
 
-### `POST /admin/pending/:username/approve`
+### `POST /admin/pending/:username/approve/:role`
 
 - Requires: `kawaz-token` cookie with **admin role**
+- `:role` must be `user` or `special`; sets the user's role at approval time
 - Sets user status to `"approved"`; sends approval email to the user's registered email
 - Success response: `200 { "message": "User approved" }`
-- Error responses: `401`, `403`, `404` (user not found or not pending)
+- Error responses: `400` (invalid role), `401`, `403`, `404` (user not found or not pending)
 
 ### `POST /admin/pending/:username/deny`
 
@@ -213,7 +214,7 @@ Returns `200 OK` if service is running.
 ### `GET /user/me`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `200 { "username": string, "role": "user" | "admin" }`
+- Success response: `200 { "username": string, "role": "user" | "special" | "admin" }`
 - Error responses: `401` (missing or invalid token)
 
 ### `POST /user/profile`
@@ -482,27 +483,30 @@ Returns `200 OK` if service is running.
 ### `GET /media/stream/:id/output.mpd`
 
 - Requires: `kawaz-token` cookie with valid JWT
+- Verifies the media exists in the user's pool before serving; returns `404` for cross-pool access attempts
 - Success response: `200` MPEG-DASH manifest (application/dash+xml)
-- Error responses: `401`, `500`
+- Error responses: `401`, `404`
 
 ### `GET /media/stream/:id/:filename.m4s`
 
 - Requires: `kawaz-token` cookie with valid JWT
+- Segments are served without a DB check; access is gated at the manifest level
 - Success response: `200` video/iso.segment binary stream with `Cache-Control: public, max-age=172800`
 - Error responses: `401`, `500`
 
 ### `GET /media/stream/:id/:filename.vtt`
 
 - Requires: `kawaz-token` cookie with valid JWT
+- Verifies the media exists in the user's pool before serving
 - Success response: `200` VTT subtitle content (text/vtt)
-- Error responses: `401`, `500`
+- Error responses: `401`, `404`
 
 ### `GET /media/stream/:id/thumbnails.jpg`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Streams the sprite-sheet / tile thumbnails image for the video directly from VOD storage
+- Verifies the media exists in the user's pool before serving
 - Success response: `200` image/jpeg binary stream with `Cache-Control: public, max-age=172800`
-- Error responses: `401`, `500`
+- Error responses: `401`, `404`
 
 ### `GET /api-docs`
 
@@ -609,7 +613,7 @@ Stores user credentials and their profiles.
 | `password` | String | Yes | Bcrypt-hashed password |
 | `email` | String | Yes | Email address (provided at signup) |
 | `status` | String | Yes | `pending` \| `approved` \| `denied` (defaults to `pending`) |
-| `role` | String | Yes | `user` or `admin` (defaults to `user`) |
+| `role` | String | Yes | `user`, `special`, or `admin` (defaults to `user`; set at admin approval time) |
 | `profiles` | Profile[] | Yes | List of user profiles (defaults to `[]`) |
 
 Each `Profile` embedded document:

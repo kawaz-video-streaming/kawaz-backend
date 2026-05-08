@@ -1,4 +1,5 @@
-import { BadRequestError } from "@ido_kawaz/server-framework";
+import { BadRequestError, NotFoundError } from "@ido_kawaz/server-framework";
+import { isNil } from "ramda";
 import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
 import { MediaGenreDal } from "../../dal/mediaGenre";
@@ -49,5 +50,8 @@ export const createMediaCollectionLogic = (
   },
   getAllMediaCollections: () => mediaCollectionDal.getAllCollections(),
   getMediaCollection: (collectionId: string) => mediaCollectionDal.getCollection(collectionId),
-  getThumbnail: (collectionId: string) => storageClient.downloadObject(kawazStorageBucket, `${thumbnailPrefix}/${collectionId}.jpg`)
+  getThumbnail: async (collectionId: string) => {
+    if (isNil(await mediaCollectionDal.getCollection(collectionId))) throw new NotFoundError('Media collection not found');
+    return storageClient.downloadObject(kawazStorageBucket, `${thumbnailPrefix}/${collectionId}.jpg`);
+  }
 });

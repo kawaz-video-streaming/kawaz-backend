@@ -153,8 +153,10 @@ describe('createAvatarLogic.getAvatar', () => {
 });
 
 describe('createAvatarLogic.getAvatarImage', () => {
-    it('returns a stream of the avatar image', async () => {
+    it('returns a stream of the avatar image when avatar exists in pool', async () => {
+        const avatar = { _id: 'av-1', name: 'lion', categoryId: 'cat-1' };
         const avatarDal = makeAvatarDal();
+        avatarDal.getAvatarById.mockResolvedValue(avatar as any);
         const avatarCategoryDal = makeAvatarCategoryDal();
         const storageClient = makeStorageClient();
         storageClient.downloadObject.mockResolvedValue(objectStream);
@@ -164,5 +166,16 @@ describe('createAvatarLogic.getAvatarImage', () => {
 
         expect(storageClient.downloadObject).toHaveBeenCalledWith('kawaz-bucket', 'avatars/av-1.jpg');
         expect(stream).toBe(objectStream);
+    });
+
+    it('throws NotFoundError and does not hit storage when avatar is not in pool', async () => {
+        const avatarDal = makeAvatarDal();
+        const avatarCategoryDal = makeAvatarCategoryDal();
+        const storageClient = makeStorageClient();
+
+        const logic = createAvatarLogic(makeBucketsConfig(), avatarCategoryDal as unknown as AvatarCategoryDal, storageClient as unknown as StorageClient)(avatarDal as unknown as AvatarDal);
+        await expect(logic.getAvatarImage('av-1')).rejects.toThrow('Avatar not found');
+
+        expect(storageClient.downloadObject).not.toHaveBeenCalled();
     });
 });

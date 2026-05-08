@@ -84,9 +84,21 @@ export const createMediaLogic = (
   getAllNoneCompletedMedia: () => mediaDal.getAllNoneCompletedMedia(),
   getMedia: (mediaId: string) => mediaDal.getMedia(mediaId),
   getMediaUploadProgress: async (mediaId: string) => mediaDal.getMediaUploadProgress(mediaId),
-  getTiles: (mediaId: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/thumbnails.jpg`),
-  getThumbnail: (mediaId: string) => storageClient.downloadObject(kawazBucket, `${thumbnailPrefix}/${mediaId}.jpg`),
-  getManifest: (mediaId: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/output.mpd`),
+  getThumbnail: async (mediaId: string) => {
+    if (isNil(await mediaDal.getMedia(mediaId))) throw new NotFoundError("Media not found");
+    return storageClient.downloadObject(kawazBucket, `${thumbnailPrefix}/${mediaId}.jpg`);
+  },
+  getTiles: async (mediaId: string) => {
+    if (isNil(await mediaDal.getMedia(mediaId))) throw new NotFoundError("Media not found");
+    return storageClient.downloadObject(vodStorageBucket, `${mediaId}/thumbnails.jpg`);
+  },
+  getManifest: async (mediaId: string) => {
+    if (isNil(await mediaDal.getMedia(mediaId))) throw new NotFoundError("Media not found");
+    return storageClient.downloadObject(vodStorageBucket, `${mediaId}/output.mpd`);
+  },
+  getVtt: async (mediaId: string, filename: string) => {
+    if (isNil(await mediaDal.getMedia(mediaId))) throw new NotFoundError("Media not found");
+    return storageClient.downloadObject(vodStorageBucket, `${mediaId}/${filename}`);
+  },
   getSegment: (mediaId: string, filename: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/${filename}`),
-  getVtt: (mediaId: string, filename: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/${filename}`),
 });

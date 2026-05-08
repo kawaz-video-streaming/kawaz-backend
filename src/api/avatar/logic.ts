@@ -1,4 +1,5 @@
-import { BadRequestError } from "@ido_kawaz/server-framework";
+import { BadRequestError, NotFoundError } from "@ido_kawaz/server-framework";
+import { isNil } from "ramda";
 import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
 import { AvatarDal } from "../../dal/avatar";
@@ -28,5 +29,8 @@ export const createAvatarLogic = (
     },
     getAllAvatars: () => avatarDal.getAllAvatars(),
     getAvatar: (avatarId: string) => avatarDal.getAvatarById(avatarId),
-    getAvatarImage: (avatarId: string) => storageClient.downloadObject(kawazStorageBucket, `${avatarPrefix}/${avatarId}.jpg`)
+    getAvatarImage: async (avatarId: string) => {
+        if (isNil(await avatarDal.getAvatarById(avatarId))) throw new NotFoundError('Avatar not found');
+        return storageClient.downloadObject(kawazStorageBucket, `${avatarPrefix}/${avatarId}.jpg`);
+    }
 });
