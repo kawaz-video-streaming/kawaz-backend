@@ -1,6 +1,6 @@
 import { Dal } from "@ido_kawaz/mongo-client";
 import { isNil, isNotNil } from "ramda";
-import { ADMIN_ROLE } from "../../utils/types";
+import { ADMIN_ROLE, Role } from "../../utils/types";
 import { APPROVED_STATUS, DENIED_STATUS, PENDING_STATUS, Profile, User, UserModel, UserProjection } from "./model";
 
 export class UserDal extends Dal<User> {
@@ -26,8 +26,8 @@ export class UserDal extends Dal<User> {
   verifyEmail = async (email: string): Promise<boolean> =>
     isNotNil(await this.model.exists({ email }));
 
-  approveUser = (name: string): Promise<User | null> =>
-    this.model.findOneAndUpdate({ name, status: PENDING_STATUS }, { status: APPROVED_STATUS }).lean<User>().exec();
+  approveUser = (name: string, role: Omit<Role, "admin">): Promise<User | null> =>
+    this.model.findOneAndUpdate({ name, status: PENDING_STATUS }, { status: APPROVED_STATUS, role }).lean<User>().exec();
 
   denyUser = (name: string): Promise<User | null> =>
     this.model.findOneAndUpdate({ name, status: PENDING_STATUS }, { status: DENIED_STATUS }).lean<User>().exec();

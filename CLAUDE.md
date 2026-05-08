@@ -74,7 +74,7 @@ Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
 | `POST` | `/auth/forgot-password` | No | Request password reset; emails raw token if email is registered. Always returns 200 (no email enumeration) |
 | `POST` | `/auth/reset-password` | No | Reset password using a valid reset token; token is SHA-256 hashed before DB lookup; clears reset request on success |
 | `GET` | `/admin/pending` | Yes (admin only) | List users awaiting approval (`[{ name, email }]`) |
-| `POST` | `/admin/pending/:username/approve` | Yes (admin only) | Approve a pending user; sends approval email |
+| `POST` | `/admin/pending/:username/approve/:role` | Yes (admin only) | Approve a pending user with a given role (`user` or `special`); sends approval email |
 | `POST` | `/admin/pending/:username/deny` | Yes (admin only) | Deny a pending user; sends denial email and removes user |
 | `GET` | `/user/me` | Yes | Returns the authenticated user's info (`username`, `role`) |
 | `POST` | `/user/profile` | Yes | Create a profile for the authenticated user |
@@ -174,7 +174,7 @@ interface User {
   password: string;           // bcrypt-hashed
   email: string;              // required at signup; unique index
   status: "pending" | "approved" | "denied";  // defaults to "pending"
-  role: "user" | "admin";     // defaults to "user"
+  role: "user" | "special" | "admin";  // defaults to "user"; set at admin approval time
   profiles: Profile[];        // embedded, defaults to []
   passwordResetRequest?: {    // set by forgot-password; cleared on reset
     token: string;            // SHA-256 hash of the emailed raw token
@@ -215,6 +215,7 @@ All `@ido_kawaz/*` packages are listed as **devDependencies** (resolved locally 
 - **Shared types**: `BucketsConfig`, `Coordinates`, `UploadedFile`, `RequestWithIdParam` are defined in `src/utils/types.ts` and shared across modules. `MEDIA_TAGS`/`MediaTag` have been removed; genres are now free-form strings referencing `MediaGenre.name`.
 - **BucketsConfig**: All storage bucket names and key prefixes are consolidated into a single `BucketsConfig` object (see `src/utils/types.ts`) passed down to media, mediaCollection, and upload consumer — no per-feature config interfaces for storage.
 - **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia(MediaInfo)`, `updateMedia()`, `deleteMedia()`, `getAllMedia()`, `getMedia()`, `getPendingMedia()`, `getMediaUploadProgress()`, `getAllNoneCompletedMedia()`, `isCollectionEmpty()`, `isGenreEmpty(genreName)`. MediaCollection: `createCollection()`, `updateCollection()`, `deleteCollection()`, `getAllCollections()`, `getCollection()`, `isCollectionEmpty()`, `isGenreUsedInCollection(genre)`. MediaGenre: `getAllGenres()`, `getGenre(genreId)`, `verifyGenreExists(name)`, `createGenre(name)`, `deleteGenre(name)`. User: `createUser(name, password, email)`, `findUser()`, `verifyUser()`, `verifyEmail()`, `approveUser()`, `denyUser()`, `removeUser()`, `getPendingUsers()`, `promoteToAdmin()`, `createPasswordResetRequestForUser(email, tokenHash)`, `findUserByPasswordResetToken(tokenHash)`, `resetUserPassword(name, newPasswordHash)`. Avatar: `createAvatar()`, `deleteAvatar()`, `getAllAvatars()`, `getAvatarById()`, `isCategoryEmpty(categoryId)`. AvatarCategory: `getAllCategories()`, `getCategory(categoryId)`, `createCategory(name)`, `deleteCategory(categoryId)`, `verifyCategoryExists(categoryId)`.
+- **User-type-based DAL routing**: `special` users get separate MongoDB collections (`specialMedia`, `specialMediaCollection`, `specialAvatar`) vs `user` role. Middleware (`src/api/avatar/middleware.ts`, `src/api/media/middleware.ts`) injects the correct DAL pair onto the request before handlers run. Admins can override with `?special=true` query param. Logic factories are curried: `createXLogic(staticDeps)(dalA, dalB)` — the second call happens per-request after the middleware has set the DALs.
 - **Colocated tests**: `__tests__/` directories next to the source they test.
 - **Handler decorator** from server-framework wraps route handlers for logging and error propagation.
 

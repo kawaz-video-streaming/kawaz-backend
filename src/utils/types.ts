@@ -4,8 +4,9 @@ import z from "zod";
 
 export const ADMIN_ROLE = "admin";
 export const USER_ROLE = "user";
+export const SPECIAL_USER_ROLE = 'special';
 
-export const roles = [ADMIN_ROLE, USER_ROLE] as const;
+export const roles = [ADMIN_ROLE, USER_ROLE, SPECIAL_USER_ROLE] as const;
 
 export type Role = (typeof roles)[number];
 

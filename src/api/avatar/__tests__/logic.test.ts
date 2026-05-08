@@ -2,7 +2,6 @@ import { StorageClient } from '@ido_kawaz/storage-client';
 import { AvatarDal } from '../../../dal/avatar';
 import { AvatarCategoryDal } from '../../../dal/avatarCategory';
 import { Avatar } from '../../../dal/avatar/model';
-import { Dals } from '../../../dal/types';
 import { BucketsConfig, UploadedFile } from '../../../utils/types';
 import { createAvatarLogic } from '../logic';
 import { Readable } from 'stream';
@@ -29,14 +28,6 @@ const makeAvatarDal = (): jest.Mocked<Pick<AvatarDal, 'createAvatar' | 'deleteAv
 
 const makeAvatarCategoryDal = (): jest.Mocked<Pick<AvatarCategoryDal, 'verifyCategoryExists'>> => ({
     verifyCategoryExists: jest.fn().mockResolvedValue(true),
-});
-
-const makeDals = (
-    avatarDal: ReturnType<typeof makeAvatarDal>,
-    avatarCategoryDal: ReturnType<typeof makeAvatarCategoryDal>,
-): Pick<Dals, 'avatarDal' | 'avatarCategoryDal'> => ({
-    avatarDal: avatarDal as unknown as AvatarDal,
-    avatarCategoryDal: avatarCategoryDal as unknown as AvatarCategoryDal,
 });
 
 const objectStream = Readable.from('https://presigned-url');
@@ -69,7 +60,7 @@ describe('createAvatarLogic.createAvatar', () => {
         const avatarCategoryDal = makeAvatarCategoryDal();
         const storageClient = makeStorageClient();
 
-        const logic = createAvatarLogic(makeBucketsConfig(), makeDals(avatarDal, avatarCategoryDal) as unknown as Dals, storageClient as unknown as StorageClient);
+        const logic = createAvatarLogic(makeBucketsConfig(), avatarCategoryDal as unknown as AvatarCategoryDal, storageClient as unknown as StorageClient)(avatarDal as unknown as AvatarDal);
         await logic.createAvatar(makeAvatar(), makeImage());
 
         expect(avatarDal.createAvatar).toHaveBeenCalledTimes(1);
@@ -85,7 +76,7 @@ describe('createAvatarLogic.createAvatar', () => {
         avatarCategoryDal.verifyCategoryExists.mockResolvedValue(false);
         const storageClient = makeStorageClient();
 
-        const logic = createAvatarLogic(makeBucketsConfig(), makeDals(avatarDal, avatarCategoryDal) as unknown as Dals, storageClient as unknown as StorageClient);
+        const logic = createAvatarLogic(makeBucketsConfig(), avatarCategoryDal as unknown as AvatarCategoryDal, storageClient as unknown as StorageClient)(avatarDal as unknown as AvatarDal);
         await expect(logic.createAvatar(makeAvatar(), makeImage())).rejects.toThrow('Category assigned to avatar does not exist');
 
         expect(avatarDal.createAvatar).not.toHaveBeenCalled();
@@ -98,7 +89,7 @@ describe('createAvatarLogic.createAvatar', () => {
         const avatarCategoryDal = makeAvatarCategoryDal();
         const storageClient = makeStorageClient();
 
-        const logic = createAvatarLogic(makeBucketsConfig(), makeDals(avatarDal, avatarCategoryDal) as unknown as Dals, storageClient as unknown as StorageClient);
+        const logic = createAvatarLogic(makeBucketsConfig(), avatarCategoryDal as unknown as AvatarCategoryDal, storageClient as unknown as StorageClient)(avatarDal as unknown as AvatarDal);
         await expect(logic.createAvatar(makeAvatar(), makeImage())).rejects.toThrow('db error');
 
         expect(storageClient.uploadObject).not.toHaveBeenCalled();
@@ -111,7 +102,7 @@ describe('createAvatarLogic.deleteAvatar', () => {
         const avatarCategoryDal = makeAvatarCategoryDal();
         const storageClient = makeStorageClient();
 
-        const logic = createAvatarLogic(makeBucketsConfig(), makeDals(avatarDal, avatarCategoryDal) as unknown as Dals, storageClient as unknown as StorageClient);
+        const logic = createAvatarLogic(makeBucketsConfig(), avatarCategoryDal as unknown as AvatarCategoryDal, storageClient as unknown as StorageClient)(avatarDal as unknown as AvatarDal);
         await logic.deleteAvatar('av-1');
 
         expect(avatarDal.deleteAvatar).toHaveBeenCalledWith('av-1');
@@ -127,7 +118,7 @@ describe('createAvatarLogic.getAllAvatars', () => {
         const avatarCategoryDal = makeAvatarCategoryDal();
         const storageClient = makeStorageClient();
 
-        const logic = createAvatarLogic(makeBucketsConfig(), makeDals(avatarDal, avatarCategoryDal) as unknown as Dals, storageClient as unknown as StorageClient);
+        const logic = createAvatarLogic(makeBucketsConfig(), avatarCategoryDal as unknown as AvatarCategoryDal, storageClient as unknown as StorageClient)(avatarDal as unknown as AvatarDal);
         const result = await logic.getAllAvatars();
 
         expect(result).toEqual(avatars);
@@ -142,7 +133,7 @@ describe('createAvatarLogic.getAvatar', () => {
         const avatarCategoryDal = makeAvatarCategoryDal();
         const storageClient = makeStorageClient();
 
-        const logic = createAvatarLogic(makeBucketsConfig(), makeDals(avatarDal, avatarCategoryDal) as unknown as Dals, storageClient as unknown as StorageClient);
+        const logic = createAvatarLogic(makeBucketsConfig(), avatarCategoryDal as unknown as AvatarCategoryDal, storageClient as unknown as StorageClient)(avatarDal as unknown as AvatarDal);
         const result = await logic.getAvatar('av-1');
 
         expect(avatarDal.getAvatarById).toHaveBeenCalledWith('av-1');
@@ -154,7 +145,7 @@ describe('createAvatarLogic.getAvatar', () => {
         const avatarCategoryDal = makeAvatarCategoryDal();
         const storageClient = makeStorageClient();
 
-        const logic = createAvatarLogic(makeBucketsConfig(), makeDals(avatarDal, avatarCategoryDal) as unknown as Dals, storageClient as unknown as StorageClient);
+        const logic = createAvatarLogic(makeBucketsConfig(), avatarCategoryDal as unknown as AvatarCategoryDal, storageClient as unknown as StorageClient)(avatarDal as unknown as AvatarDal);
         const result = await logic.getAvatar('nonexistent');
 
         expect(result).toBeNull();
@@ -168,7 +159,7 @@ describe('createAvatarLogic.getAvatarImage', () => {
         const storageClient = makeStorageClient();
         storageClient.downloadObject.mockResolvedValue(objectStream);
 
-        const logic = createAvatarLogic(makeBucketsConfig(), makeDals(avatarDal, avatarCategoryDal) as unknown as Dals, storageClient as unknown as StorageClient);
+        const logic = createAvatarLogic(makeBucketsConfig(), avatarCategoryDal as unknown as AvatarCategoryDal, storageClient as unknown as StorageClient)(avatarDal as unknown as AvatarDal);
         const stream = await logic.getAvatarImage('av-1');
 
         expect(storageClient.downloadObject).toHaveBeenCalledWith('kawaz-bucket', 'avatars/av-1.jpg');

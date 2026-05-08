@@ -40,9 +40,9 @@ describe('createAdminLogic.approveUser', () => {
         const mailer = makeMailer();
         const logic = createAdminLogic(mailer, userDal);
 
-        await logic.approveUser('alice');
+        await logic.approveUser('alice', 'user');
 
-        expect(userDal.approveUser).toHaveBeenCalledWith('alice');
+        expect(userDal.approveUser).toHaveBeenCalledWith('alice', 'user');
         expect(mailer.sendApprovalEmail).toHaveBeenCalledWith('alice', 'alice@example.com');
     });
 
@@ -50,8 +50,8 @@ describe('createAdminLogic.approveUser', () => {
         const userDal = makeUserDal({ approveUser: jest.fn().mockResolvedValue(null) });
         const logic = createAdminLogic(makeMailer(), userDal);
 
-        await expect(logic.approveUser('unknown')).rejects.toThrow(NotFoundError);
-        expect(userDal.approveUser).toHaveBeenCalledWith('unknown');
+        await expect(logic.approveUser('unknown', 'user')).rejects.toThrow(NotFoundError);
+        expect(userDal.approveUser).toHaveBeenCalledWith('unknown', 'user');
     });
 });
 

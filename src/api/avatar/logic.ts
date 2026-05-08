@@ -1,16 +1,17 @@
+import { BadRequestError } from "@ido_kawaz/server-framework";
 import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
+import { AvatarDal } from "../../dal/avatar";
 import { Avatar } from "../../dal/avatar/model";
-import { Dals } from "../../dal/types";
+import { AvatarCategoryDal } from "../../dal/avatarCategory";
 import { cleanupPath } from "../../utils/files";
 import { BucketsConfig, UploadedFile } from "../../utils/types";
-import { BadRequestError } from "@ido_kawaz/server-framework";
 
 export const createAvatarLogic = (
     { kawazPlus: { kawazStorageBucket, avatarPrefix } }: BucketsConfig,
-    { avatarDal, avatarCategoryDal }: Dals,
+    avatarCategoryDal: AvatarCategoryDal,
     storageClient: StorageClient,
-) => ({
+) => (avatarDal: AvatarDal) => ({
     createAvatar: async (avatarMetadata: Avatar, avatarImage: UploadedFile) => {
         const categoryExists = await avatarCategoryDal.verifyCategoryExists(avatarMetadata.categoryId);
         if (!categoryExists) {

@@ -3,12 +3,14 @@ import { NotFoundError } from "@ido_kawaz/server-framework";
 import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
 import { isNil } from "ramda";
-import { Dals } from "../../dal/types";
+import { MediaDal } from "../../dal/media";
+import { MediaCollectionDal } from "../../dal/mediaCollection";
+import { MediaGenreDal } from "../../dal/mediaGenre";
+import { TmdbClient } from "../../services/tmdbClient";
 import { cleanupPath } from "../../utils/files";
 import { BucketsConfig, UploadedFile } from "../../utils/types";
 import { ConvertMessage, InitiateUploadRequestBody, InitiateUploadResponse, MediaUpdateRequestBody } from "./types";
 import { validateMediaContainingCollectionAndGenre } from "./utils";
-import { TmdbClient } from "../../services/tmdbClient";
 
 const PRESIGNED_URL_EXPIRY_SECONDS = 3600;
 
@@ -17,11 +19,11 @@ export const createMediaLogic = (
     vod: { vodStorageBucket },
     kawazPlus: { kawazStorageBucket: kawazBucket, uploadPrefix, thumbnailPrefix }
   }: BucketsConfig,
-  { mediaDal, mediaCollectionDal, mediaGenreDal }: Dals,
+  mediaGenreDal: MediaGenreDal,
   amqpClient: AmqpClient,
   storageClient: StorageClient,
   tmdbClient: TmdbClient
-) => ({
+) => (mediaDal: MediaDal, mediaCollectionDal: MediaCollectionDal) => ({
   initiateUpload: async (body: InitiateUploadRequestBody): Promise<InitiateUploadResponse> => {
     const { fileName, fileSize, mimeType: _mimeType, ...mediaBody } = body;
     const { kind, genres, collectionId: containingCollectionId } = mediaBody;

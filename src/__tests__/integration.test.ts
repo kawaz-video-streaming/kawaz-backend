@@ -21,7 +21,9 @@ import { UserDal } from '../dal/user';
 import { AvatarCategoryDal } from '../dal/avatarCategory';
 import { AvatarDal } from '../dal/avatar';
 import { Dals } from '../dal/types';
+import { MediaGenreDal } from '../dal/mediaGenre';
 import { createMediaRouter } from '../api/media';
+import { decideMediaAndMediaCollectionDalByUserRoleMiddleware } from '../api/media/middleware';
 import { createAuthRouter } from '../api/auth';
 import { createAvatarCategoryRouter } from '../api/avatarCategory';
 import { createAuthMiddleware } from '../api/middleware';
@@ -99,10 +101,11 @@ describe('Media upload integration', () => {
         } as unknown as Mailer;
         app.use('/auth', createAuthRouter(AUTH_CONFIG, mailer, userDal as unknown as UserDal));
         app.use(authMiddleware);
-        app.use('/media', createMediaRouter({
+        const mockDals = { mediaDal, specialMediaDal: mediaDal, mediaCollectionDal: {}, specialMediaCollectionDal: {} } as unknown as Dals;
+        app.use('/media', decideMediaAndMediaCollectionDalByUserRoleMiddleware(mockDals), createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'upload-bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, amqpClient as unknown as AmqpClient, storageClient as unknown as StorageClient, { getMovieDetails: jest.fn() } as any));
+        }, { verifyGenreExists: jest.fn().mockResolvedValue(true) } as unknown as MediaGenreDal, amqpClient as unknown as AmqpClient, storageClient as unknown as StorageClient, { getMovieDetails: jest.fn() } as any));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -311,6 +314,7 @@ describe('AvatarCategory integration', () => {
         app.use('/avatarCategory', createAvatarCategoryRouter({
             avatarCategoryDal: avatarCategoryDal as unknown as AvatarCategoryDal,
             avatarDal: avatarDal as unknown as AvatarDal,
+            specialAvatarDal: avatarDal as unknown as AvatarDal,
         } as unknown as Dals));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {

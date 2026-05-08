@@ -1,11 +1,13 @@
 import { BadRequestError } from "@ido_kawaz/server-framework";
 import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
-import { Dals } from "../../dal/types";
+import { MediaGenreDal } from "../../dal/mediaGenre";
 import { cleanupPath } from "../../utils/files";
 import { BucketsConfig, UploadedFile } from "../../utils/types";
 import { MediaCollectionUpdateRequestBody } from "./types";
 import { validateMediaCollectionContainingCollectionAndGenre } from "./utils";
+import { MediaCollectionDal } from "../../dal/mediaCollection";
+import { MediaDal } from "../../dal/media";
 
 class CollectionNotEmptyError extends BadRequestError {
   constructor() {
@@ -15,9 +17,9 @@ class CollectionNotEmptyError extends BadRequestError {
 
 export const createMediaCollectionLogic = (
   { kawazPlus: { kawazStorageBucket, thumbnailPrefix } }: BucketsConfig,
-  { mediaCollectionDal, mediaDal, mediaGenreDal }: Dals,
+  mediaGenreDal: MediaGenreDal,
   storageClient: StorageClient,
-) => ({
+) => (mediaCollectionDal: MediaCollectionDal, mediaDal: MediaDal) => ({
   createMediaCollection: async (body: MediaCollectionUpdateRequestBody, thumbnail: UploadedFile) => {
     const { collectionId: containingCollectionId, kind, genres } = body;
     await validateMediaCollectionContainingCollectionAndGenre(mediaCollectionDal, mediaGenreDal, genres, kind, containingCollectionId);

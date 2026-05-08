@@ -17,6 +17,8 @@ import { createMediaGenreRouter } from "./mediaGenre";
 import { createAuthMiddleware, requireAdmin } from "./middleware";
 import { swaggerSpec } from "./swagger";
 import { createUserRouter } from "./user";
+import { decideAvatarDalByUserRoleMiddleware } from "./avatar/middleware";
+import { decideMediaAndMediaCollectionDalByUserRoleMiddleware } from "./media/middleware";
 
 
 export const registerRoutes = (
@@ -27,7 +29,7 @@ export const registerRoutes = (
     tmdbClient: TmdbClient,
     dals: Dals
 ) => (app: Application) => {
-    const { userDal } = dals;
+    const { userDal, avatarCategoryDal, mediaGenreDal } = dals;
     const { authConfig } = config;
 
     /**
@@ -58,10 +60,10 @@ export const registerRoutes = (
     // API routes
     app.use('/admin', requireAdmin, createAdminRouter(mailer, userDal));
     app.use('/user', createUserRouter(userDal));
-    app.use("/avatar", createAvatarRouter(config.bucketsConfig, dals, storageClient));
+    app.use("/avatar", decideAvatarDalByUserRoleMiddleware(dals), createAvatarRouter(config.bucketsConfig, avatarCategoryDal, storageClient));
     app.use('/avatarCategory', createAvatarCategoryRouter(dals));
-    app.use("/media", createMediaRouter(config.bucketsConfig, dals, amqpClient, storageClient, tmdbClient));
-    app.use("/mediaCollection", createMediaCollectionRouter(config.bucketsConfig, dals, storageClient));
+    app.use("/media", decideMediaAndMediaCollectionDalByUserRoleMiddleware(dals), createMediaRouter(config.bucketsConfig, mediaGenreDal, amqpClient, storageClient, tmdbClient));
+    app.use("/mediaCollection", decideMediaAndMediaCollectionDalByUserRoleMiddleware(dals), createMediaCollectionRouter(config.bucketsConfig, mediaGenreDal, storageClient));
     app.use("/mediaGenre", createMediaGenreRouter(dals));
     return app;
 };

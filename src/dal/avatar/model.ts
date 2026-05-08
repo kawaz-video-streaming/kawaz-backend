@@ -21,4 +21,7 @@ const avatarSchema = new Schema<Avatar>({
 export const createAvatarModel = (client: MongoClient) =>
     client.createModel<Avatar>('avatar', avatarSchema);
 
+export const createSpecialAvatarModel = (client: MongoClient) =>
+    client.createModel<Avatar>('specialAvatar', avatarSchema);
+
 export type AvatarModel = Model<Avatar>;

@@ -4,7 +4,6 @@ import { StorageClient } from '@ido_kawaz/storage-client';
 import { MediaDal } from '../../../dal/media';
 import { MediaCollectionDal } from '../../../dal/mediaCollection';
 import { MediaGenreDal } from '../../../dal/mediaGenre';
-import { Dals } from '../../../dal/types';
 import { TmdbClient } from '../../../services/tmdbClient';
 import { createMediaLogic } from '../logic';
 import { InitiateUploadRequestBody } from '../types';
@@ -49,6 +48,7 @@ describe('createMediaLogic.initiateUpload', () => {
     it('creates media record and returns presigned URLs', async () => {
         const media = { _id: 'm1', fileName: 'video.mp4', title: 'My Video', genres: [], size: 64, status: 'pending' };
         const mediaDal = { createMedia: jest.fn().mockResolvedValue(media) } as unknown as MediaDal;
+        const mediaCollectionDal = makeMediaCollectionDal() as unknown as MediaCollectionDal;
         const storageClient = {
             ensureBucket: jest.fn().mockResolvedValue(undefined),
             getPutPresignedUrl: jest.fn()
@@ -56,11 +56,7 @@ describe('createMediaLogic.initiateUpload', () => {
                 .mockResolvedValueOnce('https://minio/raw/thumbnails/m1.jpg?sig=xyz'),
         } as unknown as StorageClient;
 
-        const logic = createMediaLogic(makeConfig(), {
-            mediaDal,
-            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
-            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, {} as any, storageClient, makeTmdbClient() as unknown as TmdbClient);
+        const logic = createMediaLogic(makeConfig(), makeMediaGenreDal() as unknown as MediaGenreDal, {} as any, storageClient, makeTmdbClient() as unknown as TmdbClient)(mediaDal, mediaCollectionDal);
         const result = await logic.initiateUpload(makeBody());
 
         expect(mediaDal.createMedia).toHaveBeenCalledWith({
@@ -83,6 +79,7 @@ describe('createMediaLogic.initiateUpload', () => {
 
     it('throws BadRequestError when a referenced genre does not exist', async () => {
         const mediaDal = { createMedia: jest.fn() } as unknown as MediaDal;
+        const mediaCollectionDal = makeMediaCollectionDal() as unknown as MediaCollectionDal;
         const mediaGenreDal = makeMediaGenreDal();
         mediaGenreDal.verifyGenreExists.mockResolvedValue(false);
         const storageClient = {
@@ -90,11 +87,7 @@ describe('createMediaLogic.initiateUpload', () => {
             getPutPresignedUrl: jest.fn(),
         } as unknown as StorageClient;
 
-        const logic = createMediaLogic(makeConfig(), {
-            mediaDal,
-            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
-            mediaGenreDal: mediaGenreDal as unknown as MediaGenreDal,
-        } as unknown as Dals, {} as any, storageClient, makeTmdbClient() as unknown as TmdbClient);
+        const logic = createMediaLogic(makeConfig(), mediaGenreDal as unknown as MediaGenreDal, {} as any, storageClient, makeTmdbClient() as unknown as TmdbClient)(mediaDal, mediaCollectionDal);
 
         await expect(logic.initiateUpload(makeBody({ genres: ['NonExistent'] }))).rejects.toBeInstanceOf(BadRequestError);
         expect(mediaDal.createMedia).not.toHaveBeenCalled();
@@ -102,16 +95,13 @@ describe('createMediaLogic.initiateUpload', () => {
 
     it('propagates DAL failure and never generates URLs', async () => {
         const mediaDal = { createMedia: jest.fn().mockRejectedValue(new Error('db write failed')) } as unknown as MediaDal;
+        const mediaCollectionDal = makeMediaCollectionDal() as unknown as MediaCollectionDal;
         const storageClient = {
             ensureBucket: jest.fn().mockResolvedValue(undefined),
             getPutPresignedUrl: jest.fn(),
         } as unknown as StorageClient;
 
-        const logic = createMediaLogic(makeConfig(), {
-            mediaDal,
-            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
-            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, {} as any, storageClient, makeTmdbClient() as unknown as TmdbClient);
+        const logic = createMediaLogic(makeConfig(), makeMediaGenreDal() as unknown as MediaGenreDal, {} as any, storageClient, makeTmdbClient() as unknown as TmdbClient)(mediaDal, mediaCollectionDal);
 
         await expect(logic.initiateUpload(makeBody())).rejects.toThrow('db write failed');
         expect(storageClient.getPutPresignedUrl).not.toHaveBeenCalled();
@@ -125,13 +115,10 @@ describe('createMediaLogic.completeUpload', () => {
             getPendingMedia: jest.fn().mockResolvedValue(media),
             updateMedia: jest.fn().mockResolvedValue(undefined),
         } as unknown as MediaDal;
+        const mediaCollectionDal = makeMediaCollectionDal() as unknown as MediaCollectionDal;
         const amqpClient = { publish: jest.fn() } as unknown as AmqpClient;
 
-        const logic = createMediaLogic(makeConfig(), {
-            mediaDal,
-            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
-            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, amqpClient, {} as any, makeTmdbClient() as unknown as TmdbClient);
+        const logic = createMediaLogic(makeConfig(), makeMediaGenreDal() as unknown as MediaGenreDal, amqpClient, {} as any, makeTmdbClient() as unknown as TmdbClient)(mediaDal, mediaCollectionDal);
         await logic.completeUpload('m1');
 
         expect(mediaDal.getPendingMedia).toHaveBeenCalledWith('m1');
@@ -146,13 +133,10 @@ describe('createMediaLogic.completeUpload', () => {
 
     it('throws NotFoundError when media is not pending', async () => {
         const mediaDal = { getPendingMedia: jest.fn().mockResolvedValue(null) } as unknown as MediaDal;
+        const mediaCollectionDal = makeMediaCollectionDal() as unknown as MediaCollectionDal;
         const amqpClient = { publish: jest.fn() } as unknown as AmqpClient;
 
-        const logic = createMediaLogic(makeConfig(), {
-            mediaDal,
-            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
-            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, amqpClient, {} as any, makeTmdbClient() as unknown as TmdbClient);
+        const logic = createMediaLogic(makeConfig(), makeMediaGenreDal() as unknown as MediaGenreDal, amqpClient, {} as any, makeTmdbClient() as unknown as TmdbClient)(mediaDal, mediaCollectionDal);
 
         await expect(logic.completeUpload('m-missing')).rejects.toThrow(NotFoundError);
         expect(amqpClient.publish).not.toHaveBeenCalled();
@@ -164,13 +148,10 @@ describe('createMediaLogic.completeUpload', () => {
             getPendingMedia: jest.fn().mockResolvedValue(media),
             updateMedia: jest.fn(),
         } as unknown as MediaDal;
+        const mediaCollectionDal = makeMediaCollectionDal() as unknown as MediaCollectionDal;
         const amqpClient = { publish: jest.fn().mockImplementation(() => { throw new Error('amqp down'); }) } as unknown as AmqpClient;
 
-        const logic = createMediaLogic(makeConfig(), {
-            mediaDal,
-            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
-            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, amqpClient, {} as any, makeTmdbClient() as unknown as TmdbClient);
+        const logic = createMediaLogic(makeConfig(), makeMediaGenreDal() as unknown as MediaGenreDal, amqpClient, {} as any, makeTmdbClient() as unknown as TmdbClient)(mediaDal, mediaCollectionDal);
 
         await expect(logic.completeUpload('m1')).rejects.toThrow('amqp down');
         expect(mediaDal.updateMedia).not.toHaveBeenCalled();
@@ -198,11 +179,7 @@ describe('createMediaLogic.getMovieMediaTmdbDetails', () => {
         const tmdbClient = makeTmdbClient();
         tmdbClient.getMovieDetails.mockResolvedValue(movieDetails as any);
 
-        const logic = createMediaLogic(makeConfig(), {
-            mediaDal: {} as unknown as MediaDal,
-            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
-            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, {} as any, {} as any, tmdbClient as unknown as TmdbClient);
+        const logic = createMediaLogic(makeConfig(), makeMediaGenreDal() as unknown as MediaGenreDal, {} as any, {} as any, tmdbClient as unknown as TmdbClient)({} as unknown as MediaDal, makeMediaCollectionDal() as unknown as MediaCollectionDal);
 
         const result = await logic.getMovieMediaTmdbDetails('Inception', 2010);
 
@@ -214,11 +191,7 @@ describe('createMediaLogic.getMovieMediaTmdbDetails', () => {
         const tmdbClient = makeTmdbClient();
         tmdbClient.getMovieDetails.mockRejectedValue(new NotFoundError('No movie found on TMDB'));
 
-        const logic = createMediaLogic(makeConfig(), {
-            mediaDal: {} as unknown as MediaDal,
-            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
-            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, {} as any, {} as any, tmdbClient as unknown as TmdbClient);
+        const logic = createMediaLogic(makeConfig(), makeMediaGenreDal() as unknown as MediaGenreDal, {} as any, {} as any, tmdbClient as unknown as TmdbClient)({} as unknown as MediaDal, makeMediaCollectionDal() as unknown as MediaCollectionDal);
 
         await expect(logic.getMovieMediaTmdbDetails('Unknown', 1900)).rejects.toThrow(NotFoundError);
     });
@@ -238,11 +211,7 @@ describe('createMediaLogic.getCollectionMediaTmdbDetails', () => {
         const tmdbClient = makeTmdbClient();
         tmdbClient.getCollectionDetails.mockResolvedValue(collectionDetails as any);
 
-        const logic = createMediaLogic(makeConfig(), {
-            mediaDal: {} as unknown as MediaDal,
-            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
-            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, {} as any, {} as any, tmdbClient as unknown as TmdbClient);
+        const logic = createMediaLogic(makeConfig(), makeMediaGenreDal() as unknown as MediaGenreDal, {} as any, {} as any, tmdbClient as unknown as TmdbClient)({} as unknown as MediaDal, makeMediaCollectionDal() as unknown as MediaCollectionDal);
 
         const result = await logic.getCollectionMediaTmdbDetails(263);
 
@@ -270,11 +239,7 @@ describe('createMediaLogic.getShowMediaTmdbDetails', () => {
         const tmdbClient = makeTmdbClient();
         tmdbClient.getShowDetails.mockResolvedValue(showDetails as any);
 
-        const logic = createMediaLogic(makeConfig(), {
-            mediaDal: {} as unknown as MediaDal,
-            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
-            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, {} as any, {} as any, tmdbClient as unknown as TmdbClient);
+        const logic = createMediaLogic(makeConfig(), makeMediaGenreDal() as unknown as MediaGenreDal, {} as any, {} as any, tmdbClient as unknown as TmdbClient)({} as unknown as MediaDal, makeMediaCollectionDal() as unknown as MediaCollectionDal);
 
         const result = await logic.getShowMediaTmdbDetails('Game of Thrones', 2011);
 
@@ -286,11 +251,7 @@ describe('createMediaLogic.getShowMediaTmdbDetails', () => {
         const tmdbClient = makeTmdbClient();
         tmdbClient.getShowDetails.mockRejectedValue(new NotFoundError('No TV show found on TMDB'));
 
-        const logic = createMediaLogic(makeConfig(), {
-            mediaDal: {} as unknown as MediaDal,
-            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
-            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, {} as any, {} as any, tmdbClient as unknown as TmdbClient);
+        const logic = createMediaLogic(makeConfig(), makeMediaGenreDal() as unknown as MediaGenreDal, {} as any, {} as any, tmdbClient as unknown as TmdbClient)({} as unknown as MediaDal, makeMediaCollectionDal() as unknown as MediaCollectionDal);
 
         await expect(logic.getShowMediaTmdbDetails('Unknown', 1900)).rejects.toThrow(NotFoundError);
     });
@@ -314,11 +275,7 @@ describe('createMediaLogic.getEpisodeMediaTmdbDetails', () => {
         const tmdbClient = makeTmdbClient();
         tmdbClient.getEpisodeDetails.mockResolvedValue(episodeDetails as any);
 
-        const logic = createMediaLogic(makeConfig(), {
-            mediaDal: {} as unknown as MediaDal,
-            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
-            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, {} as any, {} as any, tmdbClient as unknown as TmdbClient);
+        const logic = createMediaLogic(makeConfig(), makeMediaGenreDal() as unknown as MediaGenreDal, {} as any, {} as any, tmdbClient as unknown as TmdbClient)({} as unknown as MediaDal, makeMediaCollectionDal() as unknown as MediaCollectionDal);
 
         const result = await logic.getEpisodeMediaTmdbDetails('Game of Thrones', 2011, 1, 1);
 
@@ -330,11 +287,7 @@ describe('createMediaLogic.getEpisodeMediaTmdbDetails', () => {
         const tmdbClient = makeTmdbClient();
         tmdbClient.getEpisodeDetails.mockRejectedValue(new NotFoundError('No TV show found on TMDB'));
 
-        const logic = createMediaLogic(makeConfig(), {
-            mediaDal: {} as unknown as MediaDal,
-            mediaCollectionDal: makeMediaCollectionDal() as unknown as MediaCollectionDal,
-            mediaGenreDal: makeMediaGenreDal() as unknown as MediaGenreDal,
-        } as unknown as Dals, {} as any, {} as any, tmdbClient as unknown as TmdbClient);
+        const logic = createMediaLogic(makeConfig(), makeMediaGenreDal() as unknown as MediaGenreDal, {} as any, {} as any, tmdbClient as unknown as TmdbClient)({} as unknown as MediaDal, makeMediaCollectionDal() as unknown as MediaCollectionDal);
 
         await expect(logic.getEpisodeMediaTmdbDetails('Unknown', 1900, 1, 1)).rejects.toThrow(NotFoundError);
     });

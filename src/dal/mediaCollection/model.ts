@@ -32,4 +32,7 @@ const mediaCollectionSchema = new Schema<MediaCollection>({
 export const createMediaCollectionModel = (client: MongoClient) =>
     client.createModel<MediaCollection>("mediaCollection", mediaCollectionSchema);
 
+export const createSpecialMediaCollectionModel = (client: MongoClient) =>
+    client.createModel<MediaCollection>("specialMediaCollection", mediaCollectionSchema);
+
 export type MediaCollectionModel = Model<MediaCollection>;
