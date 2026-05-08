@@ -14,11 +14,9 @@ import { createAvatarCategoryRouter } from "./avatarCategory";
 import { createMediaRouter } from "./media";
 import { createMediaCollectionRouter } from "./mediaCollection";
 import { createMediaGenreRouter } from "./mediaGenre";
-import { createAuthMiddleware, requireAdmin } from "./middleware";
+import { createAuthMiddleware, decideAvatarDalByUserRoleMiddleware, decideMediaAndMediaCollectionDalByUserRoleMiddleware, requireAdmin } from "./middleware";
 import { swaggerSpec } from "./swagger";
 import { createUserRouter } from "./user";
-import { decideAvatarDalByUserRoleMiddleware } from "./avatar/middleware";
-import { decideMediaAndMediaCollectionDalByUserRoleMiddleware } from "./media/middleware";
 
 
 export const registerRoutes = (

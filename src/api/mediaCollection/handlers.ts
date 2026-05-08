@@ -8,7 +8,7 @@ import { BucketsConfig } from "../../utils/types";
 import { validateRequestWithId } from "../../utils/zod";
 import { createMediaCollectionLogic } from "./logic";
 import { validateMediaCollectionCreationRequest, validateMediaCollectionUpdateRequest } from './types';
-import { MediaAuthenticatedRequest } from "../media/types";
+import { MediaAuthenticatedRequest } from "../types";
 
 export const createMediaCollectionHandlers = (bucketsConfig: BucketsConfig, mediaGenreDal: MediaGenreDal, storageClient: StorageClient) => {
     const logicFactory = createMediaCollectionLogic(bucketsConfig, mediaGenreDal, storageClient);

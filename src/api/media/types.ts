@@ -1,9 +1,7 @@
 import { isNil, isNotNil } from "ramda";
 import z from "zod";
-import { AuthenticatedRequest, Coordinates, MediaKind, mediaKinds, RequestWithIdParam, requestWithIdParamZodSchema, UploadedFile, uploadedFileZodSchema } from "../../utils/types";
+import { Coordinates, MediaKind, mediaKinds, RequestWithIdParam, requestWithIdParamZodSchema, UploadedFile, uploadedFileZodSchema } from "../../utils/types";
 import { validateRequest } from "../../utils/zod";
-import { MediaDal } from "../../dal/media";
-import { MediaCollectionDal } from "../../dal/mediaCollection";
 
 const refineMediaKind = (val: { kind: MediaKind; episodeNumber?: number | null }, ctx: z.RefinementCtx) => {
     if (val.kind === "episode" && isNil(val.episodeNumber))
@@ -138,8 +136,3 @@ export const validateGetTmdbPosterRequest = validateRequest(
     z.object({ query: z.object({ url: z.url().refine(u => u.startsWith('https://image.tmdb.org/'), { message: 'URL must be from image.tmdb.org' }) }) })
         .transform(({ query }) => query.url)
 );
-
-export interface MediaAuthenticatedRequest extends AuthenticatedRequest {
-    mediaDal: MediaDal;
-    mediaCollectionDal: MediaCollectionDal;
-}

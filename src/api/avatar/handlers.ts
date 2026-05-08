@@ -7,7 +7,8 @@ import { requestHandlerDecorator } from "../../utils/decorator";
 import { BucketsConfig } from "../../utils/types";
 import { validateRequestWithId } from "../../utils/zod";
 import { createAvatarLogic } from "./logic";
-import { AvatarAuthenticatedRequest, validateAvatarCreationRequest } from "./types";
+import { AvatarAuthenticatedRequest } from "../types";
+import { validateAvatarCreationRequest } from "./types";
 
 export const createAvatarHandlers = (bucketsConfig: BucketsConfig, avatarCategoryDal: AvatarCategoryDal, storageClient: StorageClient) => {
     const logicFactory = createAvatarLogic(bucketsConfig, avatarCategoryDal, storageClient);

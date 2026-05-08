@@ -26,7 +26,7 @@ export class UserDal extends Dal<User> {
   verifyEmail = async (email: string): Promise<boolean> =>
     isNotNil(await this.model.exists({ email }));
 
-  approveUser = (name: string, role: Omit<Role, "admin">): Promise<User | null> =>
+  approveUser = (name: string, role: Exclude<Role, "admin">): Promise<User | null> =>
     this.model.findOneAndUpdate({ name, status: PENDING_STATUS }, { status: APPROVED_STATUS, role }).lean<User>().exec();
 
   denyUser = (name: string): Promise<User | null> =>

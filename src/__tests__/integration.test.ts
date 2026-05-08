@@ -23,7 +23,7 @@ import { AvatarDal } from '../dal/avatar';
 import { Dals } from '../dal/types';
 import { MediaGenreDal } from '../dal/mediaGenre';
 import { createMediaRouter } from '../api/media';
-import { decideMediaAndMediaCollectionDalByUserRoleMiddleware } from '../api/media/middleware';
+import { decideMediaAndMediaCollectionDalByUserRoleMiddleware } from '../api/middleware';
 import { createAuthRouter } from '../api/auth';
 import { createAvatarCategoryRouter } from '../api/avatarCategory';
 import { createAuthMiddleware } from '../api/middleware';

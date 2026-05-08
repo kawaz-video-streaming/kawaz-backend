@@ -10,8 +10,8 @@ import { requestHandlerDecorator } from "../../utils/decorator";
 import { BucketsConfig } from "../../utils/types";
 import { validateRequestWithId } from "../../utils/zod";
 import { createMediaLogic } from "./logic";
+import { MediaAuthenticatedRequest } from "../types";
 import {
-  MediaAuthenticatedRequest,
   validateCompleteUploadRequest,
   validateGetCollectionTmdbDetailsRequest,
   validateGetEpisodeTmdbDetailsRequest,

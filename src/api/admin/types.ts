@@ -20,14 +20,14 @@ export const adminApprovalRequestZodSchema: z.ZodType<ValidatedAdminApprovalRequ
   .object({
     params: z.object({
       username: z.string().min(3, "valid username is required"),
-      role: z.enum(["user", "special"], "valid role is required"),
+      role: z.enum(["user", "special"], { message: "valid role is required" }),
     }),
   })
   .transform(({ params }) => params);
 
 interface ValidatedAdminApprovalRequest {
   username: string;
-  role: Omit<Role, "admin">;
+  role: Exclude<Role, "admin">;
 }
 
 export const validateAdminApprovalRequest = validateRequest(adminApprovalRequestZodSchema);

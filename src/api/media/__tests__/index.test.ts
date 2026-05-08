@@ -9,7 +9,7 @@ import { Dals } from '../../../dal/types';
 import { MediaGenreDal } from '../../../dal/mediaGenre';
 import { TmdbClient } from '../../../services/tmdbClient';
 import { createAuthMiddleware } from '../../middleware';
-import { decideMediaAndMediaCollectionDalByUserRoleMiddleware } from '../middleware';
+import { decideMediaAndMediaCollectionDalByUserRoleMiddleware } from '../../middleware';
 import { createMediaRouter } from '../index';
 
 const makeMockDals = (mediaDal: object, mediaCollectionDal: object = {}): Dals =>

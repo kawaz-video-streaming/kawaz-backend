@@ -8,7 +8,7 @@ export const createAdminLogic = (
     userDal: UserDal
 ) => ({
     getPendingUsers: userDal.getPendingUsers,
-    approveUser: async (username: string, role: Omit<Role, "admin">) => {
+    approveUser: async (username: string, role: Exclude<Role, "admin">) => {
         const user = await userDal.approveUser(username, role);
         if (user) {
             await mailer.sendApprovalEmail(user.name, user.email);
