@@ -4,8 +4,8 @@ import { Dals } from "../dal/types";
 import { ConsumersConfig } from "./config";
 import { createProgressConsumer } from "./progress";
 
-export const createConsumers = (_config: ConsumersConfig, _storageClient: StorageClient, _amqpClient: AmqpClient, { mediaDal }: Dals) => {
+export const createConsumers = (_config: ConsumersConfig, _storageClient: StorageClient, _amqpClient: AmqpClient, { mediaDal, specialMediaDal }: Dals) => {
     return [
-        createProgressConsumer(mediaDal)
+        createProgressConsumer(mediaDal, specialMediaDal)
     ];
 };
