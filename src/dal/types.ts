@@ -14,9 +14,12 @@ import { UserModel } from "./user/model";
 
 export interface Models extends Record<string, Model<any>> {
     mediaModel: MediaModel;
-    mediaCollectionModel: MediaCollectionModel
+    specialMediaModel: MediaModel;
+    mediaCollectionModel: MediaCollectionModel;
+    specialMediaCollectionModel: MediaCollectionModel;
     userModel: UserModel;
     avatarModel: AvatarModel;
+    specialAvatarModel: AvatarModel;
     avatarCategoryModel: AvatarCategoryModel;
     mediaGenreModel: MediaGenreModel;
 }
@@ -24,9 +27,12 @@ export interface Models extends Record<string, Model<any>> {
 
 export interface Dals {
     mediaDal: MediaDal;
+    specialMediaDal: MediaDal;
     mediaCollectionDal: MediaCollectionDal;
+    specialMediaCollectionDal: MediaCollectionDal;
     userDal: UserDal;
     avatarDal: AvatarDal;
+    specialAvatarDal: AvatarDal;
     avatarCategoryDal: AvatarCategoryDal;
     mediaGenreDal: MediaGenreDal;
 }

@@ -24,10 +24,14 @@ const makeDals = (
     mediaGenreDal: ReturnType<typeof makeGenreDal>,
     mediaDal: ReturnType<typeof makeMediaDal>,
     mediaCollectionDal: ReturnType<typeof makeMediaCollectionDal>,
-): Pick<Dals, 'mediaGenreDal' | 'mediaDal' | 'mediaCollectionDal'> => ({
+    specialMediaDal: ReturnType<typeof makeMediaDal> = makeMediaDal(),
+    specialMediaCollectionDal: ReturnType<typeof makeMediaCollectionDal> = makeMediaCollectionDal(),
+): Pick<Dals, 'mediaGenreDal' | 'mediaDal' | 'mediaCollectionDal' | 'specialMediaDal' | 'specialMediaCollectionDal'> => ({
     mediaGenreDal: mediaGenreDal as unknown as MediaGenreDal,
     mediaDal: mediaDal as unknown as MediaDal,
     mediaCollectionDal: mediaCollectionDal as unknown as MediaCollectionDal,
+    specialMediaDal: specialMediaDal as unknown as MediaDal,
+    specialMediaCollectionDal: specialMediaCollectionDal as unknown as MediaCollectionDal,
 });
 
 const makeGenre = (overrides: Partial<MediaGenre> = {}): MediaGenre => ({
@@ -133,6 +137,32 @@ describe('createMediaGenreLogic.deleteGenre', () => {
         collectionDal.isGenreUsedInCollection.mockResolvedValue(true);
 
         const logic = createMediaGenreLogic(makeDals(genreDal, mediaDal, collectionDal) as unknown as Dals);
+        await expect(logic.deleteGenre('Action')).rejects.toThrow('has associated media or collections');
+
+        expect(genreDal.deleteGenre).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestError when genre has associated special media', async () => {
+        const genreDal = makeGenreDal();
+        const mediaDal = makeMediaDal();
+        const collectionDal = makeMediaCollectionDal();
+        const specialMediaDal = makeMediaDal();
+        specialMediaDal.isGenreEmpty.mockResolvedValue(false);
+
+        const logic = createMediaGenreLogic(makeDals(genreDal, mediaDal, collectionDal, specialMediaDal) as unknown as Dals);
+        await expect(logic.deleteGenre('Action')).rejects.toThrow('has associated media or collections');
+
+        expect(genreDal.deleteGenre).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestError when genre is used in a special collection', async () => {
+        const genreDal = makeGenreDal();
+        const mediaDal = makeMediaDal();
+        const collectionDal = makeMediaCollectionDal();
+        const specialCollectionDal = makeMediaCollectionDal();
+        specialCollectionDal.isGenreUsedInCollection.mockResolvedValue(true);
+
+        const logic = createMediaGenreLogic(makeDals(genreDal, mediaDal, collectionDal, makeMediaDal(), specialCollectionDal) as unknown as Dals);
         await expect(logic.deleteGenre('Action')).rejects.toThrow('has associated media or collections');
 
         expect(genreDal.deleteGenre).not.toHaveBeenCalled();

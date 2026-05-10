@@ -3,7 +3,7 @@ import { isNil } from "ramda";
 import { Dals } from "../../dal/types";
 
 export const createMediaGenreLogic = (
-    { mediaDal, mediaGenreDal, mediaCollectionDal }: Dals
+    { mediaDal, specialMediaDal, mediaGenreDal, mediaCollectionDal, specialMediaCollectionDal }: Dals
 ) => ({
     getAllGenres: () => mediaGenreDal.getAllGenres(),
     getGenre: async (genreId: string) => {
@@ -24,8 +24,8 @@ export const createMediaGenreLogic = (
         }
     },
     deleteGenre: async (name: string) => {
-        const isGenreEmptyFromMedias = await mediaDal.isGenreEmpty(name);
-        const isGenreEmptyFromCollections = !(await mediaCollectionDal.isGenreUsedInCollection(name));
+        const isGenreEmptyFromMedias = await mediaDal.isGenreEmpty(name) && await specialMediaDal.isGenreEmpty(name);
+        const isGenreEmptyFromCollections = !(await mediaCollectionDal.isGenreUsedInCollection(name)) && !(await specialMediaCollectionDal.isGenreUsedInCollection(name));
         if (!isGenreEmptyFromMedias || !isGenreEmptyFromCollections) {
             throw new BadRequestError(`Cannot delete genre with name ${name} because it has associated media or collections`);
         }

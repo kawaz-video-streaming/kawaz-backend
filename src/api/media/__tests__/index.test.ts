@@ -6,9 +6,14 @@ import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import { UserDal } from '../../../dal/user';
 import { Dals } from '../../../dal/types';
+import { MediaGenreDal } from '../../../dal/mediaGenre';
 import { TmdbClient } from '../../../services/tmdbClient';
 import { createAuthMiddleware } from '../../middleware';
+import { decideMediaAndMediaCollectionDalByUserRoleMiddleware } from '../../middleware';
 import { createMediaRouter } from '../index';
+
+const makeMockDals = (mediaDal: object, mediaCollectionDal: object = {}): Dals =>
+    ({ mediaDal, specialMediaDal: mediaDal, mediaCollectionDal, specialMediaCollectionDal: mediaCollectionDal } as unknown as Dals);
 
 const parseCookies = (req: express.Request, _res: express.Response, next: express.NextFunction) => {
     req.cookies = {};
@@ -69,10 +74,11 @@ describe('POST /upload/initiate and POST /upload/complete routes', () => {
         app.use(express.json());
         app.use(parseCookies);
         app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use('/media', createMediaRouter({
+        const mockDals = makeMockDals(mediaDal);
+        app.use('/media', decideMediaAndMediaCollectionDalByUserRoleMiddleware(mockDals), createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'upload-bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, amqpClient as unknown as AmqpClient, storageClient as any, { getMovieDetails: jest.fn() } as unknown as TmdbClient));
+        }, { verifyGenreExists: jest.fn().mockResolvedValue(true) } as unknown as MediaGenreDal, amqpClient as unknown as AmqpClient, storageClient as any, { getMovieDetails: jest.fn() } as unknown as TmdbClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -186,10 +192,10 @@ describe('GET /media/uploading', () => {
         app = express();
         app.use(parseCookies);
         app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use('/media', createMediaRouter({
+        app.use('/media', decideMediaAndMediaCollectionDalByUserRoleMiddleware(makeMockDals(mediaDal)), createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, {} as unknown as AmqpClient, {} as any, { getMovieDetails: jest.fn() } as unknown as TmdbClient));
+        }, { verifyGenreExists: jest.fn().mockResolvedValue(true) } as unknown as MediaGenreDal, {} as unknown as AmqpClient, {} as any, { getMovieDetails: jest.fn() } as unknown as TmdbClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -267,10 +273,10 @@ describe('GET /media/:id/progress', () => {
         app = express();
         app.use(parseCookies);
         app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use('/media', createMediaRouter({
+        app.use('/media', decideMediaAndMediaCollectionDalByUserRoleMiddleware(makeMockDals(mediaDal)), createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal, mediaCollectionDal: {}, mediaGenreDal: { verifyGenreExists: jest.fn().mockResolvedValue(true) } } as unknown as Dals, {} as unknown as AmqpClient, {} as any, { getMovieDetails: jest.fn() } as unknown as TmdbClient));
+        }, { verifyGenreExists: jest.fn().mockResolvedValue(true) } as unknown as MediaGenreDal, {} as unknown as AmqpClient, {} as any, { getMovieDetails: jest.fn() } as unknown as TmdbClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -361,10 +367,10 @@ describe('GET /media/tmdb/movie', () => {
         app = express();
         app.use(parseCookies);
         app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use('/media', createMediaRouter({
+        app.use('/media', decideMediaAndMediaCollectionDalByUserRoleMiddleware(makeMockDals({})), createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal: {}, mediaCollectionDal: {}, mediaGenreDal: {} } as unknown as Dals, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
+        }, {} as unknown as MediaGenreDal, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -455,10 +461,10 @@ describe('GET /media/tmdb/collection', () => {
         app = express();
         app.use(parseCookies);
         app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use('/media', createMediaRouter({
+        app.use('/media', decideMediaAndMediaCollectionDalByUserRoleMiddleware(makeMockDals({})), createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal: {}, mediaCollectionDal: {}, mediaGenreDal: {} } as unknown as Dals, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
+        }, {} as unknown as MediaGenreDal, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -517,10 +523,10 @@ describe('GET /media/tmdb/poster', () => {
         app = express();
         app.use(parseCookies);
         app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use('/media', createMediaRouter({
+        app.use('/media', decideMediaAndMediaCollectionDalByUserRoleMiddleware(makeMockDals({})), createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal: {}, mediaCollectionDal: {}, mediaGenreDal: {} } as unknown as Dals, {} as unknown as AmqpClient, {} as any, { getMovieDetails: jest.fn(), getCollectionDetails: jest.fn() } as unknown as TmdbClient));
+        }, {} as unknown as MediaGenreDal, {} as unknown as AmqpClient, {} as any, { getMovieDetails: jest.fn(), getCollectionDetails: jest.fn() } as unknown as TmdbClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) {
                 res.status(error.statusCode).json({ message: error.message });
@@ -584,10 +590,10 @@ describe('GET /media/tmdb/show', () => {
         app = express();
         app.use(parseCookies);
         app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use('/media', createMediaRouter({
+        app.use('/media', decideMediaAndMediaCollectionDalByUserRoleMiddleware(makeMockDals({})), createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal: {}, mediaCollectionDal: {}, mediaGenreDal: {} } as unknown as Dals, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
+        }, {} as unknown as MediaGenreDal, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) { res.status(error.statusCode).json({ message: error.message }); return; }
             res.status(500).json({ message: error instanceof Error ? error.message : 'Internal server error' });
@@ -667,10 +673,10 @@ describe('GET /media/tmdb/episode', () => {
         app = express();
         app.use(parseCookies);
         app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
-        app.use('/media', createMediaRouter({
+        app.use('/media', decideMediaAndMediaCollectionDalByUserRoleMiddleware(makeMockDals({})), createMediaRouter({
             kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
             vod: { vodStorageBucket: 'vod-bucket' },
-        }, { mediaDal: {}, mediaCollectionDal: {}, mediaGenreDal: {} } as unknown as Dals, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
+        }, {} as unknown as MediaGenreDal, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
         app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
             if (error instanceof ApiError) { res.status(error.statusCode).json({ message: error.message }); return; }
             res.status(500).json({ message: error instanceof Error ? error.message : 'Internal server error' });

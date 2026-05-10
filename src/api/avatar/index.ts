@@ -1,13 +1,13 @@
 import { Router } from "@ido_kawaz/server-framework";
 import { StorageClient } from "@ido_kawaz/storage-client";
 import multer from "multer";
-import { Dals } from "../../dal/types";
+import { AvatarCategoryDal } from "../../dal/avatarCategory";
 import { BucketsConfig } from "../../utils/types";
 import { requireAdmin } from "../middleware";
 import { createAvatarHandlers } from './handlers';
 
-export const createAvatarRouter = (bucketsConfig: BucketsConfig, dals: Dals, storageClient: StorageClient) => {
-    const avatarHandlers = createAvatarHandlers(bucketsConfig, dals, storageClient);
+export const createAvatarRouter = (bucketsConfig: BucketsConfig, avatarCategoryDal: AvatarCategoryDal, storageClient: StorageClient) => {
+    const avatarHandlers = createAvatarHandlers(bucketsConfig, avatarCategoryDal, storageClient);
     const router = Router();
     const upload = multer({ storage: multer.diskStorage({ destination: './tmp' }) });
 

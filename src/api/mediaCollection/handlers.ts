@@ -2,21 +2,23 @@ import { NotFoundError, Request, Response } from "@ido_kawaz/server-framework";
 import { StorageClient } from "@ido_kawaz/storage-client";
 import { StatusCodes } from "http-status-codes";
 import { isEmpty, isNil } from 'ramda';
-import { Dals } from "../../dal/types";
+import { MediaGenreDal } from "../../dal/mediaGenre";
 import { requestHandlerDecorator } from "../../utils/decorator";
 import { BucketsConfig } from "../../utils/types";
 import { validateRequestWithId } from "../../utils/zod";
 import { createMediaCollectionLogic } from "./logic";
 import { validateMediaCollectionCreationRequest, validateMediaCollectionUpdateRequest } from './types';
+import { MediaAuthenticatedRequest } from "../types";
 
-export const createMediaCollectionHandlers = (bucketsConfig: BucketsConfig, dals: Dals, storageClient: StorageClient) => {
-    const logic = createMediaCollectionLogic(bucketsConfig, dals, storageClient);
+export const createMediaCollectionHandlers = (bucketsConfig: BucketsConfig, mediaGenreDal: MediaGenreDal, storageClient: StorageClient) => {
+    const logicFactory = createMediaCollectionLogic(bucketsConfig, mediaGenreDal, storageClient);
     return {
         getAllMediaCollections:
             requestHandlerDecorator(
                 'get all media collections',
-                async (_req: Request, res: Response) => {
-                    const mediaCollections = await logic.getAllMediaCollections();
+                async (req: Request, res: Response) => {
+                    const { mediaCollectionDal, mediaDal } = req as MediaAuthenticatedRequest;
+                    const mediaCollections = await logicFactory(mediaCollectionDal, mediaDal).getAllMediaCollections();
                     if (isEmpty(mediaCollections)) {
                         throw new NotFoundError('No media collections found');
                     }
@@ -26,8 +28,9 @@ export const createMediaCollectionHandlers = (bucketsConfig: BucketsConfig, dals
             requestHandlerDecorator(
                 'create media collection',
                 async (rawReq: Request, res: Response) => {
+                    const { mediaCollectionDal, mediaDal } = rawReq as MediaAuthenticatedRequest;
                     const { body, thumbnail } = validateMediaCollectionCreationRequest(rawReq);
-                    await logic.createMediaCollection(body, thumbnail);
+                    await logicFactory(mediaCollectionDal, mediaDal).createMediaCollection(body, thumbnail);
                     res.status(StatusCodes.OK).json({ message: 'Media collection created' });
                 }),
         deleteMediaCollection:
@@ -35,7 +38,8 @@ export const createMediaCollectionHandlers = (bucketsConfig: BucketsConfig, dals
                 'delete media collection',
                 async (req: Request, res: Response) => {
                     const { params: { id: mediaCollectionId } } = validateRequestWithId(req);
-                    await logic.deleteMediaCollection(mediaCollectionId);
+                    const { mediaCollectionDal, mediaDal } = req as MediaAuthenticatedRequest;
+                    await logicFactory(mediaCollectionDal, mediaDal).deleteMediaCollection(mediaCollectionId);
                     res.status(StatusCodes.OK).json({ message: 'Media collection deleted' });
                 }),
         updateMediaCollection:
@@ -43,7 +47,8 @@ export const createMediaCollectionHandlers = (bucketsConfig: BucketsConfig, dals
                 'update media collection',
                 async (req: Request, res: Response) => {
                     const { params: { id: mediaCollectionId }, body, thumbnail } = validateMediaCollectionUpdateRequest(req);
-                    await logic.updateMediaCollection(mediaCollectionId, body, thumbnail);
+                    const { mediaCollectionDal, mediaDal } = req as MediaAuthenticatedRequest;
+                    await logicFactory(mediaCollectionDal, mediaDal).updateMediaCollection(mediaCollectionId, body, thumbnail);
                     res.status(StatusCodes.OK).json({ message: 'Media collection updated' });
                 }),
         getMediaCollection:
@@ -51,7 +56,8 @@ export const createMediaCollectionHandlers = (bucketsConfig: BucketsConfig, dals
                 'get media collection',
                 async (req: Request, res: Response) => {
                     const { params: { id: mediaCollectionId } } = validateRequestWithId(req);
-                    const mediaCollection = await logic.getMediaCollection(mediaCollectionId);
+                    const { mediaCollectionDal, mediaDal } = req as MediaAuthenticatedRequest;
+                    const mediaCollection = await logicFactory(mediaCollectionDal, mediaDal).getMediaCollection(mediaCollectionId);
                     if (isNil(mediaCollection)) {
                         throw new NotFoundError('Media collection not found');
                     }
@@ -62,7 +68,8 @@ export const createMediaCollectionHandlers = (bucketsConfig: BucketsConfig, dals
                 'get media collection thumbnail',
                 async (req: Request, res: Response) => {
                     const { params: { id: mediaCollectionId } } = validateRequestWithId(req);
-                    const thumbnail = await logic.getThumbnail(mediaCollectionId);
+                    const { mediaCollectionDal, mediaDal } = req as MediaAuthenticatedRequest;
+                    const thumbnail = await logicFactory(mediaCollectionDal, mediaDal).getThumbnail(mediaCollectionId);
                     res.setHeader("Content-Type", "image/jpeg");
                     res.setHeader('Cache-Control', 'public, max-age=172800');
                     res.on('close', () => thumbnail.destroy());

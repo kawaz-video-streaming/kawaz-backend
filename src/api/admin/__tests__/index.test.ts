@@ -141,12 +141,12 @@ describe('POST /admin/pending/:username/approve', () => {
         const app = makeApp(userDal, mailer);
 
         const response = await request(app)
-            .post('/admin/pending/alice/approve')
+            .post('/admin/pending/alice/approve/user')
             .set('Cookie', `kawaz-token=${adminToken}`);
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({ message: 'User approved' });
-        expect(userDal.approveUser).toHaveBeenCalledWith('alice');
+        expect(userDal.approveUser).toHaveBeenCalledWith('alice', 'user');
         expect(mailer.sendApprovalEmail).toHaveBeenCalledWith('alice', 'alice@example.com');
     });
 
@@ -156,7 +156,7 @@ describe('POST /admin/pending/:username/approve', () => {
         const app = makeApp(userDal, mailer);
 
         const response = await request(app)
-            .post('/admin/pending/unknown/approve')
+            .post('/admin/pending/unknown/approve/user')
             .set('Cookie', `kawaz-token=${adminToken}`);
 
         expect(response.status).toBe(404);
@@ -165,7 +165,7 @@ describe('POST /admin/pending/:username/approve', () => {
 
     it('returns 401 when not authenticated', async () => {
         const app = makeApp(makeAdminDal(), makeMailer());
-        const response = await request(app).post('/admin/pending/alice/approve');
+        const response = await request(app).post('/admin/pending/alice/approve/user');
         expect(response.status).toBe(401);
     });
 
@@ -177,7 +177,7 @@ describe('POST /admin/pending/:username/approve', () => {
         const app = makeApp(userDal, mailer);
 
         const response = await request(app)
-            .post('/admin/pending/alice/approve')
+            .post('/admin/pending/alice/approve/user')
             .set('Cookie', `kawaz-token=${userToken}`);
 
         expect(response.status).toBe(401);

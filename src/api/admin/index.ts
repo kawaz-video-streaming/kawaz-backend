@@ -69,7 +69,7 @@ export const createAdminRouter = (
      *       404:
      *         description: User not found
      */
-    router.post("/pending/:username/approve", adminHandlers.approveUser);
+    router.post("/pending/:username/approve/:role", adminHandlers.approveUser);
 
     /**
      * @openapi

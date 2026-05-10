@@ -3,7 +3,7 @@ import { Dals } from "../../dal/types";
 import { isNil } from "ramda";
 
 export const createAvatarCategoryLogic = (
-    { avatarCategoryDal, avatarDal }: Dals,
+    { avatarCategoryDal, avatarDal, specialAvatarDal }: Dals,
 ) => ({
     getAllCategories: () => avatarCategoryDal.getAllCategories(),
     getCategory: async (categoryId: string) => {
@@ -24,7 +24,7 @@ export const createAvatarCategoryLogic = (
         }
     },
     deleteCategory: async (categoryId: string) => {
-        const isEmpty = await avatarDal.isCategoryEmpty(categoryId);
+        const isEmpty = await avatarDal.isCategoryEmpty(categoryId) && await specialAvatarDal.isCategoryEmpty(categoryId);
         if (!isEmpty) {
             throw new BadRequestError(`Cannot delete category with id ${categoryId} because it has associated avatars`);
         }
