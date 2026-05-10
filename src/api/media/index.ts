@@ -2,14 +2,14 @@ import { AmqpClient } from "@ido_kawaz/amqp-client";
 import { Router } from "@ido_kawaz/server-framework";
 import { StorageClient } from "@ido_kawaz/storage-client";
 import multer from "multer";
-import { Dals } from "../../dal/types";
+import { MediaGenreDal } from "../../dal/mediaGenre";
+import { TmdbClient } from "../../services/tmdbClient";
 import { BucketsConfig } from "../../utils/types";
 import { requireAdmin } from "../middleware";
 import { createMediaHandlers } from "./handlers";
-import { TmdbClient } from "../../services/tmdbClient";
 
-export const createMediaRouter = (bucketsConfig: BucketsConfig, dals: Dals, amqpClient: AmqpClient, storageClient: StorageClient, tmdbClient: TmdbClient) => {
-  const mediaHandlers = createMediaHandlers(bucketsConfig, dals, amqpClient, storageClient, tmdbClient);
+export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaGenreDal: MediaGenreDal, amqpClient: AmqpClient, storageClient: StorageClient, tmdbClient: TmdbClient) => {
+  const mediaHandlers = createMediaHandlers(bucketsConfig, mediaGenreDal, amqpClient, storageClient, tmdbClient);
   const router = Router();
   const upload = multer({ storage: multer.diskStorage({ destination: './tmp' }) });
 

@@ -6,8 +6,9 @@ import { PROGRESS_CONSUMER_EXCHANGE, PROGRESS_CONSUMER_TOPIC } from '../binding'
 describe('createProgressConsumer', () => {
     it('returns a Consumer instance', () => {
         const mediaDal = {} as MediaDal;
+        const specialMediaDal = {} as MediaDal;
 
-        const consumer = createProgressConsumer(mediaDal);
+        const consumer = createProgressConsumer(mediaDal, specialMediaDal);
 
         expect(consumer).toBeInstanceOf(Consumer);
     });

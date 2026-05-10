@@ -20,6 +20,13 @@ export const createAuthHandlers = (
   userDal: UserDal,
 ) => {
   const logic = createAuthLogic(authConfig, mailer, userDal);
+  const sameSiteOption = authConfig.isProduction ? "none" : "strict";
+  const cookieOptions = {
+    httpOnly: true,
+    sameSite: sameSiteOption as "none" | "strict",
+    ...(authConfig.isProduction && { secure: true }),
+    maxAge: 2 * 24 * 60 * 60 * 1000
+  };
   return {
     me: requestHandlerDecorator("me", async (req: Request, res: Response) => {
       const authenticatedReq = req as AuthenticatedRequest;
@@ -38,11 +45,7 @@ export const createAuthHandlers = (
       async (req: Request, res: Response) => {
         const { username, password } = validateLoginRequest(req);
         const token = await logic.login(username, password);
-        res.status(StatusCodes.OK).cookie("kawaz-token", token, {
-          httpOnly: true,
-          sameSite: "strict",
-          maxAge: 2 * 24 * 60 * 60 * 1000
-        }).json({ message: "Login successful" });
+        res.status(StatusCodes.OK).cookie("kawaz-token", token, cookieOptions).json({ message: "Login successful" });
       },
     ),
     googleLogin: requestHandlerDecorator(
@@ -70,11 +73,7 @@ export const createAuthHandlers = (
         if (token === null) {
           res.redirect(`${authConfig.appDomain}/auth/callback?pending=true`);
         } else {
-          res.cookie("kawaz-token", token, {
-            httpOnly: true,
-            sameSite: "strict",
-            maxAge: 2 * 24 * 60 * 60 * 1000
-          }).redirect(`${authConfig.appDomain}/auth/callback`);
+          res.cookie("kawaz-token", token, cookieOptions).redirect(`${authConfig.appDomain}/auth/callback`);
         }
       },
     ),

@@ -3,12 +3,14 @@ import { NotFoundError } from "@ido_kawaz/server-framework";
 import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
 import { createReadStream } from "fs";
 import { isNil } from "ramda";
-import { Dals } from "../../dal/types";
+import { MediaDal } from "../../dal/media";
+import { MediaCollectionDal } from "../../dal/mediaCollection";
+import { MediaGenreDal } from "../../dal/mediaGenre";
+import { TmdbClient } from "../../services/tmdbClient";
 import { cleanupPath } from "../../utils/files";
 import { BucketsConfig, UploadedFile } from "../../utils/types";
 import { ConvertMessage, InitiateUploadRequestBody, InitiateUploadResponse, MediaUpdateRequestBody } from "./types";
 import { validateMediaContainingCollectionAndGenre } from "./utils";
-import { TmdbClient } from "../../services/tmdbClient";
 
 const PRESIGNED_URL_EXPIRY_SECONDS = 3600;
 
@@ -17,11 +19,11 @@ export const createMediaLogic = (
     vod: { vodStorageBucket },
     kawazPlus: { kawazStorageBucket: kawazBucket, uploadPrefix, thumbnailPrefix }
   }: BucketsConfig,
-  { mediaDal, mediaCollectionDal, mediaGenreDal }: Dals,
+  mediaGenreDal: MediaGenreDal,
   amqpClient: AmqpClient,
   storageClient: StorageClient,
   tmdbClient: TmdbClient
-) => ({
+) => (mediaDal: MediaDal, mediaCollectionDal: MediaCollectionDal) => ({
   initiateUpload: async (body: InitiateUploadRequestBody): Promise<InitiateUploadResponse> => {
     const { fileName, fileSize, mimeType: _mimeType, ...mediaBody } = body;
     const { kind, genres, collectionId: containingCollectionId } = mediaBody;
@@ -82,9 +84,21 @@ export const createMediaLogic = (
   getAllNoneCompletedMedia: () => mediaDal.getAllNoneCompletedMedia(),
   getMedia: (mediaId: string) => mediaDal.getMedia(mediaId),
   getMediaUploadProgress: async (mediaId: string) => mediaDal.getMediaUploadProgress(mediaId),
-  getTiles: (mediaId: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/thumbnails.jpg`),
-  getThumbnail: (mediaId: string) => storageClient.downloadObject(kawazBucket, `${thumbnailPrefix}/${mediaId}.jpg`),
-  getManifest: (mediaId: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/output.mpd`),
+  getThumbnail: async (mediaId: string) => {
+    if (isNil(await mediaDal.getMedia(mediaId))) throw new NotFoundError("Media not found");
+    return storageClient.downloadObject(kawazBucket, `${thumbnailPrefix}/${mediaId}.jpg`);
+  },
+  getTiles: async (mediaId: string) => {
+    if (isNil(await mediaDal.getMedia(mediaId))) throw new NotFoundError("Media not found");
+    return storageClient.downloadObject(vodStorageBucket, `${mediaId}/thumbnails.jpg`);
+  },
+  getManifest: async (mediaId: string) => {
+    if (isNil(await mediaDal.getMedia(mediaId))) throw new NotFoundError("Media not found");
+    return storageClient.downloadObject(vodStorageBucket, `${mediaId}/output.mpd`);
+  },
+  getVtt: async (mediaId: string, filename: string) => {
+    if (isNil(await mediaDal.getMedia(mediaId))) throw new NotFoundError("Media not found");
+    return storageClient.downloadObject(vodStorageBucket, `${mediaId}/${filename}`);
+  },
   getSegment: (mediaId: string, filename: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/${filename}`),
-  getVtt: (mediaId: string, filename: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/${filename}`),
 });

@@ -2,7 +2,7 @@ import { Request, Response } from "@ido_kawaz/server-framework";
 import { StatusCodes } from "http-status-codes";
 import { UserDal } from "../../dal/user";
 import { requestHandlerDecorator } from "../../utils/decorator";
-import { validateAdminRequest } from "./types";
+import { validateAdminApprovalRequest, validateAdminRejectionRequest } from "./types";
 import { createAdminLogic } from "./logic";
 import { Mailer } from "../../services/mailer";
 
@@ -22,8 +22,8 @@ export const createAdminHandlers = (
         approveUser: requestHandlerDecorator(
             "approve pending user",
             async (req: Request, res: Response) => {
-                const { username } = validateAdminRequest(req);
-                await logic.approveUser(username);
+                const { username, role } = validateAdminApprovalRequest(req);
+                await logic.approveUser(username, role);
                 res.status(StatusCodes.OK).json({
                     message: "User approved",
                 });
@@ -32,7 +32,7 @@ export const createAdminHandlers = (
         denyUser: requestHandlerDecorator(
             "deny pending user",
             async (req: Request, res: Response) => {
-                const { username } = validateAdminRequest(req);
+                const { username } = validateAdminRejectionRequest(req);
                 await logic.denyUser(username);
                 res.status(StatusCodes.OK).json({
                     message: "User denied",

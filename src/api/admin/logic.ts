@@ -1,14 +1,15 @@
 import { NotFoundError } from "@ido_kawaz/server-framework";
 import { UserDal } from "../../dal/user";
 import { Mailer } from "../../services/mailer";
+import { Role } from "../../utils/types";
 
 export const createAdminLogic = (
     mailer: Mailer,
     userDal: UserDal
 ) => ({
     getPendingUsers: userDal.getPendingUsers,
-    approveUser: async (username: string) => {
-        const user = await userDal.approveUser(username);
+    approveUser: async (username: string, role: Exclude<Role, "admin">) => {
+        const user = await userDal.approveUser(username, role);
         if (user) {
             await mailer.sendApprovalEmail(user.name, user.email);
         } else {

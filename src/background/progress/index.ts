@@ -5,7 +5,7 @@ import { mediaProgressHandler } from "./handler";
 import { Progress, validateProgressPayload } from "./types";
 
 
-export const createProgressConsumer = (mediaDal: MediaDal) =>
+export const createProgressConsumer = (mediaDal: MediaDal, specialMediaDal: MediaDal) =>
     new Consumer<Progress, ProgressConsumerBinding>('progress', createProgressConsumerBinding())
         .on('validateMessage', validateProgressPayload)
-        .on('handleMessage', mediaProgressHandler(mediaDal))
+        .on('handleMessage', mediaProgressHandler(mediaDal, specialMediaDal))

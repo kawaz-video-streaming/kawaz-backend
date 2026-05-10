@@ -113,21 +113,23 @@ export const validateGetMovieTmdbDetailsRequest = validateRequest(
 
 export const validateGetCollectionTmdbDetailsRequest = validateRequest(
     z.object({ query: z.object({ id: z.coerce.number().int().positive() }) })
-     .transform(({ query }) => query.id)
+        .transform(({ query }) => query.id)
 );
 
 export const validateGetShowTmdbDetailsRequest = validateRequest(
     z.object({ query: z.object({ title: z.string().min(1), year: z.coerce.number().int().positive() }) })
-     .transform(({ query }) => query as TmdbTitleYearQuery)
+        .transform(({ query }) => query as TmdbTitleYearQuery)
 );
 
 export const validateGetEpisodeTmdbDetailsRequest = validateRequest(
-    z.object({ query: z.object({
-        showTitle: z.string().min(1),
-        showYear: z.coerce.number().int().positive(),
-        seasonNumber: z.coerce.number().int().positive(),
-        episodeNumber: z.coerce.number().int().positive(),
-    }) }).transform(({ query }) => query)
+    z.object({
+        query: z.object({
+            showTitle: z.string().min(1),
+            showYear: z.coerce.number().int().positive(),
+            seasonNumber: z.coerce.number().int().positive(),
+            episodeNumber: z.coerce.number().int().positive(),
+        })
+    }).transform(({ query }) => query)
 );
 
 export const validateGetTmdbPosterRequest = validateRequest(

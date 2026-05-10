@@ -18,9 +18,11 @@ const makeAvatarDal = (): jest.Mocked<Pick<AvatarDal, 'isCategoryEmpty'>> => ({
 const makeDals = (
     avatarCategoryDal: ReturnType<typeof makeCategoryDal>,
     avatarDal: ReturnType<typeof makeAvatarDal>,
-): Pick<Dals, 'avatarCategoryDal' | 'avatarDal'> => ({
+    specialAvatarDal: ReturnType<typeof makeAvatarDal> = makeAvatarDal(),
+): Pick<Dals, 'avatarCategoryDal' | 'avatarDal' | 'specialAvatarDal'> => ({
     avatarCategoryDal: avatarCategoryDal as unknown as AvatarCategoryDal,
     avatarDal: avatarDal as unknown as AvatarDal,
+    specialAvatarDal: specialAvatarDal as unknown as AvatarDal,
 });
 
 const makeCategory = (overrides: Partial<AvatarCategory> = {}): AvatarCategory => ({
@@ -115,6 +117,18 @@ describe('createAvatarCategoryLogic.deleteCategory', () => {
         avatarDal.isCategoryEmpty.mockResolvedValue(false);
 
         const logic = createAvatarCategoryLogic(makeDals(categoryDal, avatarDal) as unknown as Dals);
+        await expect(logic.deleteCategory('cat-1')).rejects.toThrow('has associated avatars');
+
+        expect(categoryDal.deleteCategory).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestError when category has associated special avatars', async () => {
+        const categoryDal = makeCategoryDal();
+        const avatarDal = makeAvatarDal();
+        const specialAvatarDal = makeAvatarDal();
+        specialAvatarDal.isCategoryEmpty.mockResolvedValue(false);
+
+        const logic = createAvatarCategoryLogic(makeDals(categoryDal, avatarDal, specialAvatarDal) as unknown as Dals);
         await expect(logic.deleteCategory('cat-1')).rejects.toThrow('has associated avatars');
 
         expect(categoryDal.deleteCategory).not.toHaveBeenCalled();
