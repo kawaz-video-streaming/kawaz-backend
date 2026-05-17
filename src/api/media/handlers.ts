@@ -9,8 +9,8 @@ import { TmdbClient } from "../../services/tmdbClient";
 import { requestHandlerDecorator } from "../../utils/decorator";
 import { BucketsConfig } from "../../utils/types";
 import { validateRequestWithId } from "../../utils/zod";
-import { createMediaLogic } from "./logic";
 import { MediaAuthenticatedRequest } from "../types";
+import { createMediaLogic } from "./logic";
 import {
   validateCompleteUploadRequest,
   validateGetCollectionTmdbDetailsRequest,
@@ -21,6 +21,7 @@ import {
   validateInitiateUploadRequest,
   validateMediaUpdateRequest,
 } from "./types";
+import { pipeToResponse } from "./utils";
 
 export const createMediaHandlers = (
   bucketsConfig: BucketsConfig,
@@ -182,8 +183,7 @@ export const createMediaHandlers = (
         const thumbnail = await logicFactory(mediaDal, mediaCollectionDal).getThumbnail(mediaId);
         res.setHeader("Content-Type", "image/jpeg");
         res.setHeader('Cache-Control', 'public, max-age=172800');
-        res.on('close', () => thumbnail.destroy());
-        thumbnail.pipe(res);
+        await pipeToResponse(thumbnail, res);
       },
     ),
     getTiles: requestHandlerDecorator(
@@ -194,8 +194,7 @@ export const createMediaHandlers = (
         const tiles = await logicFactory(mediaDal, mediaCollectionDal).getTiles(videoId);
         res.setHeader("Content-Type", "image/jpeg");
         res.setHeader('Cache-Control', 'public, max-age=172800');
-        res.on('close', () => tiles.destroy());
-        tiles.pipe(res);
+        await pipeToResponse(tiles, res);
       },
     ),
     getManifest: requestHandlerDecorator(
@@ -206,8 +205,7 @@ export const createMediaHandlers = (
         const manifestStream = await logicFactory(mediaDal, mediaCollectionDal).getManifest(videoId);
         res.setHeader("Content-Type", "application/dash+xml");
         res.setHeader('Cache-Control', 'public, max-age=172800');
-        res.on('close', () => manifestStream.destroy());
-        manifestStream.pipe(res);
+        await pipeToResponse(manifestStream, res);
       },
     ),
     getSegment: requestHandlerDecorator(
@@ -219,8 +217,7 @@ export const createMediaHandlers = (
         const segmentStream = await logicFactory(mediaDal, mediaCollectionDal).getSegment(videoId, filename);
         res.setHeader("Content-Type", "video/iso.segment");
         res.setHeader('Cache-Control', 'public, max-age=172800');
-        res.on('close', () => segmentStream.destroy());
-        segmentStream.pipe(res);
+        await pipeToResponse(segmentStream, res);
       },
     ),
     getVtt: requestHandlerDecorator(
@@ -232,8 +229,7 @@ export const createMediaHandlers = (
         const vttStream = await logicFactory(mediaDal, mediaCollectionDal).getVtt(videoId, filename);
         res.setHeader("Content-Type", "text/vtt");
         res.setHeader('Cache-Control', 'public, max-age=172800');
-        res.on('close', () => vttStream.destroy());
-        vttStream.pipe(res);
+        await pipeToResponse(vttStream, res);
       },
     ),
   };
