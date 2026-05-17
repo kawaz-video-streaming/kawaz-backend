@@ -1,7 +1,8 @@
 import { isNil, isNotNil } from "ramda";
 import { MediaCollectionDal } from "../../dal/mediaCollection";
-import { BadRequestError } from "@ido_kawaz/server-framework";
+import { BadRequestError, Response } from "@ido_kawaz/server-framework";
 import { MediaGenreDal } from "../../dal/mediaGenre";
+import { Readable, pipeline } from "stream";
 
 export const validateMediaContainingCollectionAndGenre = async (mediaCollectionDal: MediaCollectionDal, mediaGenreDal: MediaGenreDal, genres: string[], kind: string, containingCollectionId?: string | null) => {
     const containingCollection = isNil(containingCollectionId) ? null : await mediaCollectionDal.getCollection(containingCollectionId);
@@ -20,3 +21,15 @@ export const validateMediaContainingCollectionAndGenre = async (mediaCollectionD
         }
     }));
 }
+
+export const pipeToResponse = (source: Readable, res: Response): Promise<void> =>
+    new Promise((resolve, reject) =>
+        pipeline(source, res as unknown as NodeJS.WritableStream, (err) => {
+            if (!err || err.code === "ERR_STREAM_PREMATURE_CLOSE" || err.code === "EPIPE") {
+                resolve();
+            } else {
+                reject(err);
+            }
+        })
+    );
+
