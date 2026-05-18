@@ -4,11 +4,11 @@ import { sign } from "jsonwebtoken";
 import { createHash, randomBytes } from "node:crypto";
 import { isNil, isNotNil } from "ramda";
 import { UserDal } from "../../dal/user";
-import { APPROVED_STATUS } from "../../dal/user/model";
+import { APPROVED_STATUS, PENDING_STATUS } from "../../dal/user/model";
 import { Mailer } from "../../services/mailer";
 import { Role, USER_ROLE } from "../../utils/types";
 import { AuthConfig, TokenPayload } from "./types";
-import { fetchGoogleAccessToken, fetchGoogleUserInfo } from "./utils";
+import { fetchGoogleAccessToken, fetchGoogleDeviceCode, fetchGoogleDeviceToken, fetchGoogleUserInfo } from "./utils";
 
 const createUserTokenPayload = (
   username: string,
@@ -68,6 +68,44 @@ export const createAuthLogic = (
       await mailer.sendApprovalRequestEmail(name, email);
       return null;
     }
+  },
+
+  googleDeviceStart: async () => {
+    const { device_code, user_code, verification_url, expires_in, interval } = await fetchGoogleDeviceCode(googleClientId);
+    return {
+      deviceCode: device_code,
+      userCode: user_code,
+      verificationUrl: verification_url,
+      expiresIn: expires_in,
+      interval: interval,
+    };
+  },
+
+  googleDevicePoll: async (deviceCode: string) => {
+    const result = await fetchGoogleDeviceToken(googleClientId, googleClientSecret, deviceCode);
+    if (result.status !== "authorized") {
+      return result;
+    }
+    const { name, email } = await fetchGoogleUserInfo(result.accessToken);
+    const existingUser = await userDal.findUserByEmail(email);
+    if (isNotNil(existingUser)) {
+      if (existingUser.status !== APPROVED_STATUS) {
+        return { status: PENDING_STATUS };
+      }
+      const token = sign(
+        createUserTokenPayload(existingUser.name, existingUser.role),
+        jwtSecret,
+        { expiresIn: "2d" },
+      );
+      return { status: "authorized" as const, token, username: existingUser.name, role: existingUser.role };
+    }
+    if (await userDal.verifyUser(name)) {
+      throw new ConflictError("An account with this Google display name already exists. Please sign up manually with a different username.");
+    }
+    const placeholderPasswordHash = await bycrpt.hash(randomBytes(32).toString("hex"), 12);
+    await userDal.createUser(name, placeholderPasswordHash, email);
+    await mailer.sendApprovalRequestEmail(name, email);
+    return { status: PENDING_STATUS };
   },
 
   promoteAdmin: async (secret: string, username: string) => {

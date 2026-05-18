@@ -1,7 +1,22 @@
+import { AmqpClient } from '@ido_kawaz/amqp-client';
+import { Types } from '@ido_kawaz/mongo-client';
 import type { Application } from '@ido_kawaz/server-framework';
 import { ApiError } from '@ido_kawaz/server-framework';
+import { StorageClient } from '@ido_kawaz/storage-client';
 import bcrypt from 'bcrypt';
 import express, { NextFunction, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
+import request from 'supertest';
+import { createAuthRouter } from '../api/auth';
+import { createAvatarCategoryRouter } from '../api/avatarCategory';
+import { createMediaRouter } from '../api/media';
+import { createAuthMiddleware, decideMediaAndMediaCollectionDalByUserRoleMiddleware } from '../api/middleware';
+import { AvatarDal } from '../dal/avatar';
+import { AvatarCategoryDal } from '../dal/avatarCategory';
+import { MediaGenreDal } from '../dal/mediaGenre';
+import { Dals } from '../dal/types';
+import { UserDal } from '../dal/user';
+import { Mailer } from '../services/mailer';
 
 const parseCookies = (req: Request, _res: Response, next: NextFunction) => {
     req.cookies = {};
@@ -12,29 +27,13 @@ const parseCookies = (req: Request, _res: Response, next: NextFunction) => {
     }
     next();
 };
-import jwt from 'jsonwebtoken';
-import request from 'supertest';
-import { AmqpClient } from '@ido_kawaz/amqp-client';
-import { StorageClient } from '@ido_kawaz/storage-client';
-import { Types } from '@ido_kawaz/mongo-client';
-import { UserDal } from '../dal/user';
-import { AvatarCategoryDal } from '../dal/avatarCategory';
-import { AvatarDal } from '../dal/avatar';
-import { Dals } from '../dal/types';
-import { MediaGenreDal } from '../dal/mediaGenre';
-import { createMediaRouter } from '../api/media';
-import { decideMediaAndMediaCollectionDalByUserRoleMiddleware } from '../api/middleware';
-import { createAuthRouter } from '../api/auth';
-import { createAvatarCategoryRouter } from '../api/avatarCategory';
-import { createAuthMiddleware } from '../api/middleware';
-import { Mailer } from '../services/mailer';
 
 jest.mock('bcrypt');
 
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
 describe('Media upload integration', () => {
-    const AUTH_CONFIG = { jwtSecret: 'integration-test-secret', adminPromotionSecret: 'integration-admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000', isProduction: false };
+    const AUTH_CONFIG = { jwtSecret: 'integration-test-secret', adminPromotionSecret: 'integration-admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000', nativeAppScheme: 'com.kawaz.plus', isProduction: false };
 
     let app: Application;
     let mediaDal: { createMedia: jest.Mock; getPendingMedia: jest.Mock; updateMedia: jest.Mock };
@@ -270,7 +269,7 @@ describe('Media upload integration', () => {
 });
 
 describe('AvatarCategory integration', () => {
-    const AUTH_CONFIG = { jwtSecret: 'integration-test-secret', adminPromotionSecret: 'integration-admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000', isProduction: false };
+    const AUTH_CONFIG = { jwtSecret: 'integration-test-secret', adminPromotionSecret: 'integration-admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000', nativeAppScheme: 'com.kawaz.plus', isProduction: false };
 
     let app: Application;
     let avatarCategoryDal: { getAllCategories: jest.Mock; getCategory: jest.Mock; createCategory: jest.Mock; deleteCategory: jest.Mock; verifyCategoryExists: jest.Mock };
