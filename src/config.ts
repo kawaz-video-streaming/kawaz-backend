@@ -40,6 +40,7 @@ const environmentVariablesSchema = z.object({
   GOOGLE_CLIENT_ID: z.string(),
   GOOGLE_CLIENT_SECRET: z.string(),
   TMDB_READ_ACCESS_TOKEN: z.string(),
+  NATIVE_APP_SCHEME: z.string().default("com.kawaz.plus"),
 });
 
 export interface BackendServerConfig extends ServerConfig {
@@ -93,6 +94,7 @@ export const getConfig = (env: {} = {}): SystemConfig => {
         appDomain: envVars.APP_DOMAIN,
         googleClientId: envVars.GOOGLE_CLIENT_ID,
         googleClientSecret: envVars.GOOGLE_CLIENT_SECRET,
+        nativeAppScheme: envVars.NATIVE_APP_SCHEME,
         isProduction: envVars.NODE_ENV === 'production',
       },
       bucketsConfig,

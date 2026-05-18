@@ -1,8 +1,8 @@
 import { Router } from "@ido_kawaz/server-framework";
 import { UserDal } from "../../dal/user";
+import { Mailer } from "../../services/mailer";
 import { createAuthHandlers } from "./handlers";
 import { AuthConfig } from "./types";
-import { Mailer } from "../../services/mailer";
 
 export const createAuthRouter = (authConfig: AuthConfig, mailer: Mailer, userDal: UserDal) => {
   const authHandlers = createAuthHandlers(authConfig, mailer, userDal);
@@ -152,6 +152,133 @@ export const createAuthRouter = (authConfig: AuthConfig, mailer: Mailer, userDal
    *         description: Google authentication failed or account denied
    */
   router.get('/google/callback', authHandlers.googleCallback);
+
+  /**
+   * @openapi
+   * /auth/google/device/start:
+   *   post:
+   *     summary: Start a Google device authorization flow
+   *     description: >
+   *       Initiates the OAuth 2.0 Device Authorization Grant (RFC 8628) for input-constrained
+   *       devices such as Android TV. Returns a user code and verification URL that the user
+   *       enters on a secondary device to approve the login. Poll /auth/google/device/poll
+   *       with the returned device_code to check for authorization.
+   *     tags:
+   *       - Auth
+   *     responses:
+   *       200:
+   *         description: Device authorization initiated
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 deviceCode:
+   *                   type: string
+   *                   description: Opaque code used to poll for authorization status
+   *                 userCode:
+   *                   type: string
+   *                   description: Short code the user enters on the verification page (e.g. ABCD-1234)
+   *                 verificationUrl:
+   *                   type: string
+   *                   description: URL the user visits to enter the user code
+   *                 expiresIn:
+   *                   type: number
+   *                   description: Seconds until the device code expires
+   *                 interval:
+   *                   type: number
+   *                   description: Minimum seconds to wait between poll requests
+   *       401:
+   *         description: Failed to initiate device authorization with Google
+   */
+  router.post('/google/device/start', authHandlers.googleDeviceStart);
+
+  /**
+   * @openapi
+   * /auth/google/device/poll:
+   *   get:
+   *     summary: Poll for Google device authorization status
+   *     description: >
+   *       Polls Google's token endpoint using the device_code returned by /auth/google/device/start.
+   *       Returns pending or slow_down while the user has not yet approved. On authorization,
+   *       finds or creates the user account and sets the kawaz-token cookie. If the account is
+   *       new or awaiting admin approval, returns pending without a cookie.
+   *     tags:
+   *       - Auth
+   *     parameters:
+   *       - in: query
+   *         name: device_code
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Device code returned by /auth/google/device/start
+   *     responses:
+   *       200:
+   *         description: Current authorization status
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               required:
+   *                 - status
+   *               properties:
+   *                 status:
+   *                   type: string
+   *                   enum: [pending, slow_down, approved, denied]
+   *                 username:
+   *                   type: string
+   *                   description: Present when status is authorized
+   *                 role:
+   *                   type: string
+   *                   description: Present when status is authorized
+   *       400:
+   *         description: Missing or invalid device_code
+   *       401:
+   *         description: User denied access or device code expired
+   */
+  router.get('/google/device/poll', authHandlers.googleDevicePoll);
+
+  /**
+   * @openapi
+   * /auth/google/native/exchange:
+   *   post:
+   *     summary: Exchange a native OAuth code for a session cookie
+   *     description: >
+   *       Completes the native Android OAuth flow. After the browser redirects back to the app
+   *       with a short-lived one-time code (com.kawaz.plus://auth/callback?code=...), the app
+   *       posts that code here to receive the kawaz-token session cookie. The code expires after
+   *       60 seconds and is invalidated on first use.
+   *     tags:
+   *       - Auth
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - code
+   *             properties:
+   *               code:
+   *                 type: string
+   *                 description: One-time code received in the native app URL callback
+   *     responses:
+   *       200:
+   *         description: Login successful — kawaz-token cookie set
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *                   example: Login successful
+   *       400:
+   *         description: Missing or invalid request body
+   *       401:
+   *         description: Code is invalid or has expired
+   */
+  router.post('/google/native/exchange', authHandlers.googleNativeExchange);
 
   /**
    * @openapi

@@ -10,6 +10,7 @@ export interface AuthConfig {
   googleClientId: string;
   googleClientSecret: string;
   appDomain: string;
+  nativeAppScheme: string;
   isProduction: boolean;
 }
 
@@ -102,3 +103,53 @@ const googleTokenRequestSchema: z.ZodType<GoogleTokenRequestResult> = z.object({
 });
 
 export const validateGoogleTokenRequestResult = validateSchemaAndReturnValue(googleTokenRequestSchema);
+
+interface GoogleDeviceCodeApiResponse {
+  device_code: string;
+  user_code: string;
+  verification_url: string;
+  expires_in: number;
+  interval: number;
+}
+
+const googleDeviceCodeApiResponseSchema: z.ZodType<GoogleDeviceCodeApiResponse> = z.object({
+  device_code: z.string(),
+  user_code: z.string(),
+  verification_url: z.string(),
+  expires_in: z.number(),
+  interval: z.number(),
+});
+
+export const validateGoogleDeviceCodeApiResponse = validateSchemaAndReturnValue(googleDeviceCodeApiResponseSchema);
+
+type GoogleDeviceTokenApiResponse =
+  | { access_token: string }
+  | { error: "authorization_pending" | "slow_down" | "access_denied" | "expired_token" };
+
+const googleDeviceTokenApiResponseSchema: z.ZodType<GoogleDeviceTokenApiResponse> = z.union([
+  z.object({ access_token: z.string() }),
+  z.object({ error: z.enum(["authorization_pending", "slow_down", "access_denied", "expired_token"]) }),
+]);
+
+export const validateGoogleDeviceTokenApiResponse = validateSchemaAndReturnValue(googleDeviceTokenApiResponseSchema);
+
+export type DeviceTokenResult =
+  | { status: "authorized"; accessToken: string }
+  | { status: "pending" }
+  | { status: "slow_down" };
+
+const googleDevicePollRequestSchema: z.ZodType<{ deviceCode: string }> = z.object({
+  query: z.object({
+    device_code: z.string().min(1, "device_code is required"),
+  }),
+}).transform(({ query }) => ({ deviceCode: query.device_code }));
+
+export const validateGoogleDevicePollRequest = validateRequest(googleDevicePollRequestSchema);
+
+const nativeExchangeRequestSchema: z.ZodType<{ code: string }> = z.object({
+  body: z.object({
+    code: z.string().min(1, "code is required"),
+  }),
+}).transform(({ body }) => body);
+
+export const validateNativeExchangeRequest = validateRequest(nativeExchangeRequestSchema);

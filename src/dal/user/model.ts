@@ -3,9 +3,9 @@ import z from "zod";
 import { Role, roles, USER_ROLE } from "../../utils/types";
 import { validateSchemaAndReturnValue } from "../../utils/zod";
 
-export const PENDING_STATUS = "pending";
-export const APPROVED_STATUS = "approved";
-export const DENIED_STATUS = "denied";
+export const PENDING_STATUS = "pending" as const;
+export const APPROVED_STATUS = "approved" as const;
+export const DENIED_STATUS = "denied" as const;
 
 export const statuses = [
   PENDING_STATUS,

@@ -10,13 +10,20 @@ import { createAuthRouter } from '../index';
 jest.mock('bcrypt');
 jest.mock('jsonwebtoken');
 jest.mock('../utils');
+jest.mock('../nativeCodeStore');
 
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 const mockedSign = jsonwebtoken.sign as jest.Mock;
 
-import { fetchGoogleAccessToken, fetchGoogleUserInfo } from '../utils';
+import { fetchGoogleAccessToken, fetchGoogleDeviceCode, fetchGoogleDeviceToken, fetchGoogleUserInfo } from '../utils';
 const mockedFetchGoogleAccessToken = fetchGoogleAccessToken as jest.Mock;
 const mockedFetchGoogleUserInfo = fetchGoogleUserInfo as jest.Mock;
+const mockedFetchGoogleDeviceCode = fetchGoogleDeviceCode as jest.Mock;
+const mockedFetchGoogleDeviceToken = fetchGoogleDeviceToken as jest.Mock;
+
+import { popNativeCode, storeNativeCode } from '../nativeCodeStore';
+const mockedStoreNativeCode = storeNativeCode as jest.Mock;
+const mockedPopNativeCode = popNativeCode as jest.Mock;
 
 const AUTH_CONFIG = {
     jwtSecret: 'test-secret',
@@ -24,6 +31,7 @@ const AUTH_CONFIG = {
     googleClientId: 'test-google-client-id',
     googleClientSecret: 'test-google-client-secret',
     appDomain: 'http://localhost:3000',
+    nativeAppScheme: 'com.kawaz.plus',
     isProduction: false,
 };
 
@@ -386,6 +394,14 @@ describe('GET /auth/google/login', () => {
         expect(response.headers['location']).toContain('https://accounts.google.com/o/oauth2/v2/auth');
         expect(response.headers['location']).toContain('client_id=test-google-client-id');
         expect(response.headers['location']).toContain('scope=openid+email+profile');
+        expect(response.headers['location']).not.toContain('state=native');
+    });
+
+    it('includes state=native in the redirect when return=native is set', async () => {
+        const response = await request(app).get('/auth/google/login?return=native');
+
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toContain('state=native');
     });
 });
 
@@ -450,6 +466,235 @@ describe('GET /auth/google/callback', () => {
 
     it('returns 400 when code is missing', async () => {
         const response = await request(app).get('/auth/google/callback');
+
+        expect(response.status).toBe(400);
+    });
+});
+
+describe('GET /auth/google/callback (native flow)', () => {
+    let app: Application;
+    let userDal: { findUserByEmail: jest.Mock; verifyUser: jest.Mock; createUser: jest.Mock };
+
+    beforeEach(() => {
+        mockedFetchGoogleAccessToken.mockResolvedValue('access-token');
+        mockedFetchGoogleUserInfo.mockResolvedValue({ name: 'John Doe', email: 'john@gmail.com' });
+
+        userDal = {
+            findUserByEmail: jest.fn(),
+            verifyUser: jest.fn().mockResolvedValue(false),
+            createUser: jest.fn().mockResolvedValue(undefined),
+        };
+
+        app = express();
+        app.use(express.json());
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, makeMailer(), userDal as unknown as UserDal));
+        app.use(makeErrorHandler());
+    });
+
+    it('redirects to native scheme with one-time code for an approved user', async () => {
+        userDal.findUserByEmail.mockResolvedValue({ name: 'John Doe', email: 'john@gmail.com', role: 'user', status: 'approved' });
+        mockedSign.mockReturnValue('signed-token');
+        mockedStoreNativeCode.mockReturnValue('test-native-code');
+
+        const response = await request(app).get('/auth/google/callback?code=auth-code&state=native');
+
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toBe(`${AUTH_CONFIG.nativeAppScheme}://auth/callback?code=test-native-code`);
+        expect(response.headers['set-cookie']).toBeUndefined();
+        expect(mockedStoreNativeCode).toHaveBeenCalledWith('signed-token');
+    });
+
+    it('redirects to native scheme with pending=true for a new user', async () => {
+        userDal.findUserByEmail.mockResolvedValue(null);
+        mockedBcrypt.hash.mockResolvedValue('placeholder-hash' as never);
+
+        const response = await request(app).get('/auth/google/callback?code=auth-code&state=native');
+
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toBe(`${AUTH_CONFIG.nativeAppScheme}://auth/callback?pending=true`);
+        expect(response.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('redirects to native scheme with error=true for a non-approved existing user', async () => {
+        userDal.findUserByEmail.mockResolvedValue({ name: 'John Doe', email: 'john@gmail.com', role: 'user', status: 'pending' });
+
+        const response = await request(app).get('/auth/google/callback?code=auth-code&state=native');
+
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toBe(`${AUTH_CONFIG.nativeAppScheme}://auth/callback?error=true`);
+        expect(response.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('redirects to native scheme with error=conflict when display name is already taken', async () => {
+        userDal.findUserByEmail.mockResolvedValue(null);
+        userDal.verifyUser.mockResolvedValue(true);
+
+        const response = await request(app).get('/auth/google/callback?code=auth-code&state=native');
+
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toBe(`${AUTH_CONFIG.nativeAppScheme}://auth/callback?error=conflict`);
+        expect(response.headers['set-cookie']).toBeUndefined();
+    });
+});
+
+describe('POST /auth/google/device/start', () => {
+    let app: Application;
+
+    beforeEach(() => {
+        app = express();
+        app.use(express.json());
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, makeMailer(), {} as unknown as UserDal));
+        app.use(makeErrorHandler());
+    });
+
+    it('returns 200 with device flow fields', async () => {
+        mockedFetchGoogleDeviceCode.mockResolvedValue({
+            device_code: 'device-code-123',
+            user_code: 'ABCD-1234',
+            verification_url: 'https://google.com/device',
+            expires_in: 1800,
+            interval: 5,
+        });
+
+        const response = await request(app).post('/auth/google/device/start');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({
+            deviceCode: 'device-code-123',
+            userCode: 'ABCD-1234',
+            verificationUrl: 'https://google.com/device',
+            expiresIn: 1800,
+            interval: 5,
+        });
+    });
+
+    it('returns 401 when Google device start fails', async () => {
+        mockedFetchGoogleDeviceCode.mockRejectedValue(new Error('Google error'));
+
+        const response = await request(app).post('/auth/google/device/start');
+
+        expect(response.status).toBe(500);
+    });
+});
+
+describe('GET /auth/google/device/poll', () => {
+    let app: Application;
+    let userDal: { findUserByEmail: jest.Mock; verifyUser: jest.Mock; createUser: jest.Mock };
+
+    beforeEach(() => {
+        mockedFetchGoogleUserInfo.mockResolvedValue({ name: 'John Doe', email: 'john@gmail.com' });
+
+        userDal = {
+            findUserByEmail: jest.fn(),
+            verifyUser: jest.fn().mockResolvedValue(false),
+            createUser: jest.fn().mockResolvedValue(undefined),
+        };
+
+        app = express();
+        app.use(express.json());
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, makeMailer(), userDal as unknown as UserDal));
+        app.use(makeErrorHandler());
+    });
+
+    it('returns 200 with pending status while authorization is in progress', async () => {
+        mockedFetchGoogleDeviceToken.mockResolvedValue({ status: 'pending' });
+
+        const response = await request(app).get('/auth/google/device/poll?device_code=device-code-123');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ status: 'pending' });
+        expect(response.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('returns 200 with slow_down status', async () => {
+        mockedFetchGoogleDeviceToken.mockResolvedValue({ status: 'slow_down' });
+
+        const response = await request(app).get('/auth/google/device/poll?device_code=device-code-123');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ status: 'slow_down' });
+        expect(response.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('returns 200 with authorized status and sets cookie for an approved user', async () => {
+        mockedFetchGoogleDeviceToken.mockResolvedValue({ status: 'authorized', accessToken: 'google-access-token' });
+        mockedSign.mockReturnValue('signed-token');
+        userDal.findUserByEmail.mockResolvedValue({ name: 'John Doe', email: 'john@gmail.com', role: 'user', status: 'approved' });
+
+        const response = await request(app).get('/auth/google/device/poll?device_code=device-code-123');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ status: 'approved', username: 'John Doe', role: 'user' });
+        expect(response.headers['set-cookie'][0]).toContain('kawaz-token=signed-token');
+    });
+
+    it('returns 200 with pending status for a new user awaiting admin approval', async () => {
+        mockedFetchGoogleDeviceToken.mockResolvedValue({ status: 'authorized', accessToken: 'google-access-token' });
+        mockedBcrypt.hash.mockResolvedValue('placeholder-hash' as never);
+        userDal.findUserByEmail.mockResolvedValue(null);
+
+        const response = await request(app).get('/auth/google/device/poll?device_code=device-code-123');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ status: 'pending' });
+        expect(response.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('returns 200 with denied status for a denied user', async () => {
+        mockedFetchGoogleDeviceToken.mockResolvedValue({ status: 'authorized', accessToken: 'google-access-token' });
+        userDal.findUserByEmail.mockResolvedValue({ name: 'John Doe', email: 'john@gmail.com', role: 'user', status: 'denied' });
+
+        const response = await request(app).get('/auth/google/device/poll?device_code=device-code-123');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ status: 'denied' });
+        expect(response.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('returns 400 when device_code is missing', async () => {
+        const response = await request(app).get('/auth/google/device/poll');
+
+        expect(response.status).toBe(400);
+    });
+});
+
+describe('POST /auth/google/native/exchange', () => {
+    let app: Application;
+
+    beforeEach(() => {
+        app = express();
+        app.use(express.json());
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, makeMailer(), {} as unknown as UserDal));
+        app.use(makeErrorHandler());
+    });
+
+    it('returns 200 and sets cookie for a valid code', async () => {
+        mockedPopNativeCode.mockReturnValue('signed-token');
+
+        const response = await request(app)
+            .post('/auth/google/native/exchange')
+            .send({ code: 'test-native-code' });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ message: 'Login successful' });
+        expect(response.headers['set-cookie'][0]).toContain('kawaz-token=signed-token');
+        expect(mockedPopNativeCode).toHaveBeenCalledWith('test-native-code');
+    });
+
+    it('returns 401 for an invalid or expired code', async () => {
+        mockedPopNativeCode.mockReturnValue(null);
+
+        const response = await request(app)
+            .post('/auth/google/native/exchange')
+            .send({ code: 'expired-code' });
+
+        expect(response.status).toBe(401);
+    });
+
+    it('returns 400 when code is missing', async () => {
+        const response = await request(app)
+            .post('/auth/google/native/exchange')
+            .send({});
 
         expect(response.status).toBe(400);
     });

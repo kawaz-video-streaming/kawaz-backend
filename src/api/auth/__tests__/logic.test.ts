@@ -8,8 +8,8 @@ import bcrypt from "bcrypt";
 import * as jsonwebtoken from "jsonwebtoken";
 import { UserDal } from "../../../dal/user";
 import { Mailer } from "../../../services/mailer";
-import { createAuthLogic } from "../logic";
 import { USER_ROLE } from "../../../utils/types";
+import { createAuthLogic } from "../logic";
 
 jest.mock("bcrypt");
 jest.mock("jsonwebtoken");
@@ -18,9 +18,11 @@ jest.mock("../utils");
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 const mockedSign = jsonwebtoken.sign as jest.Mock;
 
-import { fetchGoogleAccessToken, fetchGoogleUserInfo } from "../utils";
+import { fetchGoogleAccessToken, fetchGoogleDeviceCode, fetchGoogleDeviceToken, fetchGoogleUserInfo } from "../utils";
 const mockedFetchGoogleAccessToken = fetchGoogleAccessToken as jest.Mock;
 const mockedFetchGoogleUserInfo = fetchGoogleUserInfo as jest.Mock;
+const mockedFetchGoogleDeviceCode = fetchGoogleDeviceCode as jest.Mock;
+const mockedFetchGoogleDeviceToken = fetchGoogleDeviceToken as jest.Mock;
 
 const AUTH_CONFIG = {
   jwtSecret: "test-secret",
@@ -28,6 +30,7 @@ const AUTH_CONFIG = {
   googleClientId: "test-google-client-id",
   googleClientSecret: "test-google-client-secret",
   appDomain: "http://localhost:3000",
+  nativeAppScheme: "com.kawaz.plus",
   isProduction: false,
 };
 
@@ -295,6 +298,127 @@ describe("createAuthLogic.googleCallback", () => {
     expect(result).toBeNull();
     expect(userDal.createUser).toHaveBeenCalledWith("John Doe", "placeholder-hash", "john@gmail.com");
     expect(mailer.sendApprovalRequestEmail).toHaveBeenCalledWith("John Doe", "john@gmail.com");
+  });
+});
+
+describe("createAuthLogic.googleDeviceStart", () => {
+  it("returns camelCased device flow fields from Google", async () => {
+    mockedFetchGoogleDeviceCode.mockResolvedValue({
+      device_code: "device-code-123",
+      user_code: "ABCD-1234",
+      verification_url: "https://google.com/device",
+      expires_in: 1800,
+      interval: 5,
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), makeUserDal());
+    const result = await logic.googleDeviceStart();
+
+    expect(result).toEqual({
+      deviceCode: "device-code-123",
+      userCode: "ABCD-1234",
+      verificationUrl: "https://google.com/device",
+      expiresIn: 1800,
+      interval: 5,
+    });
+    expect(mockedFetchGoogleDeviceCode).toHaveBeenCalledWith(AUTH_CONFIG.googleClientId);
+  });
+});
+
+describe("createAuthLogic.googleDevicePoll", () => {
+  beforeEach(() => {
+    mockedFetchGoogleUserInfo.mockResolvedValue({ name: "John Doe", email: "john@gmail.com" });
+  });
+
+  it("returns pending when Google reports authorization_pending", async () => {
+    mockedFetchGoogleDeviceToken.mockResolvedValue({ status: "pending" });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), makeUserDal());
+    const result = await logic.googleDevicePoll("device-code-123");
+
+    expect(result).toEqual({ status: "pending" });
+    expect(mockedFetchGoogleUserInfo).not.toHaveBeenCalled();
+  });
+
+  it("returns slow_down when Google reports slow_down", async () => {
+    mockedFetchGoogleDeviceToken.mockResolvedValue({ status: "slow_down" });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), makeUserDal());
+    const result = await logic.googleDevicePoll("device-code-123");
+
+    expect(result).toEqual({ status: "slow_down" });
+    expect(mockedFetchGoogleUserInfo).not.toHaveBeenCalled();
+  });
+
+  it("returns authorized with token for an approved existing user", async () => {
+    mockedFetchGoogleDeviceToken.mockResolvedValue({ status: "authorized", accessToken: "google-access-token" });
+    mockedSign.mockReturnValue("signed-token");
+    const userDal = makeUserDal({
+      findUserByEmail: jest.fn().mockResolvedValue({ name: "John Doe", email: "john@gmail.com", role: USER_ROLE, status: "approved" }),
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+    const result = await logic.googleDevicePoll("device-code-123");
+
+    expect(result).toEqual({ status: "approved", token: "signed-token", username: "John Doe", role: USER_ROLE });
+    expect(mockedSign).toHaveBeenCalledWith({ username: "John Doe", role: USER_ROLE }, AUTH_CONFIG.jwtSecret, { expiresIn: "2d" });
+  });
+
+  it("returns pending for a non-approved existing user", async () => {
+    mockedFetchGoogleDeviceToken.mockResolvedValue({ status: "authorized", accessToken: "google-access-token" });
+    const userDal = makeUserDal({
+      findUserByEmail: jest.fn().mockResolvedValue({ name: "John Doe", email: "john@gmail.com", role: USER_ROLE, status: "pending" }),
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+    const result = await logic.googleDevicePoll("device-code-123");
+
+    expect(result).toEqual({ status: "pending" });
+    expect(mockedSign).not.toHaveBeenCalled();
+  });
+
+  it("returns denied for a denied existing user", async () => {
+    mockedFetchGoogleDeviceToken.mockResolvedValue({ status: "authorized", accessToken: "google-access-token" });
+    const userDal = makeUserDal({
+      findUserByEmail: jest.fn().mockResolvedValue({ name: "John Doe", email: "john@gmail.com", role: USER_ROLE, status: "denied" }),
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+    const result = await logic.googleDevicePoll("device-code-123");
+
+    expect(result).toEqual({ status: "denied" });
+    expect(mockedSign).not.toHaveBeenCalled();
+  });
+
+  it("creates a new user with a placeholder password and returns pending", async () => {
+    mockedFetchGoogleDeviceToken.mockResolvedValue({ status: "authorized", accessToken: "google-access-token" });
+    mockedBcrypt.hash.mockResolvedValue("placeholder-hash" as never);
+    const mailer = makeMailer();
+    const userDal = makeUserDal({
+      findUserByEmail: jest.fn().mockResolvedValue(null),
+      verifyUser: jest.fn().mockResolvedValue(false),
+      createUser: jest.fn().mockResolvedValue(undefined),
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, mailer, userDal);
+    const result = await logic.googleDevicePoll("device-code-123");
+
+    expect(result).toEqual({ status: "pending" });
+    expect(userDal.createUser).toHaveBeenCalledWith("John Doe", "placeholder-hash", "john@gmail.com");
+    expect(mailer.sendApprovalRequestEmail).toHaveBeenCalledWith("John Doe", "john@gmail.com");
+  });
+
+  it("throws ConflictError when the Google display name is already taken", async () => {
+    mockedFetchGoogleDeviceToken.mockResolvedValue({ status: "authorized", accessToken: "google-access-token" });
+    const userDal = makeUserDal({
+      findUserByEmail: jest.fn().mockResolvedValue(null),
+      verifyUser: jest.fn().mockResolvedValue(true),
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+
+    await expect(logic.googleDevicePoll("device-code-123")).rejects.toThrow(ConflictError);
+    expect(userDal.createUser).not.toHaveBeenCalled();
   });
 });
 
