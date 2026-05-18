@@ -1,4 +1,4 @@
-import { Request, Response, UnauthorizedError } from "@ido_kawaz/server-framework";
+import { ConflictError, Request, Response, UnauthorizedError } from "@ido_kawaz/server-framework";
 import { StatusCodes } from "http-status-codes";
 import { isNil } from "ramda";
 import { UserDal } from "../../dal/user";
@@ -17,6 +17,7 @@ import {
   validatePromoteRequest,
   validateResetPasswordRequest,
 } from "./types";
+import { APPROVED_STATUS } from "../../dal/user/model";
 
 export const createAuthHandlers = (
   authConfig: AuthConfig,
@@ -83,8 +84,12 @@ export const createAuthHandlers = (
               const nativeCode = storeNativeCode(token);
               res.redirect(`${authConfig.nativeAppScheme}://auth/callback?code=${nativeCode}`);
             }
-          } catch {
-            res.redirect(`${authConfig.nativeAppScheme}://auth/callback?error=true`);
+          } catch (err) {
+            if (err instanceof ConflictError) {
+              res.redirect(`${authConfig.nativeAppScheme}://auth/callback?error=conflict`);
+            } else {
+              res.redirect(`${authConfig.nativeAppScheme}://auth/callback?error=true`);
+            }
           }
           return;
         }
@@ -108,7 +113,7 @@ export const createAuthHandlers = (
       async (req: Request, res: Response) => {
         const { deviceCode } = validateGoogleDevicePollRequest(req);
         const result = await logic.googleDevicePoll(deviceCode);
-        if (result.status === "authorized") {
+        if (result.status === APPROVED_STATUS) {
           const { token, ...response } = result;
           res.cookie("kawaz-token", token, cookieOptions).status(StatusCodes.OK).json(response);
         } else {

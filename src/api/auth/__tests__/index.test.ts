@@ -524,6 +524,17 @@ describe('GET /auth/google/callback (native flow)', () => {
         expect(response.headers['location']).toBe(`${AUTH_CONFIG.nativeAppScheme}://auth/callback?error=true`);
         expect(response.headers['set-cookie']).toBeUndefined();
     });
+
+    it('redirects to native scheme with error=conflict when display name is already taken', async () => {
+        userDal.findUserByEmail.mockResolvedValue(null);
+        userDal.verifyUser.mockResolvedValue(true);
+
+        const response = await request(app).get('/auth/google/callback?code=auth-code&state=native');
+
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toBe(`${AUTH_CONFIG.nativeAppScheme}://auth/callback?error=conflict`);
+        expect(response.headers['set-cookie']).toBeUndefined();
+    });
 });
 
 describe('POST /auth/google/device/start', () => {
@@ -613,7 +624,7 @@ describe('GET /auth/google/device/poll', () => {
         const response = await request(app).get('/auth/google/device/poll?device_code=device-code-123');
 
         expect(response.status).toBe(200);
-        expect(response.body).toEqual({ status: 'authorized', username: 'John Doe', role: 'user' });
+        expect(response.body).toEqual({ status: 'approved', username: 'John Doe', role: 'user' });
         expect(response.headers['set-cookie'][0]).toContain('kawaz-token=signed-token');
     });
 
@@ -626,6 +637,17 @@ describe('GET /auth/google/device/poll', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({ status: 'pending' });
+        expect(response.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('returns 200 with denied status for a denied user', async () => {
+        mockedFetchGoogleDeviceToken.mockResolvedValue({ status: 'authorized', accessToken: 'google-access-token' });
+        userDal.findUserByEmail.mockResolvedValue({ name: 'John Doe', email: 'john@gmail.com', role: 'user', status: 'denied' });
+
+        const response = await request(app).get('/auth/google/device/poll?device_code=device-code-123');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ status: 'denied' });
         expect(response.headers['set-cookie']).toBeUndefined();
     });
 

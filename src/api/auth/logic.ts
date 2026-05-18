@@ -4,7 +4,7 @@ import { sign } from "jsonwebtoken";
 import { createHash, randomBytes } from "node:crypto";
 import { isNil, isNotNil } from "ramda";
 import { UserDal } from "../../dal/user";
-import { APPROVED_STATUS, PENDING_STATUS } from "../../dal/user/model";
+import { APPROVED_STATUS, DENIED_STATUS, PENDING_STATUS } from "../../dal/user/model";
 import { Mailer } from "../../services/mailer";
 import { Role, USER_ROLE } from "../../utils/types";
 import { AuthConfig, TokenPayload } from "./types";
@@ -77,7 +77,7 @@ export const createAuthLogic = (
       userCode: user_code,
       verificationUrl: verification_url,
       expiresIn: expires_in,
-      interval: interval,
+      interval,
     };
   },
 
@@ -89,6 +89,9 @@ export const createAuthLogic = (
     const { name, email } = await fetchGoogleUserInfo(result.accessToken);
     const existingUser = await userDal.findUserByEmail(email);
     if (isNotNil(existingUser)) {
+      if (existingUser.status === DENIED_STATUS) {
+        return { status: DENIED_STATUS };
+      }
       if (existingUser.status !== APPROVED_STATUS) {
         return { status: PENDING_STATUS };
       }
@@ -97,7 +100,7 @@ export const createAuthLogic = (
         jwtSecret,
         { expiresIn: "2d" },
       );
-      return { status: "authorized" as const, token, username: existingUser.name, role: existingUser.role };
+      return { status: APPROVED_STATUS, token, username: existingUser.name, role: existingUser.role };
     }
     if (await userDal.verifyUser(name)) {
       throw new ConflictError("An account with this Google display name already exists. Please sign up manually with a different username.");

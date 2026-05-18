@@ -224,7 +224,7 @@ export const createAuthRouter = (authConfig: AuthConfig, mailer: Mailer, userDal
    *               properties:
    *                 status:
    *                   type: string
-   *                   enum: [pending, slow_down, authorized]
+   *                   enum: [pending, slow_down, approved, denied]
    *                 username:
    *                   type: string
    *                   description: Present when status is authorized

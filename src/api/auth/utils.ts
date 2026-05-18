@@ -67,9 +67,11 @@ export const fetchGoogleDeviceToken = async (
             grant_type: "urn:ietf:params:oauth:grant-type:device_code",
         }),
     });
-    const body = validateGoogleDeviceTokenApiResponse(await res.json());
+    const body = await res.json()
+        .then(validateGoogleDeviceTokenApiResponse)
+        .catch(() => { throw new UnauthorizedError("Google device authentication failed"); });
     if ("access_token" in body) {
-        return { status: "authorized", accessToken: body.access_token }
+        return { status: "authorized", accessToken: body.access_token };
     } else if (body.error === "authorization_pending") {
         return { status: "pending" };
     } else if (body.error === "slow_down") {
@@ -77,3 +79,4 @@ export const fetchGoogleDeviceToken = async (
     }
     throw new UnauthorizedError("Google device authentication failed");
 };
+

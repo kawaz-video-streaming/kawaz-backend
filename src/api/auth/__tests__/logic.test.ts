@@ -360,7 +360,7 @@ describe("createAuthLogic.googleDevicePoll", () => {
     const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
     const result = await logic.googleDevicePoll("device-code-123");
 
-    expect(result).toEqual({ status: "authorized", token: "signed-token", username: "John Doe", role: USER_ROLE });
+    expect(result).toEqual({ status: "approved", token: "signed-token", username: "John Doe", role: USER_ROLE });
     expect(mockedSign).toHaveBeenCalledWith({ username: "John Doe", role: USER_ROLE }, AUTH_CONFIG.jwtSecret, { expiresIn: "2d" });
   });
 
@@ -374,6 +374,19 @@ describe("createAuthLogic.googleDevicePoll", () => {
     const result = await logic.googleDevicePoll("device-code-123");
 
     expect(result).toEqual({ status: "pending" });
+    expect(mockedSign).not.toHaveBeenCalled();
+  });
+
+  it("returns denied for a denied existing user", async () => {
+    mockedFetchGoogleDeviceToken.mockResolvedValue({ status: "authorized", accessToken: "google-access-token" });
+    const userDal = makeUserDal({
+      findUserByEmail: jest.fn().mockResolvedValue({ name: "John Doe", email: "john@gmail.com", role: USER_ROLE, status: "denied" }),
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+    const result = await logic.googleDevicePoll("device-code-123");
+
+    expect(result).toEqual({ status: "denied" });
     expect(mockedSign).not.toHaveBeenCalled();
   });
 
