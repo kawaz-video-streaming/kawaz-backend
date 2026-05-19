@@ -17,7 +17,7 @@ const parseCookies = (req: express.Request, _res: express.Response, next: expres
     next();
 };
 
-const AUTH_CONFIG = { jwtSecret: 'admin-test-secret', adminPromotionSecret: 'admin-promote-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000', nativeAppScheme: 'com.kawaz.plus', isProduction: false };
+const AUTH_CONFIG = { jwtSecret: 'admin-test-secret', adminPromotionSecret: 'admin-promote-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', googleTvClientId: 'test-google-tv-client-id', googleTvClientSecret: 'test-google-tv-client-secret', appDomain: 'http://localhost:3000', nativeAppScheme: 'com.kawaz.plus', isProduction: false };
 
 const pendingUsers = [
     { name: 'alice', email: 'alice@example.com', status: 'pending', role: 'user' },

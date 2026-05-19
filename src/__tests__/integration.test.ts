@@ -33,7 +33,7 @@ jest.mock('bcrypt');
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
 describe('Media upload integration', () => {
-    const AUTH_CONFIG = { jwtSecret: 'integration-test-secret', adminPromotionSecret: 'integration-admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000', nativeAppScheme: 'com.kawaz.plus', isProduction: false };
+    const AUTH_CONFIG = { jwtSecret: 'integration-test-secret', adminPromotionSecret: 'integration-admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', googleTvClientId: 'test-google-tv-client-id', googleTvClientSecret: 'test-google-tv-client-secret', appDomain: 'http://localhost:3000', nativeAppScheme: 'com.kawaz.plus', isProduction: false };
 
     let app: Application;
     let mediaDal: { createMedia: jest.Mock; getPendingMedia: jest.Mock; updateMedia: jest.Mock };
@@ -269,7 +269,7 @@ describe('Media upload integration', () => {
 });
 
 describe('AvatarCategory integration', () => {
-    const AUTH_CONFIG = { jwtSecret: 'integration-test-secret', adminPromotionSecret: 'integration-admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', appDomain: 'http://localhost:3000', nativeAppScheme: 'com.kawaz.plus', isProduction: false };
+    const AUTH_CONFIG = { jwtSecret: 'integration-test-secret', adminPromotionSecret: 'integration-admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', googleTvClientId: 'test-google-tv-client-id', googleTvClientSecret: 'test-google-tv-client-secret', appDomain: 'http://localhost:3000', nativeAppScheme: 'com.kawaz.plus', isProduction: false };
 
     let app: Application;
     let avatarCategoryDal: { getAllCategories: jest.Mock; getCategory: jest.Mock; createCategory: jest.Mock; deleteCategory: jest.Mock; verifyCategoryExists: jest.Mock };

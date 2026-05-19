@@ -243,8 +243,10 @@ Service-specific env vars validated in `src/config.ts`:
 | `GMAIL_USER` | Yes | Gmail address used as the Mailer sender/recipient for approval request emails |
 | `GMAIL_APP_PASSWORD` | Yes | Gmail app password for SMTP authentication in the Mailer service |
 | `APP_DOMAIN` | Yes | Public base URL of the app (e.g. `https://kawazplus.com`); used in OAuth redirect URIs and mailer links |
-| `GOOGLE_CLIENT_ID` | Yes | Google OAuth 2.0 client ID |
-| `GOOGLE_CLIENT_SECRET` | Yes | Google OAuth 2.0 client secret |
+| `GOOGLE_CLIENT_ID` | Yes | Google OAuth 2.0 client ID (web/native flows) |
+| `GOOGLE_CLIENT_SECRET` | Yes | Google OAuth 2.0 client secret (web/native flows) |
+| `GOOGLE_TV_CLIENT_ID` | Yes | Google OAuth 2.0 client ID for TV/device authorization flow (RFC 8628) |
+| `GOOGLE_TV_CLIENT_SECRET` | Yes | Google OAuth 2.0 client secret for TV/device authorization flow |
 | `NATIVE_APP_SCHEME` | No (default: `"com.kawaz.plus"`) | Custom URL scheme for the native Android app; used as the redirect target in the native OAuth callback |
 
 Additional env vars are consumed by the internal packages (`createServerConfig()`, `createMongoConfig()`, `createAmqpConfig()`, `createStorageConfig()`) — refer to each package's documentation for their required variables.

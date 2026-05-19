@@ -9,6 +9,8 @@ export interface AuthConfig {
   adminPromotionSecret: string;
   googleClientId: string;
   googleClientSecret: string;
+  googleTvClientId: string;
+  googleTvClientSecret: string;
   appDomain: string;
   nativeAppScheme: string;
   isProduction: boolean;
