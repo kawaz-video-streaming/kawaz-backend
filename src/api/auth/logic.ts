@@ -16,7 +16,7 @@ const createUserTokenPayload = (
 ): TokenPayload => ({ username, role });
 
 export const createAuthLogic = (
-  { jwtSecret, adminPromotionSecret, googleClientId, googleClientSecret, appDomain }: AuthConfig,
+  { jwtSecret, adminPromotionSecret, googleClientId, googleClientSecret, googleTvClientId, googleTvClientSecret, appDomain }: AuthConfig,
   mailer: Mailer,
   userDal: UserDal,
 ) => ({
@@ -71,7 +71,7 @@ export const createAuthLogic = (
   },
 
   googleDeviceStart: async () => {
-    const { device_code, user_code, verification_url, expires_in, interval } = await fetchGoogleDeviceCode(googleClientId);
+    const { device_code, user_code, verification_url, expires_in, interval } = await fetchGoogleDeviceCode(googleTvClientId);
     return {
       deviceCode: device_code,
       userCode: user_code,
@@ -82,7 +82,7 @@ export const createAuthLogic = (
   },
 
   googleDevicePoll: async (deviceCode: string) => {
-    const result = await fetchGoogleDeviceToken(googleClientId, googleClientSecret, deviceCode);
+    const result = await fetchGoogleDeviceToken(googleTvClientId, googleTvClientSecret, deviceCode);
     if (result.status !== "authorized") {
       return result;
     }

@@ -30,6 +30,8 @@ const AUTH_CONFIG = {
     adminPromotionSecret: 'test-admin-secret',
     googleClientId: 'test-google-client-id',
     googleClientSecret: 'test-google-client-secret',
+    googleTvClientId: 'test-google-tv-client-id',
+    googleTvClientSecret: 'test-google-tv-client-secret',
     appDomain: 'http://localhost:3000',
     nativeAppScheme: 'com.kawaz.plus',
     isProduction: false,
