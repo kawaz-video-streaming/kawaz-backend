@@ -98,5 +98,49 @@ export const createAdminRouter = (
      */
     router.post("/pending/:username/deny", adminHandlers.denyUser);
 
+    /**
+     * @openapi
+     * /admin/newsletter:
+     *   post:
+     *     summary: Send a newsletter to all approved users
+     *     description: Sends an HTML email to every approved user. Personalized with each recipient's username. Requires admin role.
+     *     tags:
+     *       - Admin
+     *     security:
+     *       - cookieAuth: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [subject, body]
+     *             properties:
+     *               subject:
+     *                 type: string
+     *                 example: "Kawaz+ is now available on Android TV"
+     *               body:
+     *                 type: string
+     *                 example: "Hi everyone,\n\nWe're excited to announce..."
+     *     responses:
+     *       200:
+     *         description: Newsletter sent successfully
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 message:
+     *                   type: string
+     *                   example: Newsletter sent to 12 users
+     *       400:
+     *         description: Missing or invalid subject/body
+     *       401:
+     *         description: Not authenticated or not authorized (admin only)
+     *       500:
+     *         description: Internal server error
+     */
+    router.post("/newsletter", adminHandlers.sendNewsletter);
+
     return router;
 };

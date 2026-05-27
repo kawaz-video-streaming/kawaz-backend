@@ -2,7 +2,7 @@ import { Request, Response } from "@ido_kawaz/server-framework";
 import { StatusCodes } from "http-status-codes";
 import { UserDal } from "../../dal/user";
 import { requestHandlerDecorator } from "../../utils/decorator";
-import { validateAdminApprovalRequest, validateAdminRejectionRequest } from "./types";
+import { validateAdminApprovalRequest, validateAdminRejectionRequest, validateNewsletterRequest } from "./types";
 import { createAdminLogic } from "./logic";
 import { Mailer } from "../../services/mailer";
 
@@ -37,6 +37,14 @@ export const createAdminHandlers = (
                 res.status(StatusCodes.OK).json({
                     message: "User denied",
                 });
+            },
+        ),
+        sendNewsletter: requestHandlerDecorator(
+            "send newsletter",
+            async (req: Request, res: Response) => {
+                const { subject, body } = validateNewsletterRequest(req);
+                const count = await logic.sendNewsletter(subject, body);
+                res.status(StatusCodes.OK).json({ message: `Newsletter sent to ${count} users` });
             },
         ),
     };

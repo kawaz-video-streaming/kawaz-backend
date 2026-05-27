@@ -38,6 +38,9 @@ export class UserDal extends Dal<User> {
   getPendingUsers = (): Promise<UserProjection[]> =>
     this.model.find({ status: PENDING_STATUS }, { name: 1, email: 1 }).lean<UserProjection[]>().exec();
 
+  getAllApprovedUserEmails = (): Promise<UserProjection[]> =>
+    this.model.find({ status: APPROVED_STATUS }, { name: 1, email: 1 }).lean<UserProjection[]>().exec();
+
   createProfile = async (name: string, newProfile: Profile): Promise<boolean> => {
     const user = await this.findUser(name);
     if (isNil(user)) {

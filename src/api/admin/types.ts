@@ -31,3 +31,19 @@ interface ValidatedAdminApprovalRequest {
 }
 
 export const validateAdminApprovalRequest = validateRequest(adminApprovalRequestZodSchema);
+
+export const newsletterRequestZodSchema: z.ZodType<ValidatedNewsletterRequest> = z
+  .object({
+    body: z.object({
+      subject: z.string().min(1, "subject is required"),
+      body: z.string().min(1, "body is required"),
+    }),
+  })
+  .transform(({ body }) => body);
+
+interface ValidatedNewsletterRequest {
+  subject: string;
+  body: string;
+}
+
+export const validateNewsletterRequest = validateRequest(newsletterRequestZodSchema);

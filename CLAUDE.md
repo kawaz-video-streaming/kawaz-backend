@@ -79,6 +79,7 @@ Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
 | `GET` | `/admin/pending` | Yes (admin only) | List users awaiting approval (`[{ name, email }]`) |
 | `POST` | `/admin/pending/:username/approve/:role` | Yes (admin only) | Approve a pending user with a given role (`user` or `special`); sends approval email |
 | `POST` | `/admin/pending/:username/deny` | Yes (admin only) | Deny a pending user; sends denial email and removes user |
+| `POST` | `/admin/newsletter` | Yes (admin only) | Send an HTML newsletter email to all approved users; returns `{ message: "Newsletter sent to N users" }` |
 | `GET` | `/user/me` | Yes | Returns the authenticated user's info (`username`, `role`) |
 | `POST` | `/user/profile` | Yes | Create a profile for the authenticated user |
 | `PUT` | `/user/profile` | Yes | Update the avatar of an existing profile (matched by `profileName`) |
