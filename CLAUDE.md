@@ -84,6 +84,7 @@ Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
 | `PUT` | `/user/profile` | Yes | Update the avatar of an existing profile (matched by `profileName`) |
 | `DELETE` | `/user/profile/:name` | Yes | Delete one of the authenticated user's profiles |
 | `GET` | `/user/profiles` | Yes | List all profiles for the authenticated user |
+| `DELETE` | `/user/account` | Yes | Permanently delete the authenticated user's account (record, email, password, profiles); clears session cookie |
 | `GET` | `/avatar` | Yes | List all avatars |
 | `GET` | `/avatar/:id` | Yes | Get a single avatar's metadata |
 | `GET` | `/avatar/:id/image` | Yes | Stream avatar image as `image/jpeg` with `Cache-Control: public, max-age=172800` |

@@ -159,5 +159,33 @@ export const createUserRouter = (userDal: UserDal) => {
      */
     router.get("/profiles", userHandlers.getUserProfiles);
 
+    /**
+     * @openapi
+     * /user/account:
+     *   delete:
+     *     summary: Delete the authenticated user's account
+     *     description: Permanently deletes the user's account record, email, hashed password, and all profiles. Clears the session cookie. This action is irreversible.
+     *     tags:
+     *       - Auth
+     *     security:
+     *       - cookieAuth: []
+     *     responses:
+     *       200:
+     *         description: Account deleted successfully
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 message:
+     *                   type: string
+     *                   example: Account deleted successfully
+     *       401:
+     *         description: Missing or invalid token
+     *       500:
+     *         description: Internal server error
+     */
+    router.delete("/account", userHandlers.deleteAccount);
+
     return router;
 };

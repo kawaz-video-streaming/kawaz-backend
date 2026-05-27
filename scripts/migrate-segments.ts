@@ -15,7 +15,7 @@
 import { AmqpClient, createAmqpConfig } from '@ido_kawaz/amqp-client';
 import { createMongoConfig, MongoClient } from '@ido_kawaz/mongo-client';
 import { createMediaModel } from '../src/dal/media/model';
-import type { ConvertMessage } from '../src/background/upload/types';
+import type { ConvertMessage } from '../src/api/media/types';
 
 const BATCH_SIZE = 10;
 const BATCH_DELAY_MS = 200;
@@ -36,11 +36,11 @@ async function migrate(): Promise<void> {
 
     try {
         const completedMedia = await MediaModel
-            .find({ status: 'completed' }, { _id: 1, fileName: 1 })
+            .find({ status: 'failed' }, { _id: 1, fileName: 1 })
             .lean<{ _id: string; fileName: string }[]>()
             .exec();
 
-        console.log(`Found ${completedMedia.length} completed video(s) to re-encode. dry-run=${isDryRun}\n`);
+        console.log(`Found ${completedMedia.length} failed video(s) to re-encode. dry-run=${isDryRun}\n`);
 
         for (let i = 0; i < completedMedia.length; i++) {
             const { _id, fileName } = completedMedia[i];
