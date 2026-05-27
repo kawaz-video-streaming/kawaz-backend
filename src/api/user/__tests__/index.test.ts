@@ -131,6 +131,28 @@ describe('DELETE /user/profile/:name', () => {
     });
 });
 
+describe('DELETE /user/account', () => {
+    it('returns 200 and clears cookie when account is deleted', async () => {
+        const userDal = { removeUser: jest.fn().mockResolvedValue(undefined) };
+        const app = makeApp(userDal);
+
+        const response = await request(app).delete('/user/account');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ message: 'Account deleted successfully' });
+        expect(userDal.removeUser).toHaveBeenCalledWith('alice');
+    });
+
+    it('propagates errors from removeUser', async () => {
+        const userDal = { removeUser: jest.fn().mockRejectedValue(new Error('DB error')) };
+        const app = makeApp(userDal);
+
+        const response = await request(app).delete('/user/account');
+
+        expect(response.status).toBe(500);
+    });
+});
+
 describe('GET /user/profiles', () => {
     it('returns all profiles for the authenticated user', async () => {
         const profiles = [

@@ -55,6 +55,15 @@ export const createUserHandlers = (userDal: UserDal) => {
                 const profiles = await userDal.getUserProfiles(username);
                 res.json({ profiles });
             }
+        ),
+        deleteAccount: requestHandlerDecorator(
+            'delete account',
+            async (req: Request, res: Response) => {
+                const { user: { username } } = req as AuthenticatedRequest;
+                await userDal.removeUser(username);
+                res.clearCookie('kawaz-token');
+                res.json({ message: "Account deleted successfully" });
+            }
         )
     }
 }
