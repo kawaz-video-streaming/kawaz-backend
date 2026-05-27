@@ -9,6 +9,7 @@ const makeUserDal = (overrides: Partial<Record<keyof UserDal, jest.Mock>> = {}) 
         approveUser: jest.fn(),
         denyUser: jest.fn(),
         removeUser: jest.fn(),
+        getAllApprovedUserEmails: jest.fn(),
         ...overrides,
     }) as unknown as UserDal;
 
@@ -17,6 +18,7 @@ const makeMailer = (overrides: Partial<Record<keyof Mailer, jest.Mock>> = {}) =>
         sendApprovalEmail: jest.fn().mockResolvedValue(undefined),
         sendDenialEmail: jest.fn().mockResolvedValue(undefined),
         sendApprovalRequestEmail: jest.fn().mockResolvedValue(undefined),
+        sendNewsletter: jest.fn().mockResolvedValue(undefined),
         ...overrides,
     }) as unknown as Mailer;
 
@@ -82,5 +84,34 @@ describe('createAdminLogic.denyUser', () => {
         await expect(logic.denyUser('unknown')).rejects.toThrow(NotFoundError);
         expect(userDal.denyUser).toHaveBeenCalledWith('unknown');
         expect(userDal.removeUser).not.toHaveBeenCalled();
+    });
+});
+
+describe('createAdminLogic.sendNewsletter', () => {
+    it('sends newsletter to all approved users and returns recipient count', async () => {
+        const approvedUsers = [
+            { name: 'alice', email: 'alice@example.com' },
+            { name: 'bob', email: 'bob@example.com' },
+        ];
+        const userDal = makeUserDal({ getAllApprovedUserEmails: jest.fn().mockResolvedValue(approvedUsers) });
+        const mailer = makeMailer();
+        const logic = createAdminLogic(mailer, userDal);
+
+        const count = await logic.sendNewsletter('Hello', 'Message body');
+
+        expect(count).toBe(2);
+        expect(userDal.getAllApprovedUserEmails).toHaveBeenCalledTimes(1);
+        expect(mailer.sendNewsletter).toHaveBeenCalledWith('Hello', 'Message body', approvedUsers);
+    });
+
+    it('returns 0 when there are no approved users', async () => {
+        const userDal = makeUserDal({ getAllApprovedUserEmails: jest.fn().mockResolvedValue([]) });
+        const mailer = makeMailer();
+        const logic = createAdminLogic(mailer, userDal);
+
+        const count = await logic.sendNewsletter('Hello', 'Body');
+
+        expect(count).toBe(0);
+        expect(mailer.sendNewsletter).toHaveBeenCalledWith('Hello', 'Body', []);
     });
 });

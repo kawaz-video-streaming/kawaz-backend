@@ -30,12 +30,14 @@ type MockUserDal = {
     approveUser: jest.Mock;
     denyUser: jest.Mock;
     removeUser: jest.Mock;
+    getAllApprovedUserEmails: jest.Mock;
 };
 
 type MockMailer = {
     sendApprovalEmail: jest.Mock;
     sendDenialEmail: jest.Mock;
     sendApprovalRequestEmail: jest.Mock;
+    sendNewsletter: jest.Mock;
 };
 
 const makeApp = (userDal: MockUserDal, mailer: MockMailer): Application => {
@@ -61,6 +63,10 @@ const makeAdminDal = (overrides: Partial<MockUserDal> = {}): MockUserDal => ({
     approveUser: jest.fn().mockResolvedValue({ name: 'alice', email: 'alice@example.com' }),
     denyUser: jest.fn().mockResolvedValue({ name: 'alice', email: 'alice@example.com' }),
     removeUser: jest.fn().mockResolvedValue(undefined),
+    getAllApprovedUserEmails: jest.fn().mockResolvedValue([
+        { name: 'alice', email: 'alice@example.com' },
+        { name: 'bob', email: 'bob@example.com' },
+    ]),
     ...overrides,
 });
 
@@ -68,6 +74,7 @@ const makeMailer = (overrides: Partial<MockMailer> = {}): MockMailer => ({
     sendApprovalEmail: jest.fn().mockResolvedValue(undefined),
     sendDenialEmail: jest.fn().mockResolvedValue(undefined),
     sendApprovalRequestEmail: jest.fn().mockResolvedValue(undefined),
+    sendNewsletter: jest.fn().mockResolvedValue(undefined),
     ...overrides,
 });
 
@@ -243,5 +250,75 @@ describe('POST /admin/pending/:username/deny', () => {
 
         expect(response.status).toBe(401);
         expect(userDal.denyUser).not.toHaveBeenCalled();
+    });
+});
+
+describe('POST /admin/newsletter', () => {
+    let adminToken: string;
+    let userToken: string;
+
+    beforeEach(() => {
+        adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
+        userToken = jwt.sign({ username: 'user', role: 'user' }, AUTH_CONFIG.jwtSecret);
+    });
+
+    it('returns 200 with recipient count when newsletter is sent', async () => {
+        const userDal = makeAdminDal();
+        const mailer = makeMailer();
+        const app = makeApp(userDal, mailer);
+
+        const response = await request(app)
+            .post('/admin/newsletter')
+            .set('Cookie', `kawaz-token=${adminToken}`)
+            .send({ subject: 'Big news', body: 'Hello everyone!' });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ message: 'Newsletter sent to 2 users' });
+        expect(userDal.getAllApprovedUserEmails).toHaveBeenCalledTimes(1);
+        expect(mailer.sendNewsletter).toHaveBeenCalledWith('Big news', 'Hello everyone!', expect.any(Array));
+    });
+
+    it('returns 400 when subject is missing', async () => {
+        const app = makeApp(makeAdminDal(), makeMailer());
+
+        const response = await request(app)
+            .post('/admin/newsletter')
+            .set('Cookie', `kawaz-token=${adminToken}`)
+            .send({ body: 'Hello everyone!' });
+
+        expect(response.status).toBe(400);
+    });
+
+    it('returns 400 when body is missing', async () => {
+        const app = makeApp(makeAdminDal(), makeMailer());
+
+        const response = await request(app)
+            .post('/admin/newsletter')
+            .set('Cookie', `kawaz-token=${adminToken}`)
+            .send({ subject: 'Big news' });
+
+        expect(response.status).toBe(400);
+    });
+
+    it('returns 401 when not authenticated', async () => {
+        const app = makeApp(makeAdminDal(), makeMailer());
+        const response = await request(app).post('/admin/newsletter').send({ subject: 'x', body: 'y' });
+        expect(response.status).toBe(401);
+    });
+
+    it('returns 401 when non-admin user tries to send newsletter', async () => {
+        const userDal = makeAdminDal({
+            findUser: jest.fn().mockResolvedValue({ name: 'user', password: 'hash', role: 'user' }),
+        });
+        const mailer = makeMailer();
+        const app = makeApp(userDal, mailer);
+
+        const response = await request(app)
+            .post('/admin/newsletter')
+            .set('Cookie', `kawaz-token=${userToken}`)
+            .send({ subject: 'Big news', body: 'Hello!' });
+
+        expect(response.status).toBe(401);
+        expect(mailer.sendNewsletter).not.toHaveBeenCalled();
     });
 });

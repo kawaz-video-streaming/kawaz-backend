@@ -24,5 +24,10 @@ export const createAdminLogic = (
         } else {
             throw new NotFoundError(`User "${username}" not found`);
         }
-    }
+    },
+    sendNewsletter: async (subject: string, body: string) => {
+        const recipients = await userDal.getAllApprovedUserEmails();
+        await mailer.sendNewsletter(subject, body, recipients);
+        return recipients.length;
+    },
 });

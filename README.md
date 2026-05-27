@@ -6,8 +6,8 @@ Kawaz Plus media backend service.
 
 - Exposes a health endpoint (`GET /health`)
 - Exposes auth endpoints (`POST /auth/signup`, `POST /auth/login`, `POST /auth/promote`, `GET /auth/google/login`, `GET /auth/google/callback`) — signup requires email and creates users in `"pending"` status awaiting admin approval; login blocked for non-approved users; JWT stored in HttpOnly cookie; Google OAuth follows the same admin-approval gate as regular signup
-- Exposes admin endpoints (`GET /admin/pending`, `POST /admin/pending/:username/approve`, `POST /admin/pending/:username/deny`) — manage pending user registrations with email notifications
-- Exposes user endpoints (`GET /user/me`, `POST /user/profile`, `PUT /user/profile`, `DELETE /user/profile/:name`, `GET /user/profiles`) — per-user profile management
+- Exposes admin endpoints (`GET /admin/pending`, `POST /admin/pending/:username/approve`, `POST /admin/pending/:username/deny`, `POST /admin/newsletter`) — manage pending user registrations with email notifications; send HTML newsletters to all approved users
+- Exposes user endpoints (`GET /user/me`, `POST /user/profile`, `PUT /user/profile`, `DELETE /user/profile/:name`, `GET /user/profiles`, `DELETE /user/account`) — per-user profile management and self-service account deletion
 - Exposes avatar endpoints (`GET /avatar`, `GET /avatar/:id`, `GET /avatar/:id/image`, `POST /avatar`, `DELETE /avatar/:id`) — avatar catalog; image streamed directly as JPEG with cache headers
 - Exposes avatar category endpoints (`GET /avatar-category`, `GET /avatar-category/:categoryId`, `POST /avatar-category`, `DELETE /avatar-category/:categoryId`) — manage avatar categories stored in MongoDB; deletion blocked when avatars still reference a category
 - Exposes media genre endpoints (`GET /mediaGenre`, `GET /mediaGenre/:genreId`, `POST /mediaGenre`, `DELETE /mediaGenre`) — manage the genre taxonomy used by media and collections; deletion blocked when genre is referenced by any media or collection
@@ -211,6 +211,15 @@ Returns `200 OK` if service is running.
 - Success response: `200 { "message": "User denied" }`
 - Error responses: `401`, `403`, `404` (user not found or not pending)
 
+### `POST /admin/newsletter`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Content type: `application/json`
+- Body: `{ "subject": string, "body": string }`
+- Sends a branded HTML email to every user with `status: "approved"`; personalised with each recipient's username
+- Success response: `200 { "message": "Newsletter sent to N users" }`
+- Error responses: `400` (missing or empty subject/body), `401`, `403`
+
 ### `GET /user/me`
 
 - Requires: `kawaz-token` cookie with valid JWT
@@ -243,6 +252,14 @@ Returns `200 OK` if service is running.
 
 - Requires: `kawaz-token` cookie with valid JWT
 - Success response: `200 { "profiles": [{ "name": string, "avatarId": string }] }`
+- Error responses: `401`
+
+### `DELETE /user/account`
+
+- Requires: `kawaz-token` cookie with valid JWT
+- Permanently deletes the authenticated user's account (record, email, hashed password, all profiles); clears the `kawaz-token` session cookie
+- This action is irreversible
+- Success response: `200 { "message": "Account deleted successfully" }`
 - Error responses: `401`
 
 ### `GET /avatar`
@@ -537,8 +554,8 @@ src/
 ### Key modules:
 
 - **api/auth** - Signup (pending status, email required), login, admin promotion
-- **api/admin** - Admin panel: list/approve/deny pending users with email notifications
-- **api/user** - User info (`/me`) and profile management (`/profile`, `/profiles`)
+- **api/admin** - Admin panel: list/approve/deny pending users with email notifications; newsletter broadcast to all approved users
+- **api/user** - User info (`/me`), profile management (`/profile`, `/profiles`), and self-service account deletion (`DELETE /user/account`)
 - **api/avatar** - Avatar catalog CRUD; image streamed directly with cache headers
 - **api/avatarCategory** - Avatar category CRUD; deletion blocked when avatars reference the category
 - **api/media** - Presigned-URL upload (initiate + complete), media CRUD, streaming
@@ -552,7 +569,7 @@ src/
 - **dal/media** - Media model and database operations; includes `getPendingMedia`, `isGenreEmpty`
 - **dal/mediaCollection** - MediaCollection model and database operations; includes `isGenreUsedInCollection`
 - **dal/mediaGenre** - MediaGenre model and database operations
-- **services/mailer.ts** - Nodemailer-based Gmail SMTP service for user approval emails
+- **services/mailer.ts** - Nodemailer-based Gmail SMTP service for user approval/denial emails, password reset emails, and newsletter broadcasts
 - **services/system.ts** - Initializes API server, Mailer, and starts AMQP consumers
 
 ## Database schema
