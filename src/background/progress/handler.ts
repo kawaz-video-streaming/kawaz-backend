@@ -10,4 +10,4 @@ export const mediaProgressHandler = (mediaDal: MediaDal, specialMediaDal: MediaD
             mediaDal.updateMedia(mediaId, update),
             specialMediaDal.updateMedia(mediaId, update),
         ]);
-    }
+    };

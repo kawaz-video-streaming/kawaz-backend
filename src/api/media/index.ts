@@ -710,5 +710,173 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaGenreDal: M
    */
   router.get(/^\/stream\/([^/]+)\/([^/]+\.vtt)$/, mediaHandlers.getVtt);
 
+  /**
+   * @openapi
+   * /media/{id}/subtitle/initiate:
+   *   post:
+   *     summary: Initiate a subtitle upload
+   *     description: Reserves a subtitle slot and returns a presigned PUT URL for direct browser-to-storage upload of a VTT file.
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Media ID
+   *     responses:
+   *       200:
+   *         description: Presigned upload URL
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 subtitleId:
+   *                   type: string
+   *                 uploadUrl:
+   *                   type: string
+   *       400:
+   *         description: Bad request
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       404:
+   *         description: Media not found
+   */
+  router.post("/:id/subtitle/initiate", requireAdmin, mediaHandlers.initiateSubtitleUpload);
+
+  /**
+   * @openapi
+   * /media/{id}/subtitle/complete:
+   *   post:
+   *     summary: Complete a subtitle upload
+   *     description: Signals that the VTT file has been uploaded and saves the subtitle track to the media record. Rebuilds the MPEG-DASH manifest to include the new track.
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Media ID
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [subtitleId, language, title]
+   *             properties:
+   *               subtitleId:
+   *                 type: string
+   *               language:
+   *                 type: string
+   *               title:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Subtitle added
+   *       400:
+   *         description: Bad request
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       404:
+   *         description: Media not found
+   */
+  router.post("/:id/subtitle/complete", requireAdmin, mediaHandlers.completeSubtitleUpload);
+
+  /**
+   * @openapi
+   * /media/{id}/subtitle/{subtitleId}:
+   *   put:
+   *     summary: Update a subtitle track
+   *     description: Enable/disable a subtitle track or rename its label. Rebuilds the MPEG-DASH manifest to reflect the change.
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Media ID
+   *       - in: path
+   *         name: subtitleId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Subtitle track ID
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               enabled:
+   *                 type: boolean
+   *               title:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Subtitle updated
+   *       400:
+   *         description: Bad request - at least one field required
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       404:
+   *         description: Media not found
+   */
+  router.put("/:id/subtitle/:subtitleId", requireAdmin, mediaHandlers.updateSubtitle);
+
+  /**
+   * @openapi
+   * /media/{id}/subtitle/{subtitleId}:
+   *   delete:
+   *     summary: Delete a subtitle track
+   *     description: Removes the subtitle track from the media record, deletes the VTT file from storage, and rebuilds the MPEG-DASH manifest.
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Media ID
+   *       - in: path
+   *         name: subtitleId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Subtitle track ID
+   *     responses:
+   *       200:
+   *         description: Subtitle deleted
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       404:
+   *         description: Media or subtitle not found
+   */
+  router.delete("/:id/subtitle/:subtitleId", requireAdmin, mediaHandlers.deleteSubtitle);
+
   return router;
 };

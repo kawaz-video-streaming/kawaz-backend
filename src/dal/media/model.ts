@@ -27,7 +27,11 @@ export interface VideoStream extends Stream { }
 
 export interface AudioStream extends LanguageStream { }
 
-export interface SubtitleStream extends LanguageStream { }
+export interface SubtitleStream extends LanguageStream {
+  subtitleId?: string;
+  fileName?: string;
+  enabled?: boolean;
+}
 
 export interface VideoChapter {
   chapterName: string;
@@ -66,7 +70,11 @@ const videoStreamZodSchema = streamZodSchema satisfies z.ZodType<VideoStream>;
 
 const audioStreamZodSchema = languageStreamZodSchema satisfies z.ZodType<AudioStream>;
 
-const subtitleStreamZodSchema = languageStreamZodSchema satisfies z.ZodType<SubtitleStream>;
+const subtitleStreamZodSchema = languageStreamZodSchema.extend({
+  subtitleId: z.string().optional(),
+  fileName: z.string().optional(),
+  enabled: z.boolean().optional(),
+}) satisfies z.ZodType<SubtitleStream>;
 
 export const mediaMetadataZodSchema = z.object({
   name: z.string(),
@@ -100,7 +108,12 @@ const videoStreamSchema = new Schema<VideoStream>(streamSchemaObject, { _id: fal
 
 const audioStreamSchema = new Schema<AudioStream>(languageStreamSchemaObject, { _id: false });
 
-const subtitleStreamSchema = new Schema<SubtitleStream>(languageStreamSchemaObject, { _id: false });
+const subtitleStreamSchema = new Schema<SubtitleStream>({
+  ...languageStreamSchemaObject,
+  subtitleId: { type: String, required: false },
+  fileName: { type: String, required: false },
+  enabled: { type: Boolean, required: false },
+}, { _id: false });
 
 const mediaMetadataSchema = new Schema<MediaMetadata>({
   name: { type: String, required: true },

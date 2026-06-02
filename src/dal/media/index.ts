@@ -1,6 +1,6 @@
 import { Dal, DeleteResult, Types } from "@ido_kawaz/mongo-client";
 import { isNil, isNotEmpty, isNotNil } from "ramda";
-import { COMPLETED, Media, MediaInfo, MediaModel, MediaStatus, PENDING } from "./model";
+import { COMPLETED, Media, MediaInfo, MediaModel, MediaStatus, PENDING, SubtitleStream } from "./model";
 
 export class MediaDal extends Dal<Media> {
   constructor(mediaModel: MediaModel) {
@@ -64,5 +64,26 @@ export class MediaDal extends Dal<Media> {
 
   isGenreEmpty = async (genreName: string): Promise<boolean> =>
     isNil(await this.model.exists({ "genres": genreName }).exec());
+
+  addSubtitleStream = async (mediaId: string, stream: SubtitleStream): Promise<void> => {
+    await this.model.findByIdAndUpdate(mediaId, { $push: { 'metadata.subtitleStreams': stream } }).lean().exec();
+  }
+
+  updateSubtitleStream = async (mediaId: string, subtitleId: string, fields: { enabled?: boolean; title?: string }): Promise<void> => {
+    const $set: Record<string, unknown> = {};
+    if (isNotNil(fields.enabled)) $set['metadata.subtitleStreams.$.enabled'] = fields.enabled;
+    if (isNotNil(fields.title)) $set['metadata.subtitleStreams.$.title'] = fields.title;
+    await this.model.findOneAndUpdate(
+      { _id: mediaId, 'metadata.subtitleStreams.subtitleId': subtitleId },
+      { $set }
+    ).lean().exec();
+  }
+
+  removeSubtitleStream = async (mediaId: string, subtitleId: string): Promise<void> => {
+    await this.model.findByIdAndUpdate(
+      mediaId,
+      { $pull: { 'metadata.subtitleStreams': { subtitleId } } }
+    ).lean().exec();
+  }
 };
 

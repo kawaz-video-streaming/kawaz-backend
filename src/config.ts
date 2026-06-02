@@ -106,12 +106,7 @@ export const getConfig = (env: {} = {}): SystemConfig => {
     dbConfig: createMongoConfig(),
     storageConfig: storageConfig,
     amqpConfig: createAmqpConfig(),
-    consumersConfig: {
-      upload: {
-        bucketsConfig,
-        partSize: storageConfig.partSize,
-      },
-    },
+    consumersConfig: {},
     mailerConfig: {
       gmailUser: envVars.GMAIL_USER,
       gmailAppPassword: envVars.GMAIL_APP_PASSWORD,
