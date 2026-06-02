@@ -172,7 +172,7 @@ Deletion is blocked if the collection still contains media or subcollections (`C
 
 Thumbnail is uploaded to storage at key `<thumbnailPrefix>/<mediaId>.jpg` by the upload consumer. The `thumbnailFocalPoint` is stored in the DB and used downstream for cropping.
 
-`MediaMetadata` contains name, durationInMs, playUrl, chaptersUrl, chapters, videoStreams, audioStreams, and subtitleStreams — populated when the progress consumer receives a completed event from the media processor. Each `SubtitleStream` entry now includes `subtitleId`, `fileName`, and `enabled` (sent by media-processor in the progress message and stored as-is). These fields enable admin subtitle management: admins can add manually-uploaded VTT files (`subtitle_manual_<uuid>.vtt`), toggle tracks on/off, rename labels, and delete tracks. All changes trigger a rebuild of the stored `output.mpd` in VOD storage via `src/utils/mpd.ts`.
+`MediaMetadata` contains name, durationInMs, playUrl, chaptersUrl, chapters, videoStreams, audioStreams, and subtitleStreams — populated when the progress consumer receives a completed event from the media processor. Each `SubtitleStream` entry now includes `subtitleId`, `fileName`, and `enabled` (sent by media-processor in the progress message and stored as-is). These fields enable admin subtitle management: admins can add manually-uploaded VTT files (`subtitle_manual_<uuid>.vtt`), toggle tracks on/off, and rename labels. All changes trigger a rebuild of the stored `output.mpd` in VOD storage via `src/utils/mpd.ts`.
 
 ### User Model (`src/dal/user/model.ts`)
 

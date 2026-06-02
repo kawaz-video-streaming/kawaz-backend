@@ -10,6 +10,9 @@ const streamToString = (stream: Readable): Promise<string> =>
         stream.on('error', reject);
     });
 
+const escapeXml = (str: string): string =>
+    str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 const stripSubtitleSets = (mpd: string): string =>
     mpd.replace(/\t\t<AdaptationSet[^>]+contentType="text"[\s\S]*?<\/AdaptationSet>\n/g, '');
 
@@ -18,15 +21,15 @@ const injectSubtitleSets = (stripped: string, streams: SubtitleStream[]): string
     if (!enabled.length) return stripped;
     const maxId = Math.max(-1, ...[...stripped.matchAll(/id="(\d+)"/g)].map(m => parseInt(m[1])));
     const sets = enabled.map((s, i) => [
-        `\t\t<AdaptationSet id="${maxId + 1 + i}" contentType="text" mimeType="text/vtt" lang="${s.language}">`,
-        `\t\t\t<Label>${s.title}</Label>`,
+        `\t\t<AdaptationSet id="${maxId + 1 + i}" contentType="text" mimeType="text/vtt" lang="${escapeXml(s.language)}">`,
+        `\t\t\t<Label>${escapeXml(s.title)}</Label>`,
         `\t\t\t<Role schemeIdUri="urn:mpeg:dash:role:2011" value="subtitle"/>`,
         `\t\t\t<Representation id="${maxId + 1 + i}" mimeType="text/vtt" codecs="wvtt">`,
-        `\t\t\t\t<BaseURL>${s.fileName}</BaseURL>`,
+        `\t\t\t\t<BaseURL>${escapeXml(s.fileName ?? '')}</BaseURL>`,
         `\t\t\t</Representation>`,
         `\t\t</AdaptationSet>`,
     ].join('\n')).join('\n');
-    return stripped.replace('\n\t</Period>', `\n${sets}\n\t</Period>`);
+    return stripped.replace(/\n\t<\/Period>/g, `\n${sets}\n\t</Period>`);
 };
 
 export const rebuildAndUploadMpd = async (storageClient: StorageClient, vodStorageBucket: string, mediaId: string, streams: SubtitleStream[]): Promise<void> => {
