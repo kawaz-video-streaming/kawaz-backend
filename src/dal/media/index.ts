@@ -79,11 +79,5 @@ export class MediaDal extends Dal<Media> {
     ).lean().exec();
   }
 
-  removeSubtitleStream = async (mediaId: string, subtitleId: string): Promise<void> => {
-    await this.model.findByIdAndUpdate(
-      mediaId,
-      { $pull: { 'metadata.subtitleStreams': { subtitleId } } }
-    ).lean().exec();
-  }
 };
 

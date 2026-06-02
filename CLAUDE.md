@@ -118,7 +118,6 @@ Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
 | `POST` | `/media/:id/subtitle/initiate` | Yes (admin only) | Reserve a subtitle slot; returns `{ subtitleId, uploadUrl }` (presigned PUT URL for VTT) |
 | `POST` | `/media/:id/subtitle/complete` | Yes (admin only) | Confirm VTT upload; saves track to DB and rebuilds the MPEG-DASH manifest |
 | `PUT` | `/media/:id/subtitle/:subtitleId` | Yes (admin only) | Enable/disable or rename a subtitle track; rebuilds manifest |
-| `DELETE` | `/media/:id/subtitle/:subtitleId` | Yes (admin only) | Delete subtitle track from DB and VOD storage; rebuilds manifest |
 | `POST` | `/media-collection` | Yes (admin only) | Create a collection with a required thumbnail |
 | `GET` | `/media-collection` | Yes | List all media collections |
 | `GET` | `/media-collection/:id` | Yes | Get a single collection's metadata |

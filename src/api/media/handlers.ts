@@ -14,7 +14,6 @@ import { createMediaLogic } from "./logic";
 import {
   validateCompleteSubtitleUploadRequest,
   validateCompleteUploadRequest,
-  validateDeleteSubtitleRequest,
   validateGetCollectionTmdbDetailsRequest,
   validateGetEpisodeTmdbDetailsRequest,
   validateGetMovieTmdbDetailsRequest,
@@ -261,15 +260,6 @@ export const createMediaHandlers = (
         const { mediaId, subtitleId, ...fields } = validateUpdateSubtitleRequest(rawReq);
         await logicFactory(mediaDal, mediaCollectionDal).updateSubtitle(mediaId, subtitleId, fields);
         res.status(StatusCodes.OK).json({ message: "Subtitle updated" });
-      },
-    ),
-    deleteSubtitle: requestHandlerDecorator(
-      "delete subtitle",
-      async (rawReq: Request, res: Response) => {
-        const { mediaDal, mediaCollectionDal } = (rawReq as MediaAuthenticatedRequest);
-        const { mediaId, subtitleId } = validateDeleteSubtitleRequest(rawReq);
-        await logicFactory(mediaDal, mediaCollectionDal).deleteSubtitle(mediaId, subtitleId);
-        res.status(StatusCodes.OK).json({ message: "Subtitle deleted" });
       },
     ),
   };

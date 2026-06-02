@@ -3,7 +3,7 @@ import { NotFoundError } from "@ido_kawaz/server-framework";
 import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
 import { randomUUID } from "crypto";
 import { createReadStream } from "fs";
-import { isNil, isNotNil } from "ramda";
+import { isNil } from "ramda";
 import { MediaDal } from "../../dal/media";
 import { SubtitleStream } from "../../dal/media/model";
 import { MediaCollectionDal } from "../../dal/mediaCollection";
@@ -130,18 +130,6 @@ export const createMediaLogic = (
     const updatedStreams = (media.metadata?.subtitleStreams ?? []).map(s =>
       s.subtitleId === subtitleId ? { ...s, ...fields } : s
     );
-    await rebuildAndUploadMpd(storageClient, vodStorageBucket, mediaId, updatedStreams);
-  },
-  deleteSubtitle: async (mediaId: string, subtitleId: string) => {
-    const media = await mediaDal.getMedia(mediaId);
-    if (isNil(media)) throw new NotFoundError("Media not found");
-    const stream = (media.metadata?.subtitleStreams ?? []).find(s => s.subtitleId === subtitleId);
-    if (isNil(stream)) throw new NotFoundError("Subtitle not found");
-    if (isNotNil(stream.fileName)) {
-      await storageClient.deleteObject(vodStorageBucket, `${mediaId}/${stream.fileName}`);
-    }
-    await mediaDal.removeSubtitleStream(mediaId, subtitleId);
-    const updatedStreams = (media.metadata?.subtitleStreams ?? []).filter(s => s.subtitleId !== subtitleId);
     await rebuildAndUploadMpd(storageClient, vodStorageBucket, mediaId, updatedStreams);
   },
 });

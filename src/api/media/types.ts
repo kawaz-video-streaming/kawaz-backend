@@ -174,6 +174,3 @@ export const validateUpdateSubtitleRequest = validateRequest(
     }).transform(({ params, body }) => ({ mediaId: params.id, subtitleId: params.subtitleId, ...body }))
 );
 
-export const validateDeleteSubtitleRequest = validateRequest(
-    subtitleIdParamSchema.transform(({ params }) => ({ mediaId: params.id, subtitleId: params.subtitleId }))
-);

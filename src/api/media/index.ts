@@ -843,40 +843,5 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaGenreDal: M
    */
   router.put("/:id/subtitle/:subtitleId", requireAdmin, mediaHandlers.updateSubtitle);
 
-  /**
-   * @openapi
-   * /media/{id}/subtitle/{subtitleId}:
-   *   delete:
-   *     summary: Delete a subtitle track
-   *     description: Removes the subtitle track from the media record, deletes the VTT file from storage, and rebuilds the MPEG-DASH manifest.
-   *     tags:
-   *       - Media
-   *     security:
-   *       - cookieAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Media ID
-   *       - in: path
-   *         name: subtitleId
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Subtitle track ID
-   *     responses:
-   *       200:
-   *         description: Subtitle deleted
-   *       401:
-   *         description: Unauthorized
-   *       403:
-   *         description: Forbidden - admin only
-   *       404:
-   *         description: Media or subtitle not found
-   */
-  router.delete("/:id/subtitle/:subtitleId", requireAdmin, mediaHandlers.deleteSubtitle);
-
   return router;
 };
