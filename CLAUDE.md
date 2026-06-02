@@ -115,6 +115,9 @@ Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
 | `GET` | `/media/stream/:id/:filename.m4s` | Yes | Stream video segment as `video/iso.segment` with `Cache-Control: public, max-age=172800` |
 | `GET` | `/media/stream/:id/:filename.vtt` | Yes | Stream VTT subtitle file from VOD storage bucket |
 | `GET` | `/media/stream/:id/thumbnails.jpg` | Yes | Stream sprite-sheet tile thumbnails as `image/jpeg` with `Cache-Control: public, max-age=172800` |
+| `POST` | `/media/:id/subtitle/initiate` | Yes (admin only) | Reserve a subtitle slot; returns `{ subtitleId, uploadUrl }` (presigned PUT URL for VTT) |
+| `POST` | `/media/:id/subtitle/complete` | Yes (admin only) | Confirm VTT upload; saves track to DB and rebuilds the MPEG-DASH manifest |
+| `PUT` | `/media/:id/subtitle/:subtitleId` | Yes (admin only) | Enable/disable or rename a subtitle track; rebuilds manifest |
 | `POST` | `/media-collection` | Yes (admin only) | Create a collection with a required thumbnail |
 | `GET` | `/media-collection` | Yes | List all media collections |
 | `GET` | `/media-collection/:id` | Yes | Get a single collection's metadata |
@@ -169,7 +172,7 @@ Deletion is blocked if the collection still contains media or subcollections (`C
 
 Thumbnail is uploaded to storage at key `<thumbnailPrefix>/<mediaId>.jpg` by the upload consumer. The `thumbnailFocalPoint` is stored in the DB and used downstream for cropping.
 
-`MediaMetadata` contains name, durationInMs, playUrl, chaptersUrl, chapters, videoStreams, audioStreams, and subtitleStreams — populated when the progress consumer receives a completed event from the media processor.
+`MediaMetadata` contains name, durationInMs, playUrl, chaptersUrl, chapters, videoStreams, audioStreams, and subtitleStreams — populated when the progress consumer receives a completed event from the media processor. Each `SubtitleStream` entry now includes `subtitleId`, `fileName`, and `enabled` (sent by media-processor in the progress message and stored as-is). These fields enable admin subtitle management: admins can add manually-uploaded VTT files (`subtitle_manual_<uuid>.vtt`), toggle tracks on/off, and rename labels. All changes trigger a rebuild of the stored `output.mpd` in VOD storage via `src/utils/mpd.ts`.
 
 ### User Model (`src/dal/user/model.ts`)
 

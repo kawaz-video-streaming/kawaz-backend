@@ -136,3 +136,41 @@ export const validateGetTmdbPosterRequest = validateRequest(
     z.object({ query: z.object({ url: z.url().refine(u => u.startsWith('https://image.tmdb.org/'), { message: 'URL must be from image.tmdb.org' }) }) })
         .transform(({ query }) => query.url)
 );
+
+// --- subtitle management ---
+
+const subtitleIdParamSchema = z.object({
+    params: z.object({
+        id: z.string(),
+        subtitleId: z.string().min(1),
+    }),
+});
+
+export const validateInitiateSubtitleUploadRequest = validateRequest(
+    z.object({
+        params: requestWithIdParamZodSchema.shape.params,
+    }).transform(({ params }) => ({ mediaId: params.id }))
+);
+
+export const validateCompleteSubtitleUploadRequest = validateRequest(
+    z.object({
+        params: requestWithIdParamZodSchema.shape.params,
+        body: z.object({
+            subtitleId: z.string().min(1),
+            language: z.string().min(1),
+            title: z.string().min(1),
+        }),
+    }).transform(({ params, body }) => ({ mediaId: params.id, ...body }))
+);
+
+export const validateUpdateSubtitleRequest = validateRequest(
+    subtitleIdParamSchema.extend({
+        body: z.object({
+            enabled: z.boolean().optional(),
+            title: z.string().min(1).optional(),
+        }).refine(d => d.enabled !== undefined || d.title !== undefined, {
+            message: 'At least one of enabled or title must be provided',
+        }),
+    }).transform(({ params, body }) => ({ mediaId: params.id, subtitleId: params.subtitleId, ...body }))
+);
+

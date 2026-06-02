@@ -1,13 +1,16 @@
 import { AmqpClient } from "@ido_kawaz/amqp-client";
 import { NotFoundError } from "@ido_kawaz/server-framework";
 import { StorageClient, StorageObject } from "@ido_kawaz/storage-client";
+import { randomUUID } from "crypto";
 import { createReadStream } from "fs";
 import { isNil } from "ramda";
 import { MediaDal } from "../../dal/media";
+import { SubtitleStream } from "../../dal/media/model";
 import { MediaCollectionDal } from "../../dal/mediaCollection";
 import { MediaGenreDal } from "../../dal/mediaGenre";
 import { TmdbClient } from "../../services/tmdbClient";
 import { cleanupPath } from "../../utils/files";
+import { rebuildAndUploadMpd } from "../../utils/mpd";
 import { BucketsConfig, UploadedFile } from "../../utils/types";
 import { ConvertMessage, InitiateUploadRequestBody, InitiateUploadResponse, MediaUpdateRequestBody } from "./types";
 import { validateMediaContainingCollectionAndGenre } from "./utils";
@@ -101,4 +104,32 @@ export const createMediaLogic = (
     return storageClient.downloadObject(vodStorageBucket, `${mediaId}/${filename}`);
   },
   getSegment: (mediaId: string, filename: string) => storageClient.downloadObject(vodStorageBucket, `${mediaId}/${filename}`),
+  initiateSubtitleUpload: async (mediaId: string) => {
+    if (isNil(await mediaDal.getMedia(mediaId))) throw new NotFoundError("Media not found");
+    const subtitleId = randomUUID();
+    const fileName = `subtitle_manual_${subtitleId}.vtt`;
+    const uploadUrl = await storageClient.getPutPresignedUrl(vodStorageBucket, `${mediaId}/${fileName}`, PRESIGNED_URL_EXPIRY_SECONDS);
+    return { subtitleId, uploadUrl };
+  },
+  completeSubtitleUpload: async (mediaId: string, subtitleId: string, language: string, title: string) => {
+    const media = await mediaDal.getMedia(mediaId);
+    if (isNil(media)) throw new NotFoundError("Media not found");
+    const newStream: SubtitleStream = {
+      subtitleId, language, title, durationInMs: 0,
+      fileName: `subtitle_manual_${subtitleId}.vtt`,
+      enabled: true,
+    };
+    await mediaDal.addSubtitleStream(mediaId, newStream);
+    const updatedStreams = [...(media.metadata?.subtitleStreams ?? []), newStream];
+    await rebuildAndUploadMpd(storageClient, vodStorageBucket, mediaId, updatedStreams);
+  },
+  updateSubtitle: async (mediaId: string, subtitleId: string, fields: { enabled?: boolean; title?: string }) => {
+    const media = await mediaDal.getMedia(mediaId);
+    if (isNil(media)) throw new NotFoundError("Media not found");
+    await mediaDal.updateSubtitleStream(mediaId, subtitleId, fields);
+    const updatedStreams = (media.metadata?.subtitleStreams ?? []).map(s =>
+      s.subtitleId === subtitleId ? { ...s, ...fields } : s
+    );
+    await rebuildAndUploadMpd(storageClient, vodStorageBucket, mediaId, updatedStreams);
+  },
 });

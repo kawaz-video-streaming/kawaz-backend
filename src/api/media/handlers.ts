@@ -12,14 +12,17 @@ import { validateRequestWithId } from "../../utils/zod";
 import { MediaAuthenticatedRequest } from "../types";
 import { createMediaLogic } from "./logic";
 import {
+  validateCompleteSubtitleUploadRequest,
   validateCompleteUploadRequest,
   validateGetCollectionTmdbDetailsRequest,
   validateGetEpisodeTmdbDetailsRequest,
   validateGetMovieTmdbDetailsRequest,
   validateGetShowTmdbDetailsRequest,
   validateGetTmdbPosterRequest,
+  validateInitiateSubtitleUploadRequest,
   validateInitiateUploadRequest,
   validateMediaUpdateRequest,
+  validateUpdateSubtitleRequest,
 } from "./types";
 import { pipeToResponse } from "./utils";
 
@@ -230,6 +233,33 @@ export const createMediaHandlers = (
         res.setHeader("Content-Type", "text/vtt");
         res.setHeader('Cache-Control', 'public, max-age=172800');
         await pipeToResponse(vttStream, res);
+      },
+    ),
+    initiateSubtitleUpload: requestHandlerDecorator(
+      "initiate subtitle upload",
+      async (rawReq: Request, res: Response) => {
+        const { mediaDal, mediaCollectionDal } = (rawReq as MediaAuthenticatedRequest);
+        const { mediaId } = validateInitiateSubtitleUploadRequest(rawReq);
+        const result = await logicFactory(mediaDal, mediaCollectionDal).initiateSubtitleUpload(mediaId);
+        res.status(StatusCodes.OK).json(result);
+      },
+    ),
+    completeSubtitleUpload: requestHandlerDecorator(
+      "complete subtitle upload",
+      async (rawReq: Request, res: Response) => {
+        const { mediaDal, mediaCollectionDal } = (rawReq as MediaAuthenticatedRequest);
+        const { mediaId, subtitleId, language, title } = validateCompleteSubtitleUploadRequest(rawReq);
+        await logicFactory(mediaDal, mediaCollectionDal).completeSubtitleUpload(mediaId, subtitleId, language, title);
+        res.status(StatusCodes.OK).json({ message: "Subtitle added" });
+      },
+    ),
+    updateSubtitle: requestHandlerDecorator(
+      "update subtitle",
+      async (rawReq: Request, res: Response) => {
+        const { mediaDal, mediaCollectionDal } = (rawReq as MediaAuthenticatedRequest);
+        const { mediaId, subtitleId, ...fields } = validateUpdateSubtitleRequest(rawReq);
+        await logicFactory(mediaDal, mediaCollectionDal).updateSubtitle(mediaId, subtitleId, fields);
+        res.status(StatusCodes.OK).json({ message: "Subtitle updated" });
       },
     ),
   };
