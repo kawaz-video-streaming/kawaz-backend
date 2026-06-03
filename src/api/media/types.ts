@@ -132,6 +132,16 @@ export const validateGetEpisodeTmdbDetailsRequest = validateRequest(
     }).transform(({ query }) => query)
 );
 
+export const validateGetSeasonTmdbDetailsRequest = validateRequest(
+    z.object({
+        query: z.object({
+            showTitle: z.string().min(1),
+            showYear: z.coerce.number().int().positive(),
+            seasonNumber: z.coerce.number().int().positive(),
+        })
+    }).transform(({ query }) => query)
+);
+
 export const validateGetTmdbPosterRequest = validateRequest(
     z.object({ query: z.object({ url: z.url().refine(u => u.startsWith('https://image.tmdb.org/'), { message: 'URL must be from image.tmdb.org' }) }) })
         .transform(({ query }) => query.url)

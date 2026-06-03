@@ -17,6 +17,7 @@ import {
   validateGetCollectionTmdbDetailsRequest,
   validateGetEpisodeTmdbDetailsRequest,
   validateGetMovieTmdbDetailsRequest,
+  validateGetSeasonTmdbDetailsRequest,
   validateGetShowTmdbDetailsRequest,
   validateGetTmdbPosterRequest,
   validateInitiateSubtitleUploadRequest,
@@ -140,6 +141,15 @@ export const createMediaHandlers = (
         const { mediaDal, mediaCollectionDal } = (req as MediaAuthenticatedRequest);
         const { title, year } = validateGetShowTmdbDetailsRequest(req);
         const details = await logicFactory(mediaDal, mediaCollectionDal).getShowMediaTmdbDetails(title, year);
+        res.status(StatusCodes.OK).json(details);
+      },
+    ),
+    getSeasonMediaTmdbDetails: requestHandlerDecorator(
+      "get media season info details",
+      async (req: Request, res: Response) => {
+        const { mediaDal, mediaCollectionDal } = (req as MediaAuthenticatedRequest);
+        const { showTitle, showYear, seasonNumber } = validateGetSeasonTmdbDetailsRequest(req);
+        const details = await logicFactory(mediaDal, mediaCollectionDal).getSeasonMediaTmdbDetails(showTitle, showYear, seasonNumber);
         res.status(StatusCodes.OK).json(details);
       },
     ),
