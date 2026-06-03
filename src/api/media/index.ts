@@ -427,6 +427,49 @@ export const createMediaRouter = (bucketsConfig: BucketsConfig, mediaGenreDal: M
 
   /**
    * @openapi
+   * /media/tmdb/season:
+   *   get:
+   *     summary: Get TV season details from TMDB
+   *     description: Fetches season metadata from TMDB by show title, year, and season number
+   *     tags:
+   *       - Media
+   *     security:
+   *       - cookieAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: showTitle
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Show title
+   *       - in: query
+   *         name: showYear
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: Show first air year
+   *       - in: query
+   *         name: seasonNumber
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: Season number
+   *     responses:
+   *       200:
+   *         description: TMDB season details
+   *       400:
+   *         description: Missing or invalid query parameters
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - admin only
+   *       404:
+   *         description: Show or season not found on TMDB
+   */
+  router.get("/tmdb/season", requireAdmin, mediaHandlers.getSeasonMediaTmdbDetails);
+
+  /**
+   * @openapi
    * /media/tmdb/poster:
    *   get:
    *     summary: Proxy a TMDB poster image

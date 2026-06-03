@@ -314,3 +314,34 @@ const TmdbEpisodeDetailsRawZodSchema: z.ZodType<TmdbEpisodeDetailsRaw> = z.objec
 });
 
 export const validateTmdbEpisodeDetailsRaw = validateSchemaAndReturnValue(TmdbEpisodeDetailsRawZodSchema);
+
+// --- Season details ---
+
+export interface TmdbSeasonDetailsRaw {
+    id: number;
+    name: string;
+    overview: string;
+    air_date: string | null;
+    poster_path: string | null;
+    season_number: number;
+}
+
+export interface TmdbSeasonDetails {
+    id: number;
+    name: string;
+    overview: string;
+    air_date: string | null;
+    poster_url: string | null;
+    season_number: number;
+}
+
+const TmdbSeasonDetailsRawZodSchema: z.ZodType<TmdbSeasonDetailsRaw> = z.object({
+    id: z.number(),
+    name: z.string(),
+    overview: z.string(),
+    air_date: z.string().nullable(),
+    poster_path: z.string().nullable(),
+    season_number: z.number(),
+});
+
+export const validateTmdbSeasonDetailsRaw = validateSchemaAndReturnValue(TmdbSeasonDetailsRawZodSchema);

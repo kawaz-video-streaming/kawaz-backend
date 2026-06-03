@@ -101,6 +101,9 @@ Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
 | `DELETE` | `/mediaGenre` | Yes (admin only) | Delete a media genre by name (must not be referenced by media or collections) |
 | `GET` | `/media/tmdb/movie` | Yes (admin only) | Fetch movie metadata from TMDB by `?title=` and `?year=` query params |
 | `GET` | `/media/tmdb/collection` | Yes (admin only) | Fetch TMDB collection metadata by `?id=`; genres are the intersection of all parts' genres |
+| `GET` | `/media/tmdb/show` | Yes (admin only) | Fetch TV show metadata from TMDB by `?title=` and `?year=` query params |
+| `GET` | `/media/tmdb/episode` | Yes (admin only) | Fetch TV episode metadata from TMDB by `?showTitle=`, `?showYear=`, `?seasonNumber=`, `?episodeNumber=` |
+| `GET` | `/media/tmdb/season` | Yes (admin only) | Fetch TV season metadata from TMDB by `?showTitle=`, `?showYear=`, `?seasonNumber=` |
 | `GET` | `/media/tmdb/poster` | Yes (admin only) | Proxy a TMDB image URL (`?url=`, must start with `https://image.tmdb.org/`) to avoid browser CORS |
 | `POST` | `/media/upload/initiate` | Yes (admin only) | Create media record; returns `{ mediaId, videoUploadUrl, thumbnailUploadUrl }` (presigned PUT URLs) |
 | `POST` | `/media/upload/complete` | Yes (admin only) | Signal browser upload done; triggers convert AMQP message, sets status to `processing` |

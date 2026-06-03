@@ -1,4 +1,4 @@
-import { validateInitiateUploadRequest, validateCompleteUploadRequest, validateGetMovieTmdbDetailsRequest } from '../types';
+import { validateInitiateUploadRequest, validateCompleteUploadRequest, validateGetMovieTmdbDetailsRequest, validateGetSeasonTmdbDetailsRequest } from '../types';
 
 describe('validateInitiateUploadRequest', () => {
     const makeReq = (overrides: Record<string, unknown> = {}) => ({
@@ -87,5 +87,38 @@ describe('validateGetMovieTmdbDetailsRequest', () => {
 
     it('throws when year is not a positive integer', () => {
         expect(() => validateGetMovieTmdbDetailsRequest({ query: { title: 'Inception', year: '-1' } } as any)).toThrow();
+    });
+});
+
+describe('validateGetSeasonTmdbDetailsRequest', () => {
+    it('returns parsed query for valid params', () => {
+        const result = validateGetSeasonTmdbDetailsRequest({ query: { showTitle: 'Breaking Bad', showYear: '2008', seasonNumber: '2' } } as any);
+        expect(result).toEqual({ showTitle: 'Breaking Bad', showYear: 2008, seasonNumber: 2 });
+    });
+
+    it('coerces string numbers to integers', () => {
+        const result = validateGetSeasonTmdbDetailsRequest({ query: { showTitle: 'Westworld', showYear: '2016', seasonNumber: '1' } } as any);
+        expect(result.showYear).toBe(2016);
+        expect(result.seasonNumber).toBe(1);
+    });
+
+    it('throws when showTitle is missing', () => {
+        expect(() => validateGetSeasonTmdbDetailsRequest({ query: { showYear: '2008', seasonNumber: '1' } } as any)).toThrow();
+    });
+
+    it('throws when showTitle is empty', () => {
+        expect(() => validateGetSeasonTmdbDetailsRequest({ query: { showTitle: '', showYear: '2008', seasonNumber: '1' } } as any)).toThrow();
+    });
+
+    it('throws when showYear is missing', () => {
+        expect(() => validateGetSeasonTmdbDetailsRequest({ query: { showTitle: 'Breaking Bad', seasonNumber: '1' } } as any)).toThrow();
+    });
+
+    it('throws when seasonNumber is missing', () => {
+        expect(() => validateGetSeasonTmdbDetailsRequest({ query: { showTitle: 'Breaking Bad', showYear: '2008' } } as any)).toThrow();
+    });
+
+    it('throws when seasonNumber is not a positive integer', () => {
+        expect(() => validateGetSeasonTmdbDetailsRequest({ query: { showTitle: 'Breaking Bad', showYear: '2008', seasonNumber: '0' } } as any)).toThrow();
     });
 });

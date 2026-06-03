@@ -13,8 +13,9 @@ Kawaz Plus media backend service.
 - Exposes media genre endpoints (`GET /mediaGenre`, `GET /mediaGenre/:genreId`, `POST /mediaGenre`, `DELETE /mediaGenre`) — manage the genre taxonomy used by media and collections; deletion blocked when genre is referenced by any media or collection
 - Exposes media CRUD endpoints (`GET /media`, `GET /media/uploading`, `GET /media/:id`, `PUT /media/:id`, `DELETE /media/:id`) — served from MongoDB; `/uploading` returns all non-completed media
 - Exposes presigned-URL based media upload endpoints (`POST /media/upload/initiate`, `POST /media/upload/complete`) — browser uploads directly to S3 using presigned PUT URLs, then calls complete to trigger processing
-- Exposes TMDB metadata lookup endpoint (`GET /media/tmdb/movie?title=&year=`) — admin-only; fetches movie details from The Movie Database API
-- Exposes media collection CRUD endpoints (`/media-collection`) — group media into nestable collections; thumbnail streamed directly
+- Exposes TMDB metadata lookup endpoints (`GET /media/tmdb/movie`, `/tmdb/show`, `/tmdb/episode`, `/tmdb/season`, `/tmdb/collection`, `/tmdb/poster`) — admin-only; fetch movie/show/episode/season/collection metadata and proxy poster images from The Movie Database API
+- Exposes subtitle management endpoints (`POST /media/:id/subtitle/initiate`, `POST /media/:id/subtitle/complete`, `PUT /media/:id/subtitle/:subtitleId`) — admin-only; upload VTT files to VOD storage and rebuild the MPEG-DASH manifest with updated subtitle tracks
+- Exposes media collection CRUD endpoints (`/media-collection`) — group media into nestable collections (show → season → episodes, or general collection); thumbnail streamed directly
 - Exposes MPEG-DASH streaming endpoints (`/media/stream/:id/output.mpd`, `*.m4s`, `*.vtt`, `thumbnails.jpg`) — all streamed directly from VOD storage with cache headers
 - Persists media metadata and status in MongoDB
 - Exposes OpenAPI docs at `GET /api-docs`
@@ -58,9 +59,11 @@ This service validates all environment variables at startup using Zod schemas. M
 - `GMAIL_USER` - Gmail address used as sender for Mailer (approval requests, approval/denial emails)
 - `GMAIL_APP_PASSWORD` - Gmail app password for SMTP authentication in the Mailer service
 - `APP_DOMAIN` - Public base URL of the app (e.g. `https://kawazplus.com`); used in OAuth redirect URIs and mailer links
-- `GOOGLE_CLIENT_ID` - Google OAuth 2.0 client ID
-- `GOOGLE_CLIENT_SECRET` - Google OAuth 2.0 client secret
-- `TMDB_READ_ACCESS_TOKEN` - TMDB API v4 read access token for movie/show/episode metadata lookups
+- `GOOGLE_CLIENT_ID` - Google OAuth 2.0 client ID (web/native flows)
+- `GOOGLE_CLIENT_SECRET` - Google OAuth 2.0 client secret (web/native flows)
+- `GOOGLE_TV_CLIENT_ID` - Google OAuth 2.0 client ID for TV/device authorization (RFC 8628)
+- `GOOGLE_TV_CLIENT_SECRET` - Google OAuth 2.0 client secret for TV/device authorization
+- `TMDB_READ_ACCESS_TOKEN` - TMDB API v4 read access token for movie/show/episode/season metadata lookups
 
 **Optional variables:**
 
@@ -76,7 +79,7 @@ This service validates all environment variables at startup using Zod schemas. M
 **Troubleshooting startup:**
 
 If the app fails to start, verify:
-1. All required variables (`KAWAZ_PLUS_BUCKET`, `UPLOAD_PREFIX`, `THUMBNAIL_PREFIX`, `AVATAR_PREFIX`, `VOD_STORAGE_BUCKET`, `JWT_SECRET`, `ADMIN_PROMOTION_SECRET`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `APP_DOMAIN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) are set
+1. All required variables (`KAWAZ_PLUS_BUCKET`, `UPLOAD_PREFIX`, `THUMBNAIL_PREFIX`, `AVATAR_PREFIX`, `VOD_STORAGE_BUCKET`, `JWT_SECRET`, `ADMIN_PROMOTION_SECRET`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `APP_DOMAIN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TV_CLIENT_ID`, `GOOGLE_TV_CLIENT_SECRET`, `TMDB_READ_ACCESS_TOKEN`) are set
 2. Shared client environment variables are valid (MongoDB, AMQP, S3 credentials)
 3. `NODE_ENV` is one of the supported values (`development`, `local`, `test`, `production`)
  
@@ -383,6 +386,14 @@ Returns `200 OK` if service is running.
 - Success response: `200 { id, name, overview, air_date, episode_number, season_number, still_url, vote_average, vote_count, runtime }`
 - Error responses: `400` (missing/invalid query params), `401`, `404` (show or episode not found on TMDB)
 
+### `GET /media/tmdb/season`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Query params: `showTitle` (string, required), `showYear` (integer, required), `seasonNumber` (integer, required)
+- Fetches season metadata from TMDB by show title, year, and season number
+- Success response: `200 { id, name, overview, air_date, poster_url, season_number }`
+- Error responses: `400` (missing/invalid query params), `401`, `404` (show or season not found on TMDB)
+
 ### `GET /media/tmdb/poster`
 
 - Requires: `kawaz-token` cookie with **admin role**
@@ -525,6 +536,31 @@ Returns `200 OK` if service is running.
 - Success response: `200` image/jpeg binary stream with `Cache-Control: public, max-age=172800`
 - Error responses: `401`, `404`
 
+### `POST /media/:id/subtitle/initiate`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Reserves a subtitle slot and returns a presigned S3 PUT URL for uploading a VTT file
+- Success response: `200 { "subtitleId": string, "uploadUrl": string }`
+- Error responses: `401`, `403`, `404` (media not found)
+
+### `POST /media/:id/subtitle/complete`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Content type: `application/json`
+- Body: `{ "subtitleId": string, "language": string, "title": string }`
+- Confirms the VTT file was uploaded; saves the subtitle track to the media record and rebuilds the MPEG-DASH manifest in VOD storage
+- Success response: `200 { "message": "Subtitle added" }`
+- Error responses: `400`, `401`, `403`, `404`
+
+### `PUT /media/:id/subtitle/:subtitleId`
+
+- Requires: `kawaz-token` cookie with **admin role**
+- Content type: `application/json`
+- Body: `{ "enabled"?: boolean, "title"?: string }` — at least one field required
+- Enables/disables or renames a subtitle track; rebuilds the MPEG-DASH manifest in VOD storage
+- Success response: `200 { "message": "Subtitle updated" }`
+- Error responses: `400`, `401`, `403`, `404`
+
 ### `GET /api-docs`
 
 Swagger UI for API documentation.
@@ -586,12 +622,15 @@ Stores metadata for uploaded media files.
 | `fileName` | String | Yes | Original filename |
 | `title` | String | Yes | User-provided display title |
 | `description` | String | No | Optional description |
+| `kind` | String | Yes | `"movie"` or `"episode"` |
+| `episodeNumber` | Number | No | Required when `kind === "episode"` |
 | `genres` | String[] | Yes | Genre names referencing `MediaGenre.name` values |
 | `size` | Number | Yes | File size in bytes |
 | `status` | String | Yes | One of: `pending`, `processing`, `completed`, `failed` |
+| `percentage` | Number | Yes | Processing progress 0–100 |
 | `thumbnailFocalPoint` | Object `{ x, y }` | Yes | Crop anchor for the thumbnail (0–1 range, defaults to `{ x: 0.5, y: 0.5 }`) |
-| `collectionId` | String | No | Parent collection ID |
-| `metadata` | Object | No | Populated on completion (durationInMs, playUrl, thumbnailsUrl, streams, chapters, etc.) |
+| `collectionId` | String | No | Parent collection ID (episodes reference a season; movies may reference a collection) |
+| `metadata` | Object | No | Populated on completion — includes `durationInMs`, `playUrl`, `thumbnailsUrl`, `videoStreams`, `audioStreams`, `subtitleStreams` (with `subtitleId`, `fileName`, `enabled` per track) |
 
 Example document:
 ```json
@@ -616,9 +655,11 @@ Stores metadata for media collections (groups of media).
 | `_id` | String (ObjectId) | Yes | Unique identifier |
 | `title` | String | Yes | Display title |
 | `description` | String | No | Optional description |
+| `kind` | String | Yes | `"show"`, `"season"`, or `"collection"` |
+| `seasonNumber` | Number | No | Required when `kind === "season"` |
 | `genres` | String[] | Yes | Genre names referencing `MediaGenre.name` values |
 | `thumbnailFocalPoint` | Object `{ x, y }` | Yes | Crop anchor for the thumbnail (0–1 range, defaults to `{ x: 0.5, y: 0.5 }`) |
-| `collectionId` | String | No | Parent collection ID (for nesting) |
+| `collectionId` | String | No | Parent collection ID — season must reference a show; show may reference a collection |
 
 ### `User`
 

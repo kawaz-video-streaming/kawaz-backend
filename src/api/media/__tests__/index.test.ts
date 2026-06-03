@@ -717,3 +717,74 @@ describe('GET /media/tmdb/episode', () => {
         expect(response.status).toBe(401);
     });
 });
+
+describe('GET /media/tmdb/season', () => {
+    const AUTH_CONFIG = { jwtSecret: 'tmdb-season-secret', adminPromotionSecret: 'admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', googleTvClientId: 'test-google-tv-client-id', googleTvClientSecret: 'test-google-tv-client-secret', appDomain: 'http://localhost:3000', nativeAppScheme: 'com.kawaz.plus', isProduction: false };
+
+    let app: Application;
+    let tmdbClient: { getMovieDetails: jest.Mock; getCollectionDetails: jest.Mock; getShowDetails: jest.Mock; getEpisodeDetails: jest.Mock; getSeasonDetails: jest.Mock };
+    let userDal: { findUser: jest.Mock };
+    let adminToken: string;
+
+    const seasonDetails = {
+        id: 3624,
+        name: 'Season 1',
+        overview: 'The first season of Breaking Bad.',
+        air_date: '2008-01-20',
+        poster_url: 'https://image.tmdb.org/t/p/original/poster.jpg',
+        season_number: 1,
+    };
+
+    beforeEach(() => {
+        tmdbClient = { getMovieDetails: jest.fn(), getCollectionDetails: jest.fn(), getShowDetails: jest.fn(), getEpisodeDetails: jest.fn(), getSeasonDetails: jest.fn().mockResolvedValue(seasonDetails) };
+        userDal = { findUser: jest.fn().mockResolvedValue({ name: 'admin', password: 'hash', role: 'admin' }) };
+        adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
+
+        app = express();
+        app.use(parseCookies);
+        app.use(createAuthMiddleware(AUTH_CONFIG, userDal as unknown as UserDal));
+        app.use('/media', decideMediaAndMediaCollectionDalByUserRoleMiddleware(makeMockDals({})), createMediaRouter({
+            kawazPlus: { kawazStorageBucket: 'bucket', uploadPrefix: 'raw', thumbnailPrefix: 'raw/thumbnails', avatarPrefix: 'avatars' },
+            vod: { vodStorageBucket: 'vod-bucket' },
+        }, {} as unknown as MediaGenreDal, {} as unknown as AmqpClient, {} as any, tmdbClient as unknown as TmdbClient));
+        app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+            if (error instanceof ApiError) { res.status(error.statusCode).json({ message: error.message }); return; }
+            res.status(500).json({ message: error instanceof Error ? error.message : 'Internal server error' });
+        });
+    });
+
+    it('returns 200 with season details for valid params', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/season?showTitle=Breaking+Bad&showYear=2008&seasonNumber=1')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(seasonDetails);
+        expect(tmdbClient.getSeasonDetails).toHaveBeenCalledWith('Breaking Bad', 2008, 1);
+    });
+
+    it('returns 400 when any required param is missing', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/season?showTitle=Breaking+Bad&showYear=2008')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(400);
+        expect(tmdbClient.getSeasonDetails).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when tmdbClient throws NotFoundError', async () => {
+        tmdbClient.getSeasonDetails.mockRejectedValueOnce(new NotFoundError('No TV show found'));
+
+        const response = await request(app)
+            .get('/media/tmdb/season?showTitle=Unknown&showYear=1900&seasonNumber=1')
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(404);
+    });
+
+    it('returns 401 when not authenticated', async () => {
+        const response = await request(app)
+            .get('/media/tmdb/season?showTitle=Breaking+Bad&showYear=2008&seasonNumber=1');
+        expect(response.status).toBe(401);
+    });
+});

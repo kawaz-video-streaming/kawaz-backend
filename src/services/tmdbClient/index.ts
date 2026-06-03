@@ -1,6 +1,6 @@
 import { NotFoundError } from "@ido_kawaz/server-framework";
 import { isEmpty, isNil, isNotNil } from "ramda";
-import { TmdbCollectionDetails, TmdbCollectionDetailsRaw, TmdbEpisodeDetails, TmdbEpisodeDetailsRaw, TmdbGenre, TmdbMovieDetails, TmdbMovieDetailsRaw, TmdbShowDetails, TmdbShowDetailsRaw, validateTmdbCollectionDetailsRaw, validateTmdbEpisodeDetailsRaw, validateTmdbGenreList, validateTmdbMovieDetailsRaw, validateTmdbSearchMovieResponse, validateTmdbSearchShowResponse, validateTmdbShowDetailsRaw } from "./types";
+import { TmdbCollectionDetails, TmdbCollectionDetailsRaw, TmdbEpisodeDetails, TmdbEpisodeDetailsRaw, TmdbGenre, TmdbMovieDetails, TmdbMovieDetailsRaw, TmdbSeasonDetails, TmdbSeasonDetailsRaw, TmdbShowDetails, TmdbShowDetailsRaw, validateTmdbCollectionDetailsRaw, validateTmdbEpisodeDetailsRaw, validateTmdbGenreList, validateTmdbMovieDetailsRaw, validateTmdbSearchMovieResponse, validateTmdbSearchShowResponse, validateTmdbSeasonDetailsRaw, validateTmdbShowDetailsRaw } from "./types";
 
 export interface TmdbConfig {
     readAccessToken: string;
@@ -26,6 +26,11 @@ export class TmdbClient {
     private toEpisodeDetails = (raw: TmdbEpisodeDetailsRaw): TmdbEpisodeDetails => {
         const { still_path, ...rest } = raw;
         return { ...rest, still_url: this.toImageUrl(still_path) };
+    }
+
+    private toSeasonDetails = (raw: TmdbSeasonDetailsRaw): TmdbSeasonDetails => {
+        const { poster_path, ...rest } = raw;
+        return { ...rest, poster_url: this.toImageUrl(poster_path) };
     }
 
     private toShowDetails = (raw: TmdbShowDetailsRaw): TmdbShowDetails => {
@@ -119,6 +124,23 @@ export class TmdbClient {
         const raw = validateTmdbCollectionDetailsRaw(collectionJson);
         const { genres: allGenres } = validateTmdbGenreList(genreListJson);
         return this.toCollectionDetails(raw, allGenres);
+    }
+
+    getSeasonDetails = async (showTitle: string, showYear: number, seasonNumber: number): Promise<TmdbSeasonDetails> => {
+        const searchParams = new URLSearchParams({
+            query: showTitle,
+            first_air_date_year: showYear.toString(),
+            language: "en-US"
+        });
+        const searchJson = await this.getRequest("/search/tv", searchParams);
+        const searchResults = validateTmdbSearchShowResponse(searchJson);
+        const topResult = searchResults.results[0];
+        if (isNil(topResult)) {
+            throw new NotFoundError(`No TV show found on TMDB for title "${showTitle}" and year ${showYear}`);
+        }
+        const detailsJson = await this.getRequest(`/tv/${topResult.id}/season/${seasonNumber}`);
+        const rawDetails = validateTmdbSeasonDetailsRaw(detailsJson);
+        return this.toSeasonDetails(rawDetails);
     }
 
     getEpisodeDetails = async (showTitle: string, showYear: number, seasonNumber: number, episodeNumber: number): Promise<TmdbEpisodeDetails> => {

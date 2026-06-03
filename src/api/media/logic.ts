@@ -80,6 +80,9 @@ export const createMediaLogic = (
   getShowMediaTmdbDetails: async (title: string, year: number) => {
     return tmdbClient.getShowDetails(title, year);
   },
+  getSeasonMediaTmdbDetails: async (showTitle: string, showYear: number, seasonNumber: number) => {
+    return tmdbClient.getSeasonDetails(showTitle, showYear, seasonNumber);
+  },
   getEpisodeMediaTmdbDetails: async (showTitle: string, showYear: number, seasonNumber: number, episodeNumber: number) => {
     return tmdbClient.getEpisodeDetails(showTitle, showYear, seasonNumber, episodeNumber);
   },
