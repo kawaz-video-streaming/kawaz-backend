@@ -1,11 +1,57 @@
 import { UnauthorizedError } from "@ido_kawaz/server-framework";
+import { decode, verify } from "jsonwebtoken";
+import { createPublicKey } from "node:crypto";
+import { isNil, propEq } from "ramda";
 import { UserProjection, validateUserProjection } from "../../dal/user/model";
 import {
+    AppleJwk,
+    AppleUserName,
     DeviceTokenResult,
+    validateAppleJwksResponse,
+    validateAppleTokenPayload,
+    validateAppleUserJson,
     validateGoogleDeviceCodeApiResponse,
     validateGoogleDeviceTokenApiResponse,
     validateGoogleTokenRequestResult,
 } from "./types";
+
+const fetchApplePublicKeys = async (): Promise<AppleJwk[]> => {
+    const res = await fetch("https://appleid.apple.com/auth/keys");
+    if (!res.ok) {
+        throw new UnauthorizedError("Apple sign-in failed");
+    }
+    const { keys } = validateAppleJwksResponse(await res.json());
+    return keys;
+};
+
+export const verifyAppleIdentityToken = async (identityToken: string, audience: string): Promise<{ sub: string; email: string }> => {
+    const keys = await fetchApplePublicKeys();
+    const decoded = decode(identityToken, { complete: true });
+    if (isNil(decoded) || typeof decoded === "string") {
+        throw new UnauthorizedError("Apple sign-in failed");
+    }
+    const { header: { kid } } = decoded;
+    const jwk = keys.find(propEq(kid, "kid"));
+    if (isNil(jwk)) {
+        throw new UnauthorizedError("Apple sign-in failed");
+    }
+    const publicKey = createPublicKey({ key: jwk, format: "jwk" });
+    try {
+        const payload = verify(identityToken, publicKey, { algorithms: ["RS256"], issuer: "https://appleid.apple.com", audience });
+        return validateAppleTokenPayload(payload);
+    } catch {
+        throw new UnauthorizedError("Apple sign-in failed");
+    }
+};
+
+export const parseAppleUserName = (userJson: unknown): AppleUserName => {
+    try {
+        const { name } = validateAppleUserJson(userJson);
+        return { givenName: name?.firstName, familyName: name?.lastName };
+    } catch {
+        return {};
+    }
+};
 
 export const fetchGoogleAccessToken = async (code: string, googleClientId: string, googleClientSecret: string, appDomain: string): Promise<string> => {
     const googleTokenRequestResult = await fetch("https://oauth2.googleapis.com/token", {

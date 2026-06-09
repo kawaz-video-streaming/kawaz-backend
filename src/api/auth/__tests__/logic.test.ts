@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestError,
   ConflictError,
   NotFoundError,
@@ -33,6 +33,7 @@ const AUTH_CONFIG = {
   googleTvClientSecret: "test-google-tv-client-secret",
   appDomain: "http://localhost:3000",
   nativeAppScheme: "com.kawaz.plus",
+  appleClientId: "test-apple-client-id",
   isProduction: false,
 };
 
@@ -44,6 +45,8 @@ const makeUserDal = (
     createUser: jest.fn(),
     findUser: jest.fn(),
     findUserByEmail: jest.fn(),
+    findUserByAppleId: jest.fn().mockResolvedValue(null),
+    linkAppleId: jest.fn().mockResolvedValue(undefined),
     promoteToAdmin: jest.fn(),
     createPasswordResetRequestForUser: jest.fn(),
     findUserByPasswordResetToken: jest.fn(),
@@ -166,14 +169,14 @@ describe("createAuthLogic.login", () => {
     mockedSign.mockReturnValue("signed-token");
 
     const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
-    const token = await logic.login("ido", "strongpassword123");
+    const result = await logic.login("ido", "strongpassword123");
 
     expect(mockedSign).toHaveBeenCalledWith(
       { username: "ido", role: USER_ROLE },
       AUTH_CONFIG.jwtSecret,
       { expiresIn: "2d" },
     );
-    expect(token).toBe("signed-token");
+    expect(result).toEqual({ token: "signed-token", role: USER_ROLE, username: "ido" });
   });
 });
 
@@ -446,5 +449,110 @@ describe("createAuthLogic.resetPassword", () => {
     await expect(logic.resetPassword("valid-token", "newpassword123")).resolves.toBeUndefined();
     expect(mockedBcrypt.hash).toHaveBeenCalledWith("newpassword123", 12);
     expect(userDal.resetUserPassword).toHaveBeenCalledWith("ido", "new-hashed-password");
+  });
+});
+
+describe("createAuthLogic.appleSignIn", () => {
+  it("returns token for approved user found by appleId", async () => {
+    mockedSign.mockReturnValue("signed-token");
+    const userDal = makeUserDal({
+      findUserByAppleId: jest.fn().mockResolvedValue({ name: "ido", email: "ido@example.com", role: USER_ROLE, status: "approved" }),
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+    const result = await logic.appleSignIn("apple-sub-123", "ido@example.com");
+
+    expect(result).toEqual({ token: "signed-token", role: USER_ROLE, username: "ido" });
+    expect(mockedSign).toHaveBeenCalledWith({ username: "ido", role: USER_ROLE }, AUTH_CONFIG.jwtSecret, { expiresIn: "2d" });
+    expect(userDal.findUserByEmail).not.toHaveBeenCalled();
+  });
+
+  it("returns null for non-approved user found by appleId", async () => {
+    const userDal = makeUserDal({
+      findUserByAppleId: jest.fn().mockResolvedValue({ name: "ido", email: "ido@example.com", role: USER_ROLE, status: "pending" }),
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+    const result = await logic.appleSignIn("apple-sub-123", "ido@example.com");
+
+    expect(result).toBeNull();
+    expect(mockedSign).not.toHaveBeenCalled();
+  });
+
+  it("links appleId and returns token for approved user found by email only", async () => {
+    mockedSign.mockReturnValue("signed-token");
+    const userDal = makeUserDal({
+      findUserByAppleId: jest.fn().mockResolvedValue(null),
+      findUserByEmail: jest.fn().mockResolvedValue({ name: "ido", email: "ido@example.com", role: USER_ROLE, status: "approved" }),
+      linkAppleId: jest.fn().mockResolvedValue(undefined),
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+    const result = await logic.appleSignIn("apple-sub-123", "ido@example.com");
+
+    expect(result).toEqual({ token: "signed-token", role: USER_ROLE, username: "ido" });
+    expect(userDal.linkAppleId).toHaveBeenCalledWith("ido", "apple-sub-123");
+  });
+
+  it("returns null for non-approved user found by email only", async () => {
+    const userDal = makeUserDal({
+      findUserByAppleId: jest.fn().mockResolvedValue(null),
+      findUserByEmail: jest.fn().mockResolvedValue({ name: "ido", email: "ido@example.com", role: USER_ROLE, status: "pending" }),
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+    const result = await logic.appleSignIn("apple-sub-123", "ido@example.com");
+
+    expect(result).toBeNull();
+    expect(userDal.linkAppleId).not.toHaveBeenCalled();
+  });
+
+  it("creates new user derived from email and returns null when no match", async () => {
+    mockedBcrypt.hash.mockResolvedValue("placeholder-hash" as never);
+    const mailer = makeMailer();
+    const userDal = makeUserDal({
+      findUserByAppleId: jest.fn().mockResolvedValue(null),
+      findUserByEmail: jest.fn().mockResolvedValue(null),
+      verifyUser: jest.fn().mockResolvedValue(false),
+      createUser: jest.fn().mockResolvedValue(undefined),
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, mailer, userDal);
+    const result = await logic.appleSignIn("apple-sub-123", "john@example.com");
+
+    expect(result).toBeNull();
+    expect(userDal.createUser).toHaveBeenCalledWith("john", "placeholder-hash", "john@example.com", "apple-sub-123");
+    expect(mailer.sendApprovalRequestEmail).toHaveBeenCalledWith("john", "john@example.com");
+  });
+
+  it("appends a numeric suffix when the derived username is already taken", async () => {
+    mockedBcrypt.hash.mockResolvedValue("placeholder-hash" as never);
+    const userDal = makeUserDal({
+      findUserByAppleId: jest.fn().mockResolvedValue(null),
+      findUserByEmail: jest.fn().mockResolvedValue(null),
+      verifyUser: jest.fn().mockResolvedValue(true),
+      createUser: jest.fn().mockResolvedValue(undefined),
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+    await logic.appleSignIn("apple-sub-123", "john@example.com");
+
+    const [calledName] = (userDal.createUser as jest.Mock).mock.calls[0] as [string, ...unknown[]];
+    expect(calledName).toMatch(/^john\d{4}$/);
+  });
+
+  it("derives username from given+family name when provided", async () => {
+    mockedBcrypt.hash.mockResolvedValue("placeholder-hash" as never);
+    const userDal = makeUserDal({
+      findUserByAppleId: jest.fn().mockResolvedValue(null),
+      findUserByEmail: jest.fn().mockResolvedValue(null),
+      verifyUser: jest.fn().mockResolvedValue(false),
+      createUser: jest.fn().mockResolvedValue(undefined),
+    });
+
+    const logic = createAuthLogic(AUTH_CONFIG, makeMailer(), userDal);
+    await logic.appleSignIn("apple-sub-123", "john@example.com", "John", "Doe");
+
+    expect(userDal.createUser).toHaveBeenCalledWith("johndoe", "placeholder-hash", "john@example.com", "apple-sub-123");
   });
 });

@@ -11,6 +11,7 @@ export interface AuthConfig {
   googleClientSecret: string;
   googleTvClientId: string;
   googleTvClientSecret: string;
+  appleClientId: string;
   appDomain: string;
   nativeAppScheme: string;
   isProduction: boolean;
@@ -155,3 +156,49 @@ const nativeExchangeRequestSchema: z.ZodType<{ code: string }> = z.object({
 }).transform(({ body }) => body);
 
 export const validateNativeExchangeRequest = validateRequest(nativeExchangeRequestSchema);
+
+const appleJwkSchema = z.object({
+  kty: z.string(),
+  kid: z.string(),
+  use: z.string(),
+  alg: z.string(),
+  n: z.string(),
+  e: z.string(),
+});
+
+export type AppleJwk = z.infer<typeof appleJwkSchema>;
+
+export const validateAppleJwksResponse = validateSchemaAndReturnValue(z.object({
+  keys: z.array(appleJwkSchema),
+}));
+
+export const validateAppleTokenPayload = validateSchemaAndReturnValue(z.object({
+  sub: z.string(),
+  email: z.string(),
+}));
+
+export interface AppleUserName {
+  givenName?: string;
+  familyName?: string;
+}
+
+export const validateAppleUserJson = validateSchemaAndReturnValue(
+  z.preprocess(
+    (val) => {
+      if (typeof val !== "string") {
+        return val;
+      }
+      try {
+        return JSON.parse(val);
+      } catch {
+        return val;
+      }
+    },
+    z.object({
+      name: z.object({
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+      }).optional(),
+    }),
+  ),
+);

@@ -1,4 +1,5 @@
 import { ConflictError, Request, Response, UnauthorizedError } from "@ido_kawaz/server-framework";
+import { decode } from "jsonwebtoken";
 import { StatusCodes } from "http-status-codes";
 import { isNil } from "ramda";
 import { UserDal } from "../../dal/user";
@@ -7,6 +8,7 @@ import { requestHandlerDecorator } from "../../utils/decorator";
 import { AuthenticatedRequest } from "../../utils/types";
 import { createAuthLogic } from "./logic";
 import { popNativeCode, storeNativeCode } from "./nativeCodeStore";
+import { parseAppleUserName, verifyAppleIdentityToken } from "./utils";
 import {
   AuthConfig,
   validateAuthSignupRequest,
@@ -49,8 +51,8 @@ export const createAuthHandlers = (
       "login",
       async (req: Request, res: Response) => {
         const { username, password } = validateLoginRequest(req);
-        const token = await logic.login(username, password);
-        res.status(StatusCodes.OK).cookie("kawaz-token", token, cookieOptions).json({ message: "Login successful" });
+        const { token, role, username: name } = await logic.login(username, password);
+        res.status(StatusCodes.OK).cookie("kawaz-token", token, cookieOptions).json({ message: "Login successful", role, username: name });
       },
     ),
     googleLogin: requestHandlerDecorator(
@@ -129,7 +131,57 @@ export const createAuthHandlers = (
         if (isNil(jwt)) {
           throw new UnauthorizedError("Invalid or expired code");
         }
-        res.cookie("kawaz-token", jwt, cookieOptions).status(StatusCodes.OK).json({ message: "Login successful" });
+        const payload = decode(jwt) as { username?: string; role?: string } | null;
+        res.cookie("kawaz-token", jwt, cookieOptions).status(StatusCodes.OK).json({ message: "Login successful", role: payload?.role, username: payload?.username });
+      },
+    ),
+    appleLogin: requestHandlerDecorator(
+      "apple login",
+      async (req: Request, res: Response) => {
+        const params = new URLSearchParams({
+          client_id: authConfig.appleClientId,
+          redirect_uri: `${authConfig.appDomain}/api/auth/apple/callback`,
+          response_type: "code id_token",
+          scope: "name email",
+          response_mode: "form_post",
+          ...(req.query.return === "native" && { state: "native" }),
+        });
+        res.redirect(`https://appleid.apple.com/auth/authorize?${params}`);
+      },
+    ),
+    appleCallback: requestHandlerDecorator(
+      "apple callback",
+      async (req: Request, res: Response) => {
+        if (typeof req.body.error === "string") {
+          if (req.body.state === "native") {
+            res.redirect(`${authConfig.nativeAppScheme}://auth/callback?error=true`);
+          } else {
+            res.redirect(`${authConfig.appDomain}/auth/callback?error=true`);
+          }
+          return;
+        }
+        const identityToken = req.body.id_token;
+        if (typeof identityToken !== "string") {
+          res.status(StatusCodes.BAD_REQUEST).json({ message: "Invalid callback" });
+          return;
+        }
+        const { sub: appleId, email } = await verifyAppleIdentityToken(identityToken, authConfig.appleClientId);
+        const { givenName, familyName } = parseAppleUserName(req.body.user);
+        const result = await logic.appleSignIn(appleId, email, givenName, familyName);
+        if (req.body.state === "native") {
+          if (isNil(result)) {
+            res.redirect(`${authConfig.nativeAppScheme}://auth/callback?pending=true`);
+          } else {
+            const nativeCode = storeNativeCode(result.token);
+            res.redirect(`${authConfig.nativeAppScheme}://auth/callback?code=${nativeCode}&provider=apple`);
+          }
+        } else {
+          if (isNil(result)) {
+            res.redirect(`${authConfig.appDomain}/auth/callback?pending=true`);
+          } else {
+            res.cookie("kawaz-token", result.token, cookieOptions).redirect(`${authConfig.appDomain}/auth/callback`);
+          }
+        }
       },
     ),
     promoteAdmin: requestHandlerDecorator(

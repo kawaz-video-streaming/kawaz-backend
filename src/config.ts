@@ -41,6 +41,7 @@ const environmentVariablesSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string(),
   GOOGLE_TV_CLIENT_ID: z.string(),
   GOOGLE_TV_CLIENT_SECRET: z.string(),
+  APPLE_CLIENT_ID: z.string(),
   TMDB_READ_ACCESS_TOKEN: z.string(),
   NATIVE_APP_SCHEME: z.string().default("com.kawaz.plus"),
 });
@@ -98,6 +99,7 @@ export const getConfig = (env: {} = {}): SystemConfig => {
         googleClientSecret: envVars.GOOGLE_CLIENT_SECRET,
         googleTvClientId: envVars.GOOGLE_TV_CLIENT_ID,
         googleTvClientSecret: envVars.GOOGLE_TV_CLIENT_SECRET,
+        appleClientId: envVars.APPLE_CLIENT_ID,
         nativeAppScheme: envVars.NATIVE_APP_SCHEME,
         isProduction: envVars.NODE_ENV === 'production',
       },

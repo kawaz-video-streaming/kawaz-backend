@@ -282,6 +282,75 @@ export const createAuthRouter = (authConfig: AuthConfig, mailer: Mailer, userDal
 
   /**
    * @openapi
+   * /auth/apple/login:
+   *   get:
+   *     summary: Initiate Apple Sign In
+   *     description: Redirects the browser to Apple's OAuth consent screen.
+   *     tags:
+   *       - Auth
+   *     parameters:
+   *       - in: query
+   *         name: return
+   *         schema:
+   *           type: string
+   *           enum: [native]
+   *         description: Pass "native" to redirect back to the native app scheme after auth
+   *     responses:
+   *       302:
+   *         description: Redirect to Apple's OAuth consent screen
+   */
+  router.get('/apple/login', authHandlers.appleLogin);
+
+  /**
+   * @openapi
+   * /auth/apple/callback:
+   *   post:
+   *     summary: Apple Sign In callback
+   *     description: >
+   *       Receives the Apple OAuth form_post callback. Verifies the id_token,
+   *       finds or creates the user account, and either sets the auth cookie and
+   *       redirects (web flow) or redirects to the native app scheme with a
+   *       one-time code (native flow). The one-time code is exchanged for the
+   *       session cookie via POST /auth/google/native/exchange.
+   *       On first sign-in Apple also POSTs a user JSON with name fields.
+   *     tags:
+   *       - Auth
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               id_token:
+   *                 type: string
+   *                 description: Apple identity token (RS256 JWT)
+   *               code:
+   *                 type: string
+   *               state:
+   *                 type: string
+   *                 description: Set to "native" when initiated via /auth/apple/login?return=native
+   *               user:
+   *                 type: string
+   *                 description: JSON string with name.firstName/lastName, only present on first sign-in
+   *               error:
+   *                 type: string
+   *     responses:
+   *       302:
+   *         description: >
+   *           Web: sets kawaz-token cookie and redirects to appDomain/auth/callback.
+   *           Native: redirects to nativeAppScheme://auth/callback?code=<one-time-code>&provider=apple.
+   *           Pending/new account: redirects with ?pending=true.
+   *           Error: redirects with ?error=true.
+   *       400:
+   *         description: Missing id_token
+   *       401:
+   *         description: Invalid or unverifiable identity token
+   */
+  router.post('/apple/callback', authHandlers.appleCallback);
+
+  /**
+   * @openapi
    * /auth/promote:
    *   post:
    *     summary: Promote a user to admin
