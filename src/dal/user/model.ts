@@ -33,6 +33,7 @@ export interface User {
   role: Role;
   profiles: Profile[];
   passwordResetRequest?: PasswordResetRequest;
+  appleId?: string;
 }
 
 export type UserProjection = Pick<User, "name" | "email">;
@@ -63,6 +64,7 @@ const userSchema = new Schema<User>(
     role: { type: String, enum: roles, default: USER_ROLE },
     profiles: { type: [profileSchema], default: [] },
     passwordResetRequest: { type: passwordResetRequestSchema, required: false },
+    appleId: { type: String, required: false, sparse: true, unique: true },
   },
   { versionKey: false },
 );

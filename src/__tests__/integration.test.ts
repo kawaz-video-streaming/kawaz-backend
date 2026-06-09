@@ -1,4 +1,4 @@
-import { AmqpClient } from '@ido_kawaz/amqp-client';
+﻿import { AmqpClient } from '@ido_kawaz/amqp-client';
 import { Types } from '@ido_kawaz/mongo-client';
 import type { Application } from '@ido_kawaz/server-framework';
 import { ApiError } from '@ido_kawaz/server-framework';
@@ -33,7 +33,7 @@ jest.mock('bcrypt');
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
 describe('Media upload integration', () => {
-    const AUTH_CONFIG = { jwtSecret: 'integration-test-secret', adminPromotionSecret: 'integration-admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', googleTvClientId: 'test-google-tv-client-id', googleTvClientSecret: 'test-google-tv-client-secret', appDomain: 'http://localhost:3000', nativeAppScheme: 'com.kawaz.plus', isProduction: false };
+    const AUTH_CONFIG = { jwtSecret: 'integration-test-secret', adminPromotionSecret: 'integration-admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', googleTvClientId: 'test-google-tv-client-id', googleTvClientSecret: 'test-google-tv-client-secret', appDomain: 'http://localhost:3000', nativeAppScheme: 'com.kawaz.plus', appleClientId: 'test-apple-client-id', isProduction: false };
 
     let app: Application;
     let mediaDal: { createMedia: jest.Mock; getPendingMedia: jest.Mock; updateMedia: jest.Mock };
@@ -198,7 +198,7 @@ describe('Media upload integration', () => {
         expect(mediaDal.createMedia).not.toHaveBeenCalled();
     });
 
-    it('signup → login → initiate upload with admin token', async () => {
+    it('signup â†’ login â†’ initiate upload with admin token', async () => {
         userDal.verifyUser.mockResolvedValueOnce(false);
 
         const signupRes = await request(app)
@@ -269,7 +269,7 @@ describe('Media upload integration', () => {
 });
 
 describe('AvatarCategory integration', () => {
-    const AUTH_CONFIG = { jwtSecret: 'integration-test-secret', adminPromotionSecret: 'integration-admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', googleTvClientId: 'test-google-tv-client-id', googleTvClientSecret: 'test-google-tv-client-secret', appDomain: 'http://localhost:3000', nativeAppScheme: 'com.kawaz.plus', isProduction: false };
+    const AUTH_CONFIG = { jwtSecret: 'integration-test-secret', adminPromotionSecret: 'integration-admin-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', googleTvClientId: 'test-google-tv-client-id', googleTvClientSecret: 'test-google-tv-client-secret', appDomain: 'http://localhost:3000', nativeAppScheme: 'com.kawaz.plus', appleClientId: 'test-apple-client-id', isProduction: false };
 
     let app: Application;
     let avatarCategoryDal: { getAllCategories: jest.Mock; getCategory: jest.Mock; createCategory: jest.Mock; deleteCategory: jest.Mock; verifyCategoryExists: jest.Mock };

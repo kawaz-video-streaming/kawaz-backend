@@ -83,7 +83,7 @@ async function migrate(): Promise<void> {
                         await storage.uploadObject(vodBucket, {
                             key: `${mediaId}/output.mpd`,
                             data: () => Readable.from(patched),
-                        });
+                        }, { multipartUpload: true });
                     }
                     totalRebuilt++;
                 } catch (err) {

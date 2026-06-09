@@ -195,7 +195,7 @@ export const createMediaHandlers = (
         } = validateRequestWithId(req);
         const thumbnail = await logicFactory(mediaDal, mediaCollectionDal).getThumbnail(mediaId);
         res.setHeader("Content-Type", "image/jpeg");
-        res.setHeader('Cache-Control', 'public, max-age=172800');
+        res.setHeader('Cache-Control', 'public, max-age=604800');
         await pipeToResponse(thumbnail, res);
       },
     ),
@@ -206,7 +206,7 @@ export const createMediaHandlers = (
         const videoId = req.params[0];
         const tiles = await logicFactory(mediaDal, mediaCollectionDal).getTiles(videoId);
         res.setHeader("Content-Type", "image/jpeg");
-        res.setHeader('Cache-Control', 'public, max-age=172800');
+        res.setHeader('Cache-Control', 'public, max-age=604800');
         await pipeToResponse(tiles, res);
       },
     ),
@@ -217,7 +217,7 @@ export const createMediaHandlers = (
         const videoId = req.params[0];
         const manifestStream = await logicFactory(mediaDal, mediaCollectionDal).getManifest(videoId);
         res.setHeader("Content-Type", "application/dash+xml");
-        res.setHeader('Cache-Control', 'public, max-age=172800');
+        res.setHeader('Cache-Control', 'no-cache');
         await pipeToResponse(manifestStream, res);
       },
     ),
@@ -229,7 +229,7 @@ export const createMediaHandlers = (
         const filename = req.params[1];
         const segmentStream = await logicFactory(mediaDal, mediaCollectionDal).getSegment(videoId, filename);
         res.setHeader("Content-Type", "video/iso.segment");
-        res.setHeader('Cache-Control', 'public, max-age=172800');
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         await pipeToResponse(segmentStream, res);
       },
     ),
@@ -241,7 +241,7 @@ export const createMediaHandlers = (
         const filename = req.params[1];
         const vttStream = await logicFactory(mediaDal, mediaCollectionDal).getVtt(videoId, filename);
         res.setHeader("Content-Type", "text/vtt");
-        res.setHeader('Cache-Control', 'public, max-age=172800');
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         await pipeToResponse(vttStream, res);
       },
     ),

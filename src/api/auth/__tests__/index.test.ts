@@ -15,11 +15,13 @@ jest.mock('../nativeCodeStore');
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 const mockedSign = jsonwebtoken.sign as jest.Mock;
 
-import { fetchGoogleAccessToken, fetchGoogleDeviceCode, fetchGoogleDeviceToken, fetchGoogleUserInfo } from '../utils';
+import { fetchGoogleAccessToken, fetchGoogleDeviceCode, fetchGoogleDeviceToken, fetchGoogleUserInfo, parseAppleUserName, verifyAppleIdentityToken } from '../utils';
 const mockedFetchGoogleAccessToken = fetchGoogleAccessToken as jest.Mock;
 const mockedFetchGoogleUserInfo = fetchGoogleUserInfo as jest.Mock;
 const mockedFetchGoogleDeviceCode = fetchGoogleDeviceCode as jest.Mock;
 const mockedFetchGoogleDeviceToken = fetchGoogleDeviceToken as jest.Mock;
+const mockedVerifyAppleIdentityToken = verifyAppleIdentityToken as jest.Mock;
+const mockedParseAppleUserName = parseAppleUserName as jest.Mock;
 
 import { popNativeCode, storeNativeCode } from '../nativeCodeStore';
 const mockedStoreNativeCode = storeNativeCode as jest.Mock;
@@ -34,6 +36,7 @@ const AUTH_CONFIG = {
     googleTvClientSecret: 'test-google-tv-client-secret',
     appDomain: 'http://localhost:3000',
     nativeAppScheme: 'com.kawaz.plus',
+    appleClientId: 'test-apple-client-id',
     isProduction: false,
 };
 
@@ -156,7 +159,7 @@ describe('POST /auth/login', () => {
             .send({ username: 'ido', password: 'strongpassword123' });
 
         expect(response.status).toBe(200);
-        expect(response.body).toEqual({ message: 'Login successful' });
+        expect(response.body).toEqual({ message: 'Login successful', role: 'user', username: 'ido' });
         expect(response.headers['set-cookie']).toBeDefined();
         expect(response.headers['set-cookie'][0]).toContain('kawaz-token=signed-token');
     });
@@ -699,5 +702,134 @@ describe('POST /auth/google/native/exchange', () => {
             .send({});
 
         expect(response.status).toBe(400);
+    });
+});
+
+describe('GET /auth/apple/login', () => {
+    let app: Application;
+
+    beforeEach(() => {
+        app = express();
+        app.use(express.json());
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, makeMailer(), {} as unknown as UserDal));
+        app.use(makeErrorHandler());
+    });
+
+    it('redirects to Apple OAuth consent screen', async () => {
+        const response = await request(app).get('/auth/apple/login');
+
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toContain('https://appleid.apple.com/auth/authorize');
+        expect(response.headers['location']).toContain(`client_id=${AUTH_CONFIG.appleClientId}`);
+        expect(response.headers['location']).toContain('response_mode=form_post');
+        expect(response.headers['location']).not.toContain('state=native');
+    });
+
+    it('includes state=native when return=native is set', async () => {
+        const response = await request(app).get('/auth/apple/login?return=native');
+
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toContain('state=native');
+    });
+});
+
+describe('POST /auth/apple/callback', () => {
+    let app: Application;
+    let userDal: { findUserByAppleId: jest.Mock; findUserByEmail: jest.Mock; verifyUser: jest.Mock; createUser: jest.Mock; linkAppleId: jest.Mock };
+
+    beforeEach(() => {
+        mockedVerifyAppleIdentityToken.mockResolvedValue({ sub: 'apple-sub-123', email: 'john@example.com' });
+        mockedParseAppleUserName.mockReturnValue({});
+        mockedSign.mockReturnValue('signed-token');
+
+        userDal = {
+            findUserByAppleId: jest.fn().mockResolvedValue(null),
+            findUserByEmail: jest.fn().mockResolvedValue(null),
+            verifyUser: jest.fn().mockResolvedValue(false),
+            createUser: jest.fn().mockResolvedValue(undefined),
+            linkAppleId: jest.fn().mockResolvedValue(undefined),
+        };
+
+        app = express();
+        app.use(express.urlencoded({ extended: true }));
+        app.use(express.json());
+        app.use('/auth', createAuthRouter(AUTH_CONFIG, makeMailer(), userDal as unknown as UserDal));
+        app.use(makeErrorHandler());
+    });
+
+    it('returns 400 when id_token is missing', async () => {
+        const response = await request(app)
+            .post('/auth/apple/callback')
+            .send('code=some-code');
+
+        expect(response.status).toBe(400);
+    });
+
+    it('redirects to web error URL when Apple reports an error', async () => {
+        const response = await request(app)
+            .post('/auth/apple/callback')
+            .send('error=user_cancelled_authorize');
+
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toBe(`${AUTH_CONFIG.appDomain}/auth/callback?error=true`);
+    });
+
+    it('redirects to native error URL when Apple reports an error in native flow', async () => {
+        const response = await request(app)
+            .post('/auth/apple/callback')
+            .send('error=user_cancelled_authorize&state=native');
+
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toBe(`${AUTH_CONFIG.nativeAppScheme}://auth/callback?error=true`);
+    });
+
+    it('sets cookie and redirects to web callback for an approved user', async () => {
+        userDal.findUserByAppleId.mockResolvedValue({ name: 'john', email: 'john@example.com', role: 'user', status: 'approved' });
+
+        const response = await request(app)
+            .post('/auth/apple/callback')
+            .send('id_token=valid-token');
+
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toBe(`${AUTH_CONFIG.appDomain}/auth/callback`);
+        expect(response.headers['set-cookie'][0]).toContain('kawaz-token=signed-token');
+    });
+
+    it('redirects to web pending URL for a new user', async () => {
+        mockedBcrypt.hash.mockResolvedValue('placeholder-hash' as never);
+
+        const response = await request(app)
+            .post('/auth/apple/callback')
+            .send('id_token=valid-token');
+
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toBe(`${AUTH_CONFIG.appDomain}/auth/callback?pending=true`);
+        expect(response.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('redirects to native scheme with provider=apple for an approved user in native flow', async () => {
+        userDal.findUserByAppleId.mockResolvedValue({ name: 'john', email: 'john@example.com', role: 'user', status: 'approved' });
+        mockedStoreNativeCode.mockReturnValue('test-native-code');
+
+        const response = await request(app)
+            .post('/auth/apple/callback')
+            .send('id_token=valid-token&state=native');
+
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toBe(`${AUTH_CONFIG.nativeAppScheme}://auth/callback?code=test-native-code&provider=apple`);
+        expect(response.headers['set-cookie']).toBeUndefined();
+        expect(mockedStoreNativeCode).toHaveBeenCalledWith('signed-token');
+    });
+
+    it('redirects to native pending URL for a new user in native flow', async () => {
+        mockedBcrypt.hash.mockResolvedValue('placeholder-hash' as never);
+
+        const response = await request(app)
+            .post('/auth/apple/callback')
+            .send('id_token=valid-token&state=native');
+
+        expect(response.status).toBe(302);
+        expect(response.headers['location']).toBe(`${AUTH_CONFIG.nativeAppScheme}://auth/callback?pending=true`);
+        expect(response.headers['set-cookie']).toBeUndefined();
     });
 });

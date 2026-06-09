@@ -8,8 +8,8 @@ export class UserDal extends Dal<User> {
     super(userModel);
   }
 
-  createUser = (name: string, password: string, email: string): Promise<User> =>
-    this.model.create({ name, password, email });
+  createUser = (name: string, password: string, email: string, appleId?: string): Promise<User> =>
+    this.model.create({ name, password, email, ...(isNotNil(appleId) && { appleId }) });
 
   removeUser = (name: string) =>
     this.model.findOneAndDelete({ name }).exec();
@@ -19,6 +19,12 @@ export class UserDal extends Dal<User> {
 
   findUserByEmail = (email: string): Promise<User | null> =>
     this.model.findOne({ email }).lean<User>().exec();
+
+  findUserByAppleId = (appleId: string): Promise<User | null> =>
+    this.model.findOne({ appleId }).lean<User>().exec();
+
+  linkAppleId = (name: string, appleId: string) =>
+    this.model.findOneAndUpdate({ name }, { appleId }).exec();
 
   verifyUser = async (name: string): Promise<boolean> =>
     isNotNil(await this.model.exists({ name }));

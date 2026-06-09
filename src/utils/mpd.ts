@@ -36,5 +36,5 @@ export const rebuildAndUploadMpd = async (storageClient: StorageClient, vodStora
     const rawStream = await storageClient.downloadObject(vodStorageBucket, `${mediaId}/output.mpd`);
     const raw = await streamToString(rawStream);
     const patched = injectSubtitleSets(stripSubtitleSets(raw), streams);
-    await storageClient.uploadObject(vodStorageBucket, { key: `${mediaId}/output.mpd`, data: () => Readable.from(patched) });
+    await storageClient.uploadObject(vodStorageBucket, { key: `${mediaId}/output.mpd`, data: () => Readable.from(patched) }, { multipartUpload: true });
 };

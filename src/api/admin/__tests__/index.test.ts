@@ -1,4 +1,4 @@
-import { ApiError } from '@ido_kawaz/server-framework';
+﻿import { ApiError } from '@ido_kawaz/server-framework';
 import express, { Application } from 'express';
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
@@ -17,7 +17,7 @@ const parseCookies = (req: express.Request, _res: express.Response, next: expres
     next();
 };
 
-const AUTH_CONFIG = { jwtSecret: 'admin-test-secret', adminPromotionSecret: 'admin-promote-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', googleTvClientId: 'test-google-tv-client-id', googleTvClientSecret: 'test-google-tv-client-secret', appDomain: 'http://localhost:3000', nativeAppScheme: 'com.kawaz.plus', isProduction: false };
+const AUTH_CONFIG = { jwtSecret: 'admin-test-secret', adminPromotionSecret: 'admin-promote-secret', googleClientId: 'test-google-client-id', googleClientSecret: 'test-google-client-secret', googleTvClientId: 'test-google-tv-client-id', googleTvClientSecret: 'test-google-tv-client-secret', appDomain: 'http://localhost:3000', nativeAppScheme: 'com.kawaz.plus', appleClientId: 'test-apple-client-id', isProduction: false };
 
 const pendingUsers = [
     { name: 'alice', email: 'alice@example.com', status: 'pending', role: 'user' },

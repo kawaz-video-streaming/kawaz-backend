@@ -7,6 +7,7 @@ import { UserDal } from "../../dal/user";
 import { APPROVED_STATUS, DENIED_STATUS, PENDING_STATUS } from "../../dal/user/model";
 import { Mailer } from "../../services/mailer";
 import { Role, USER_ROLE } from "../../utils/types";
+import { NON_USERNAME_CHARS } from "./consts";
 import { AuthConfig, TokenPayload } from "./types";
 import { fetchGoogleAccessToken, fetchGoogleDeviceCode, fetchGoogleDeviceToken, fetchGoogleUserInfo } from "./utils";
 
@@ -14,6 +15,11 @@ const createUserTokenPayload = (
   username: string,
   role: Role = USER_ROLE,
 ): TokenPayload => ({ username, role });
+
+const deriveUsername = (email: string, givenName?: string, familyName?: string): string => {
+  const fromName = [givenName, familyName].filter(isNotNil).join("").toLowerCase().replace(NON_USERNAME_CHARS, "");
+  return fromName.length >= 3 ? fromName : email.split("@")[0].toLowerCase().replace(NON_USERNAME_CHARS, "").slice(0, 20) ?? "user";
+};
 
 export const createAuthLogic = (
   { jwtSecret, adminPromotionSecret, googleClientId, googleClientSecret, googleTvClientId, googleTvClientSecret, appDomain }: AuthConfig,
@@ -41,7 +47,7 @@ export const createAuthLogic = (
       jwtSecret,
       { expiresIn: "2d" },
     );
-    return token;
+    return { token, role: user.role, username: user.name };
   },
 
   googleCallback: async (code: string): Promise<string | null> => {
@@ -109,6 +115,32 @@ export const createAuthLogic = (
     await userDal.createUser(name, placeholderPasswordHash, email);
     await mailer.sendApprovalRequestEmail(name, email);
     return { status: PENDING_STATUS };
+  },
+
+  appleSignIn: async (appleId: string, email: string, givenName?: string, familyName?: string) => {
+    const userByAppleId = await userDal.findUserByAppleId(appleId);
+    if (isNotNil(userByAppleId)) {
+      if (userByAppleId.status !== APPROVED_STATUS) {
+        return null;
+      }
+      const token = sign(createUserTokenPayload(userByAppleId.name, userByAppleId.role), jwtSecret, { expiresIn: "2d" });
+      return { token, role: userByAppleId.role, username: userByAppleId.name };
+    }
+    const userByEmail = await userDal.findUserByEmail(email);
+    if (isNotNil(userByEmail)) {
+      if (userByEmail.status !== APPROVED_STATUS) {
+        return null;
+      }
+      await userDal.linkAppleId(userByEmail.name, appleId);
+      const token = sign(createUserTokenPayload(userByEmail.name, userByEmail.role), jwtSecret, { expiresIn: "2d" });
+      return { token, role: userByEmail.role, username: userByEmail.name };
+    }
+    const baseName = deriveUsername(email, givenName, familyName);
+    const candidateName = (await userDal.verifyUser(baseName)) ? `${baseName}${Math.floor(Math.random() * 9000) + 1000}` : baseName;
+    const placeholderPasswordHash = await bycrpt.hash(randomBytes(32).toString("hex"), 12);
+    await userDal.createUser(candidateName, placeholderPasswordHash, email, appleId);
+    await mailer.sendApprovalRequestEmail(candidateName, email);
+    return null;
   },
 
   promoteAdmin: async (secret: string, username: string) => {

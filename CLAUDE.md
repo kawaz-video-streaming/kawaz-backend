@@ -67,7 +67,7 @@ Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `POST` | `/auth/signup` | No | Register a new user (requires email); returns 202, account awaits admin approval |
-| `POST` | `/auth/login` | No | Login; sets `kawaz-token` HttpOnly cookie (maxAge: 2 days). Blocked if status is `pending` or `denied` |
+| `POST` | `/auth/login` | No | Login; sets `kawaz-token` HttpOnly cookie (maxAge: 30 days). Blocked if status is `pending` or `denied` |
 | `GET` | `/auth/google/login` | No | Redirect browser to Google OAuth consent screen. Pass `?return=native` to add `state=native` for the native Android flow |
 | `GET` | `/auth/google/callback` | No | Google OAuth callback — exchanges code, finds/creates user; sets cookie on approval or redirects to `appDomain/auth/callback?pending=true` if new/pending. When `state=native`, redirects to `<nativeAppScheme>://auth/callback?code=<one-time-code>` (success), `?pending=true`, or `?error=true` instead of setting a cookie. New users require admin approval. Throws 409 if Google display name is already taken |
 | `POST` | `/auth/google/device/start` | No | Start a Google Device Authorization flow (RFC 8628) for TV/limited-input devices; returns `{ deviceCode, userCode, verificationUrl, expiresIn, interval }` |
@@ -113,11 +113,11 @@ Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
 | `GET` | `/media/:id/progress` | Yes | Get upload progress `{ status, percentage }` for a media item |
 | `PUT` | `/media/:id` | Yes (admin only) | Update media title, description, genres, thumbnail image, or thumbnail focal point |
 | `DELETE` | `/media/:id` | Yes (admin only) | Delete media from DB and VOD storage |
-| `GET` | `/media/:id/thumbnail` | Yes | Stream thumbnail as `image/jpeg` with `Cache-Control: public, max-age=172800` |
-| `GET` | `/media/stream/:id/output.mpd` | Yes | Stream MPEG-DASH manifest from VOD storage bucket |
-| `GET` | `/media/stream/:id/:filename.m4s` | Yes | Stream video segment as `video/iso.segment` with `Cache-Control: public, max-age=172800` |
-| `GET` | `/media/stream/:id/:filename.vtt` | Yes | Stream VTT subtitle file from VOD storage bucket |
-| `GET` | `/media/stream/:id/thumbnails.jpg` | Yes | Stream sprite-sheet tile thumbnails as `image/jpeg` with `Cache-Control: public, max-age=172800` |
+| `GET` | `/media/:id/thumbnail` | Yes | Stream thumbnail as `image/jpeg` with `Cache-Control: public, max-age=604800` |
+| `GET` | `/media/stream/:id/output.mpd` | Yes | Stream MPEG-DASH manifest from VOD storage bucket with `Cache-Control: no-cache` (rebuilt on subtitle changes) |
+| `GET` | `/media/stream/:id/:filename.m4s` | Yes | Stream video segment as `video/iso.segment` with `Cache-Control: public, max-age=31536000, immutable` |
+| `GET` | `/media/stream/:id/:filename.vtt` | Yes | Stream VTT subtitle file from VOD storage bucket with `Cache-Control: public, max-age=31536000, immutable` |
+| `GET` | `/media/stream/:id/thumbnails.jpg` | Yes | Stream sprite-sheet tile thumbnails as `image/jpeg` with `Cache-Control: public, max-age=604800` |
 | `POST` | `/media/:id/subtitle/initiate` | Yes (admin only) | Reserve a subtitle slot; returns `{ subtitleId, uploadUrl }` (presigned PUT URL for VTT) |
 | `POST` | `/media/:id/subtitle/complete` | Yes (admin only) | Confirm VTT upload; saves track to DB and rebuilds the MPEG-DASH manifest |
 | `PUT` | `/media/:id/subtitle/:subtitleId` | Yes (admin only) | Enable/disable or rename a subtitle track; rebuilds manifest |
