@@ -13,7 +13,9 @@ const extractBearerToken = (authorization?: string) =>
 
 export const createAuthMiddleware = ({ jwtSecret }: AuthConfig, userDal: UserDal) =>
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-        const token = req.cookies?.["kawaz-token"] ?? extractBearerToken(req.headers.authorization);
+        const token = req.cookies?.["kawaz-token"]
+            ?? extractBearerToken(req.headers.authorization)
+            ?? (typeof req.query.token === "string" ? req.query.token : undefined);
         if (isNil(token)) {
             res.status(401).json({ message: "no token provided" });
             return;
