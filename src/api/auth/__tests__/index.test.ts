@@ -159,7 +159,7 @@ describe('POST /auth/login', () => {
             .send({ username: 'ido', password: 'strongpassword123' });
 
         expect(response.status).toBe(200);
-        expect(response.body).toEqual({ message: 'Login successful', role: 'user', username: 'ido' });
+        expect(response.body).toEqual({ message: 'Login successful', role: 'user', username: 'ido', token: 'signed-token' });
         expect(response.headers['set-cookie']).toBeDefined();
         expect(response.headers['set-cookie'][0]).toContain('kawaz-token=signed-token');
     });
@@ -629,7 +629,7 @@ describe('GET /auth/google/device/poll', () => {
         const response = await request(app).get('/auth/google/device/poll?device_code=device-code-123');
 
         expect(response.status).toBe(200);
-        expect(response.body).toEqual({ status: 'approved', username: 'John Doe', role: 'user' });
+        expect(response.body).toEqual({ status: 'approved', username: 'John Doe', role: 'user', token: 'signed-token' });
         expect(response.headers['set-cookie'][0]).toContain('kawaz-token=signed-token');
     });
 
@@ -681,7 +681,7 @@ describe('POST /auth/google/native/exchange', () => {
             .send({ code: 'test-native-code' });
 
         expect(response.status).toBe(200);
-        expect(response.body).toEqual({ message: 'Login successful' });
+        expect(response.body).toEqual({ message: 'Login successful', token: 'signed-token' });
         expect(response.headers['set-cookie'][0]).toContain('kawaz-token=signed-token');
         expect(mockedPopNativeCode).toHaveBeenCalledWith('test-native-code');
     });

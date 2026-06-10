@@ -8,9 +8,12 @@ import { AuthConfig, TokenPayload } from "./auth/types";
 import { AvatarAuthenticatedRequest, MediaAuthenticatedRequest } from "./types";
 
 
+const extractBearerToken = (authorization?: string) =>
+    typeof authorization === "string" && authorization.startsWith("Bearer ") ? authorization.slice(7) : undefined;
+
 export const createAuthMiddleware = ({ jwtSecret }: AuthConfig, userDal: UserDal) =>
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-        const token = req.cookies?.["kawaz-token"];
+        const token = req.cookies?.["kawaz-token"] ?? extractBearerToken(req.headers.authorization);
         if (isNil(token)) {
             res.status(401).json({ message: "no token provided" });
             return;

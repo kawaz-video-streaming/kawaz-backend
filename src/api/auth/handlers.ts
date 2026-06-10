@@ -52,7 +52,7 @@ export const createAuthHandlers = (
       async (req: Request, res: Response) => {
         const { username, password } = validateLoginRequest(req);
         const { token, role, username: name } = await logic.login(username, password);
-        res.status(StatusCodes.OK).cookie("kawaz-token", token, cookieOptions).json({ message: "Login successful", role, username: name });
+        res.status(StatusCodes.OK).cookie("kawaz-token", token, cookieOptions).json({ message: "Login successful", role, username: name, token });
       },
     ),
     googleLogin: requestHandlerDecorator(
@@ -117,7 +117,7 @@ export const createAuthHandlers = (
         const result = await logic.googleDevicePoll(deviceCode);
         if (result.status === APPROVED_STATUS) {
           const { token, ...response } = result;
-          res.cookie("kawaz-token", token, cookieOptions).status(StatusCodes.OK).json(response);
+          res.cookie("kawaz-token", token, cookieOptions).status(StatusCodes.OK).json({ ...response, token });
         } else {
           res.status(StatusCodes.OK).json(result);
         }
@@ -132,7 +132,7 @@ export const createAuthHandlers = (
           throw new UnauthorizedError("Invalid or expired code");
         }
         const payload = decode(jwt) as { username?: string; role?: string } | null;
-        res.cookie("kawaz-token", jwt, cookieOptions).status(StatusCodes.OK).json({ message: "Login successful", role: payload?.role, username: payload?.username });
+        res.cookie("kawaz-token", jwt, cookieOptions).status(StatusCodes.OK).json({ message: "Login successful", role: payload?.role, username: payload?.username, token: jwt });
       },
     ),
     appleLogin: requestHandlerDecorator(
