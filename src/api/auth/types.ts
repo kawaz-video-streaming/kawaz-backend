@@ -182,6 +182,22 @@ export interface AppleUserName {
   familyName?: string;
 }
 
+export type PollEntry =
+  | { status: 'pending' }
+  | { status: 'success'; code: string; provider: string }
+  | { status: 'pending_approval' }
+  | { status: 'error'; reason?: 'conflict' }
+
+export type ResolvedPollEntry = Exclude<PollEntry, { status: 'pending' }>
+
+const nativePollRequestSchema: z.ZodType<{ nonce: string }> = z.object({
+  query: z.object({
+    nonce: z.string().min(1, "nonce is required"),
+  }),
+}).transform(({ query }) => ({ nonce: query.nonce }));
+
+export const validateNativePollRequest = validateRequest(nativePollRequestSchema);
+
 export const validateAppleUserJson = validateSchemaAndReturnValue(
   z.preprocess(
     (val) => {
