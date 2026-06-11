@@ -1,13 +1,14 @@
 import { ConflictError, Request, Response, UnauthorizedError } from "@ido_kawaz/server-framework";
 import { decode } from "jsonwebtoken";
 import { StatusCodes } from "http-status-codes";
-import { isNil } from "ramda";
+import { isNil, isNotNil } from "ramda";
 import { UserDal } from "../../dal/user";
 import { Mailer } from "../../services/mailer";
 import { requestHandlerDecorator } from "../../utils/decorator";
 import { AuthenticatedRequest } from "../../utils/types";
 import { createAuthLogic } from "./logic";
 import { popNativeCode, storeNativeCode } from "./nativeCodeStore";
+import { initNonce, pollNonce, resolveNonce } from "./nativePollStore";
 import { parseAppleUserName, verifyAppleIdentityToken } from "./utils";
 import {
   AuthConfig,
@@ -16,10 +17,12 @@ import {
   validateGoogleDevicePollRequest,
   validateLoginRequest,
   validateNativeExchangeRequest,
+  validateNativePollRequest,
   validatePromoteRequest,
   validateResetPasswordRequest,
 } from "./types";
 import { APPROVED_STATUS } from "../../dal/user/model";
+import { NATIVE_SUCCESS_HTML } from "./consts";
 
 export const createAuthHandlers = (
   authConfig: AuthConfig,
@@ -58,15 +61,19 @@ export const createAuthHandlers = (
     googleLogin: requestHandlerDecorator(
       "google login",
       async (req: Request, res: Response) => {
+        const nonce = typeof req.query.nonce === "string" ? req.query.nonce : null;
+        if (isNotNil(nonce)) {
+          initNonce(nonce);
+        }
+        const state = nonce ? `native:${nonce}` : (req.query.return === "native" ? "native" : undefined);
         const params = new URLSearchParams({
           client_id: authConfig.googleClientId,
           redirect_uri: `${authConfig.appDomain}/api/auth/google/callback`,
           response_type: "code",
           scope: "openid email profile",
-          ...(req.query.return === "native" && { state: "native" }),
+          ...(isNotNil(state) && { state }),
         });
-        const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-        res.redirect(redirectUrl);
+        res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
       },
     ),
     googleCallback: requestHandlerDecorator(
@@ -77,7 +84,23 @@ export const createAuthHandlers = (
           res.status(StatusCodes.BAD_REQUEST).json({ message: "Invalid code" });
           return;
         }
-        if (req.query.state === "native") {
+        const state = typeof req.query.state === "string" ? req.query.state : null;
+        const nonce = state?.startsWith("native:") ? state.slice(7) : null;
+        if (isNotNil(nonce)) {
+          try {
+            const token = await logic.googleCallback(code);
+            if (isNil(token)) {
+              resolveNonce(nonce, { status: "pending_approval" });
+            } else {
+              resolveNonce(nonce, { status: "success", code: storeNativeCode(token), provider: "google" });
+            }
+          } catch (err) {
+            resolveNonce(nonce, { status: "error", ...(err instanceof ConflictError && { reason: "conflict" }) });
+          }
+          res.send(NATIVE_SUCCESS_HTML);
+          return;
+        }
+        if (state === "native") {
           try {
             const token = await logic.googleCallback(code);
             if (isNil(token)) {
@@ -138,13 +161,18 @@ export const createAuthHandlers = (
     appleLogin: requestHandlerDecorator(
       "apple login",
       async (req: Request, res: Response) => {
+        const nonce = typeof req.query.nonce === "string" ? req.query.nonce : null;
+        if (isNotNil(nonce)) {
+          initNonce(nonce);
+        }
+        const state = nonce ? `native:${nonce}` : (req.query.return === "native" ? "native" : undefined);
         const params = new URLSearchParams({
           client_id: authConfig.appleClientId,
           redirect_uri: `${authConfig.appDomain}/api/auth/apple/callback`,
           response_type: "code id_token",
           scope: "name email",
           response_mode: "form_post",
-          ...(req.query.return === "native" && { state: "native" }),
+          ...(isNotNil(state) && { state }),
         });
         res.redirect(`https://appleid.apple.com/auth/authorize?${params}`);
       },
@@ -152,8 +180,13 @@ export const createAuthHandlers = (
     appleCallback: requestHandlerDecorator(
       "apple callback",
       async (req: Request, res: Response) => {
+        const state = typeof req.body.state === "string" ? req.body.state : null;
+        const nonce = state?.startsWith("native:") ? state.slice(7) : null;
         if (typeof req.body.error === "string") {
-          if (req.body.state === "native") {
+          if (isNotNil(nonce)) {
+            resolveNonce(nonce, { status: "error" });
+            res.send(NATIVE_SUCCESS_HTML);
+          } else if (state === "native") {
             res.redirect(`${authConfig.nativeAppScheme}://auth/callback?error=true`);
           } else {
             res.redirect(`${authConfig.appDomain}/auth/callback?error=true`);
@@ -168,7 +201,14 @@ export const createAuthHandlers = (
         const { sub: appleId, email } = await verifyAppleIdentityToken(identityToken, authConfig.appleClientId);
         const { givenName, familyName } = parseAppleUserName(req.body.user);
         const result = await logic.appleSignIn(appleId, email, givenName, familyName);
-        if (req.body.state === "native") {
+        if (isNotNil(nonce)) {
+          if (isNil(result)) {
+            resolveNonce(nonce, { status: "pending_approval" });
+          } else {
+            resolveNonce(nonce, { status: "success", code: storeNativeCode(result.token), provider: "apple" });
+          }
+          res.send(NATIVE_SUCCESS_HTML);
+        } else if (state === "native") {
           if (isNil(result)) {
             res.redirect(`${authConfig.nativeAppScheme}://auth/callback?pending=true`);
           } else {
@@ -182,6 +222,18 @@ export const createAuthHandlers = (
             res.cookie("kawaz-token", result.token, cookieOptions).redirect(`${authConfig.appDomain}/auth/callback`);
           }
         }
+      },
+    ),
+    nativePoll: requestHandlerDecorator(
+      "native poll",
+      async (req: Request, res: Response) => {
+        const { nonce } = validateNativePollRequest(req);
+        const entry = pollNonce(nonce);
+        if (isNil(entry)) {
+          res.status(StatusCodes.NOT_FOUND).json({ message: "Nonce not found or expired" });
+          return;
+        }
+        res.status(StatusCodes.OK).json(entry);
       },
     ),
     promoteAdmin: requestHandlerDecorator(
