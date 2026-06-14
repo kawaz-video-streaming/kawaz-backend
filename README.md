@@ -1,5 +1,7 @@
 # kawaz-backend
 
+**Version:** 1.0.0
+
 Kawaz Plus media backend service.
 
 ## What it does
