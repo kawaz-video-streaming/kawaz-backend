@@ -202,7 +202,7 @@ Returns `200 OK` if service is running.
 ### `POST /admin/pending/:username/approve/:role`
 
 - Requires: `kawaz-token` cookie with **admin role**
-- `:role` must be `user` or `special`; sets the user's role at approval time
+- `:role` sets the user's role at approval time
 - Sets user status to `"approved"`; sends approval email to the user's registered email
 - Success response: `200 { "message": "User approved" }`
 - Error responses: `400` (invalid role), `401`, `403`, `404` (user not found or not pending)
@@ -226,7 +226,7 @@ Returns `200 OK` if service is running.
 ### `GET /user/me`
 
 - Requires: `kawaz-token` cookie with valid JWT
-- Success response: `200 { "username": string, "role": "user" | "special" | "admin" }`
+- Success response: `200 { "username": string, "role": string }`
 - Error responses: `401` (missing or invalid token)
 
 ### `POST /user/profile`
@@ -671,7 +671,7 @@ Stores user credentials and their profiles.
 | `password` | String | Yes | Bcrypt-hashed password |
 | `email` | String | Yes | Email address (provided at signup) |
 | `status` | String | Yes | `pending` \| `approved` \| `denied` (defaults to `pending`) |
-| `role` | String | Yes | `user`, `special`, or `admin` (defaults to `user`; set at admin approval time) |
+| `role` | String | Yes | User role (defaults to `user`; set at admin approval time) |
 | `profiles` | Profile[] | Yes | List of user profiles (defaults to `[]`) |
 
 Each `Profile` embedded document:
