@@ -567,6 +567,9 @@ Returns `200 OK` if service is running.
 
 Swagger UI for API documentation.
 
+- Local: `http://localhost:8080/api-docs`
+- Production: `https://api.kawazplus.com` (redirects to `/api-docs`)
+
 ## Upload processing flow
 
 1. Client calls `POST /media/upload/initiate` with JSON metadata (title, fileName, fileSize, mimeType).
