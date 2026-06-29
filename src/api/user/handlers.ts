@@ -1,10 +1,14 @@
 import { ConflictError, NotFoundError, Request, Response } from "@ido_kawaz/server-framework";
+import { StatusCodes } from "http-status-codes";
 import { UserDal } from '../../dal/user';
 import { requestHandlerDecorator } from "../../utils/decorator";
 import { AuthenticatedRequest } from "../../utils/types";
-import { validateUserProfileRequest } from "./types";
+import { MediaAuthenticatedRequest } from "../types";
+import { createUserLogic } from "./logic";
+import { validateProfileMediaRequest, validateProfileNameRequest, validateUserProfileRequest, validateWatchProgressRequest } from "./types";
 
 export const createUserHandlers = (userDal: UserDal) => {
+    const logicFactory = createUserLogic(userDal);
     return {
         me: requestHandlerDecorator(
             'me',
@@ -17,7 +21,7 @@ export const createUserHandlers = (userDal: UserDal) => {
             async (req: Request, res: Response) => {
                 const { user: { username } } = req as AuthenticatedRequest;
                 const { body: { profileName, avatarId } } = validateUserProfileRequest(req);
-                const newProfile = { name: profileName, avatarId };
+                const newProfile = { name: profileName, avatarId, watchProgress: [], watchlist: [] };
                 const success = await userDal.createProfile(username, newProfile);
                 if (success) {
                     res.status(201).json({ message: "Profile created successfully" });
@@ -64,6 +68,72 @@ export const createUserHandlers = (userDal: UserDal) => {
                 res.clearCookie('kawaz-token');
                 res.json({ message: "Account deleted successfully" });
             }
-        )
+        ),
+
+        upsertWatchProgress: requestHandlerDecorator(
+            'upsert watch progress',
+            async (req: Request, res: Response) => {
+                const { user: { username } } = req as AuthenticatedRequest;
+                const { mediaDal } = req as MediaAuthenticatedRequest;
+                const { body: { mediaId, positionInMs }, params: { profileName } } = validateWatchProgressRequest(req);
+                await logicFactory(mediaDal).upsertWatchProgress(username, profileName, mediaId, positionInMs);
+                res.status(StatusCodes.OK).json({ message: "Watch progress updated" });
+            }
+        ),
+
+        removeWatchProgress: requestHandlerDecorator(
+            'remove watch progress',
+            async (req: Request, res: Response) => {
+                const { user: { username } } = req as AuthenticatedRequest;
+                const { mediaDal } = req as MediaAuthenticatedRequest;
+                const { params: { profileName, mediaId } } = validateProfileMediaRequest(req);
+                await logicFactory(mediaDal).removeWatchProgress(username, profileName, mediaId);
+                res.status(StatusCodes.OK).json({ message: "Watch progress removed" });
+            }
+        ),
+
+        getContinueWatching: requestHandlerDecorator(
+            'get continue watching',
+            async (req: Request, res: Response) => {
+                const { user: { username } } = req as AuthenticatedRequest;
+                const { mediaDal } = req as MediaAuthenticatedRequest;
+                const { params: { profileName } } = validateProfileNameRequest(req);
+                const items = await logicFactory(mediaDal).getContinueWatching(username, profileName);
+                res.status(StatusCodes.OK).json(items);
+            }
+        ),
+
+        addToWatchlist: requestHandlerDecorator(
+            'add to watchlist',
+            async (req: Request, res: Response) => {
+                const { user: { username } } = req as AuthenticatedRequest;
+                const { mediaDal } = req as MediaAuthenticatedRequest;
+                const { params: { profileName, mediaId } } = validateProfileMediaRequest(req);
+                await logicFactory(mediaDal).addToWatchlist(username, profileName, mediaId);
+                res.status(StatusCodes.OK).json({ message: "Added to watchlist" });
+            }
+        ),
+
+        removeFromWatchlist: requestHandlerDecorator(
+            'remove from watchlist',
+            async (req: Request, res: Response) => {
+                const { user: { username } } = req as AuthenticatedRequest;
+                const { mediaDal } = req as MediaAuthenticatedRequest;
+                const { params: { profileName, mediaId } } = validateProfileMediaRequest(req);
+                await logicFactory(mediaDal).removeFromWatchlist(username, profileName, mediaId);
+                res.status(StatusCodes.OK).json({ message: "Removed from watchlist" });
+            }
+        ),
+
+        getWatchlist: requestHandlerDecorator(
+            'get watchlist',
+            async (req: Request, res: Response) => {
+                const { user: { username } } = req as AuthenticatedRequest;
+                const { mediaDal } = req as MediaAuthenticatedRequest;
+                const { params: { profileName } } = validateProfileNameRequest(req);
+                const items = await logicFactory(mediaDal).getWatchlist(username, profileName);
+                res.status(StatusCodes.OK).json(items);
+            }
+        ),
     }
 }

@@ -187,5 +187,135 @@ export const createUserRouter = (userDal: UserDal) => {
      */
     router.delete("/account", userHandlers.deleteAccount);
 
+    /**
+     * @openapi
+     * /user/profile/{profileName}/progress:
+     *   put:
+     *     summary: Upsert watch progress for a media item
+     *     tags: [User]
+     *     security: [{ cookieAuth: [] }]
+     *     parameters:
+     *       - in: path
+     *         name: profileName
+     *         required: true
+     *         schema: { type: string }
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             properties:
+     *               mediaId: { type: string }
+     *               positionInMs: { type: number }
+     *     responses:
+     *       200: { description: Watch progress updated }
+     *       401: { description: Unauthorized }
+     *       404: { description: Profile not found }
+     */
+    router.put("/profile/:profileName/progress", userHandlers.upsertWatchProgress);
+
+    /**
+     * @openapi
+     * /user/profile/{profileName}/progress/{mediaId}:
+     *   delete:
+     *     summary: Remove watch progress for a media item
+     *     tags: [User]
+     *     security: [{ cookieAuth: [] }]
+     *     parameters:
+     *       - in: path
+     *         name: profileName
+     *         required: true
+     *         schema: { type: string }
+     *       - in: path
+     *         name: mediaId
+     *         required: true
+     *         schema: { type: string }
+     *     responses:
+     *       200: { description: Watch progress removed }
+     *       401: { description: Unauthorized }
+     */
+    router.delete("/profile/:profileName/progress/:mediaId", userHandlers.removeWatchProgress);
+
+    /**
+     * @openapi
+     * /user/profile/{profileName}/continue-watching:
+     *   get:
+     *     summary: Get in-progress media for a profile, newest first
+     *     tags: [User]
+     *     security: [{ cookieAuth: [] }]
+     *     parameters:
+     *       - in: path
+     *         name: profileName
+     *         required: true
+     *         schema: { type: string }
+     *     responses:
+     *       200: { description: List of in-progress media with positionInMs }
+     *       401: { description: Unauthorized }
+     */
+    router.get("/profile/:profileName/continue-watching", userHandlers.getContinueWatching);
+
+    /**
+     * @openapi
+     * /user/profile/{profileName}/watchlist/{mediaId}:
+     *   post:
+     *     summary: Add a media item to the profile watchlist
+     *     tags: [User]
+     *     security: [{ cookieAuth: [] }]
+     *     parameters:
+     *       - in: path
+     *         name: profileName
+     *         required: true
+     *         schema: { type: string }
+     *       - in: path
+     *         name: mediaId
+     *         required: true
+     *         schema: { type: string }
+     *     responses:
+     *       200: { description: Added to watchlist }
+     *       401: { description: Unauthorized }
+     */
+    router.post("/profile/:profileName/watchlist/:mediaId", userHandlers.addToWatchlist);
+
+    /**
+     * @openapi
+     * /user/profile/{profileName}/watchlist/{mediaId}:
+     *   delete:
+     *     summary: Remove a media item from the profile watchlist
+     *     tags: [User]
+     *     security: [{ cookieAuth: [] }]
+     *     parameters:
+     *       - in: path
+     *         name: profileName
+     *         required: true
+     *         schema: { type: string }
+     *       - in: path
+     *         name: mediaId
+     *         required: true
+     *         schema: { type: string }
+     *     responses:
+     *       200: { description: Removed from watchlist }
+     *       401: { description: Unauthorized }
+     */
+    router.delete("/profile/:profileName/watchlist/:mediaId", userHandlers.removeFromWatchlist);
+
+    /**
+     * @openapi
+     * /user/profile/{profileName}/watchlist:
+     *   get:
+     *     summary: Get the profile watchlist
+     *     tags: [User]
+     *     security: [{ cookieAuth: [] }]
+     *     parameters:
+     *       - in: path
+     *         name: profileName
+     *         required: true
+     *         schema: { type: string }
+     *     responses:
+     *       200: { description: List of media in the watchlist }
+     *       401: { description: Unauthorized }
+     */
+    router.get("/profile/:profileName/watchlist", userHandlers.getWatchlist);
+
     return router;
 };

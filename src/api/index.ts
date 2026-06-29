@@ -57,7 +57,7 @@ export const registerRoutes = (
 
     // API routes
     app.use('/admin', requireAdmin, createAdminRouter(mailer, userDal));
-    app.use('/user', createUserRouter(userDal));
+    app.use('/user', decideMediaAndMediaCollectionDalByUserRoleMiddleware(dals), createUserRouter(userDal));
     app.use("/avatar", decideAvatarDalByUserRoleMiddleware(dals), createAvatarRouter(config.bucketsConfig, avatarCategoryDal, storageClient));
     app.use('/avatarCategory', createAvatarCategoryRouter(dals));
     app.use("/media", decideMediaAndMediaCollectionDalByUserRoleMiddleware(dals), createMediaRouter(config.bucketsConfig, mediaGenreDal, amqpClient, storageClient, tmdbClient));
