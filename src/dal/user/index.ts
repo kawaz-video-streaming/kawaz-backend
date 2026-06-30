@@ -1,5 +1,5 @@
 import { Dal } from "@ido_kawaz/mongo-client";
-import { isNil, isNotNil } from "ramda";
+import { isNil, isNotNil, propEq } from "ramda";
 import { ADMIN_ROLE, Role } from "../../utils/types";
 import { APPROVED_STATUS, DENIED_STATUS, PENDING_STATUS, Profile, User, UserModel, UserProjection, WatchProgressEntry } from "./model";
 
@@ -60,15 +60,21 @@ export class UserDal extends Dal<User> {
 
   getProfile = async (username: string, profileName: string): Promise<Profile | null> => {
     const user = await this.findUser(username);
-    if (isNil(user)) { return null; }
-    return user.profiles.find((p) => p.name === profileName) ?? null;
+    if (isNil(user)) {
+      return null;
+    }
+    return user.profiles.find(propEq(profileName, 'name')) ?? null;
   };
 
   updateProfileAvatar = async (username: string, profileName: string, avatarId: string): Promise<boolean> => {
     const user = await this.findUser(username);
-    if (isNil(user)) { return false; }
-    const profileIndex = user.profiles.findIndex((p) => p.name === profileName);
-    if (profileIndex === -1) { return false; }
+    if (isNil(user)) {
+      return false;
+    }
+    const profileIndex = user.profiles.findIndex(propEq(profileName, 'name'));
+    if (profileIndex === -1) {
+      return false;
+    }
     user.profiles[profileIndex].avatarId = avatarId;
     await this.model.findOneAndUpdate({ name: username }, { profiles: user.profiles }).exec();
     return true;
@@ -76,11 +82,14 @@ export class UserDal extends Dal<User> {
 
   upsertWatchProgress = async (username: string, profileName: string, mediaId: string, positionInMs: number): Promise<boolean> => {
     const user = await this.findUser(username);
-    if (isNil(user)) { return false; }
-    const profileIndex = user.profiles.findIndex((p) => p.name === profileName);
-    if (profileIndex === -1) { return false; }
-    const profile = user.profiles[profileIndex];
-    const entryIndex = profile.watchProgress.findIndex((e) => e.mediaId === mediaId);
+    if (isNil(user)) {
+      return false;
+    }
+    const profile = user.profiles.find(propEq(profileName, 'name'));
+    if (isNil(profile)) {
+      return false;
+    }
+    const entryIndex = profile.watchProgress.findIndex(propEq(mediaId, 'mediaId'));
     const updatedEntry: WatchProgressEntry = { mediaId, positionInMs, updatedAt: new Date() };
     if (entryIndex === -1) {
       profile.watchProgress.push(updatedEntry);
@@ -91,26 +100,23 @@ export class UserDal extends Dal<User> {
     return true;
   };
 
-  removeWatchProgress = async (username: string, profileName: string, mediaId: string): Promise<void> => {
-    await this.model.findOneAndUpdate(
+  removeWatchProgress = (username: string, profileName: string, mediaId: string) =>
+    this.model.findOneAndUpdate(
       { name: username, 'profiles.name': profileName },
       { $pull: { 'profiles.$.watchProgress': { mediaId } } }
     ).exec();
-  };
 
-  addToWatchlist = async (username: string, profileName: string, mediaId: string): Promise<void> => {
-    await this.model.findOneAndUpdate(
+  addToWatchlist = (username: string, profileName: string, mediaId: string) =>
+    this.model.findOneAndUpdate(
       { name: username, 'profiles.name': profileName },
       { $addToSet: { 'profiles.$.watchlist': mediaId } }
     ).exec();
-  };
 
-  removeFromWatchlist = async (username: string, profileName: string, mediaId: string): Promise<void> => {
-    await this.model.findOneAndUpdate(
+  removeFromWatchlist = (username: string, profileName: string, mediaId: string) =>
+    this.model.findOneAndUpdate(
       { name: username, 'profiles.name': profileName },
       { $pull: { 'profiles.$.watchlist': mediaId } }
     ).exec();
-  };
 
   deleteProfile = (name: string, profileName: string) =>
     this.model.findOneAndUpdate({ name }, { $pull: { profiles: { name: profileName } } }).exec();

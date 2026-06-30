@@ -88,10 +88,10 @@ Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
 | `DELETE` | `/user/account` | Yes | Permanently delete the authenticated user's account (record, email, password, profiles); clears session cookie |
 | `PUT` | `/user/profile/:profileName/progress` | Yes | Upsert watch progress entry (`{ mediaId, positionInMs }`) for a profile |
 | `DELETE` | `/user/profile/:profileName/progress/:mediaId` | Yes | Remove a watch progress entry for a specific media item |
-| `GET` | `/user/profile/:profileName/continue-watching` | Yes | List in-progress media (excludes finished items ≥90% watched), sorted by most recent |
+| `GET` | `/user/profile/:profileName/continueWatching` | Yes | List in-progress media as `{ mediaId, positionInMs }[]` (excludes items within last 3 minutes of end), sorted by most recent |
 | `POST` | `/user/profile/:profileName/watchlist/:mediaId` | Yes | Add a media item to the profile's watchlist |
 | `DELETE` | `/user/profile/:profileName/watchlist/:mediaId` | Yes | Remove a media item from the profile's watchlist |
-| `GET` | `/user/profile/:profileName/watchlist` | Yes | List all media items in the profile's watchlist |
+| `GET` | `/user/profile/:profileName/watchlist` | Yes | List profile's watchlist as `string[]` (mediaIds) |
 | `GET` | `/avatar` | Yes | List all avatars |
 | `GET` | `/avatar/:id` | Yes | Get a single avatar's metadata |
 | `GET` | `/avatar/:id/image` | Yes | Stream avatar image as `image/jpeg` with `Cache-Control: public, max-age=172800` |

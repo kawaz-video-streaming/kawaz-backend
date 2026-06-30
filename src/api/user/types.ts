@@ -1,6 +1,5 @@
 import { Types } from "@ido_kawaz/mongo-client";
 import z from "zod";
-import { Media } from "../../dal/media/model";
 import { validateRequest } from "../../utils/zod";
 
 interface UserProfileRequestBody {
@@ -91,6 +90,7 @@ export const validateProfileNameRequest = validateRequest(validatedProfileNameRe
 
 // Response types
 
-export interface ContinueWatchingItem extends Media {
+export interface ContinueWatchingItem {
+    mediaId: string;
     positionInMs: number;
 }

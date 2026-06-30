@@ -237,53 +237,53 @@ describe('DELETE /user/profile/:profileName/progress/:mediaId', () => {
     });
 });
 
-describe('GET /user/profile/:profileName/continue-watching', () => {
+describe('GET /user/profile/:profileName/continueWatching', () => {
     it('returns empty array when profile does not exist', async () => {
         const userDal = { getProfile: jest.fn().mockResolvedValue(null) };
         const app = makeApp(userDal);
 
-        const response = await request(app).get('/user/profile/Kids/continue-watching');
+        const response = await request(app).get('/user/profile/Kids/continueWatching');
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual([]);
     });
 
-    it('returns resolved media items with positionInMs', async () => {
+    it('returns mediaId and positionInMs for in-progress items', async () => {
         const profile = {
             name: 'Kids',
             avatarId: '507f1f77bcf86cd799439011',
             watchProgress: [
-                { mediaId: 'm1', positionInMs: 3000, updatedAt: new Date('2026-01-02') },
+                { mediaId: 'm1', positionInMs: 1800000, updatedAt: new Date('2026-01-02') },
             ],
             watchlist: [],
         };
-        const media = { _id: 'm1', title: 'Movie', durationInMs: 10000, metadata: { durationInMs: 10000 } };
+        const media = { _id: 'm1', title: 'Movie', metadata: { durationInMs: 3600000 } };
         const userDal = { getProfile: jest.fn().mockResolvedValue(profile) };
         const mediaDal = { getMedia: jest.fn().mockResolvedValue(media) };
         const app = makeApp(userDal, 'alice', 'user', mediaDal);
 
-        const response = await request(app).get('/user/profile/Kids/continue-watching');
+        const response = await request(app).get('/user/profile/Kids/continueWatching');
 
         expect(response.status).toBe(200);
         expect(response.body).toHaveLength(1);
-        expect(response.body[0]).toMatchObject({ _id: 'm1', positionInMs: 3000 });
+        expect(response.body[0]).toEqual({ mediaId: 'm1', positionInMs: 1800000 });
     });
 
-    it('excludes finished items (positionInMs >= 90% of duration)', async () => {
+    it('excludes finished items (within last 3 minutes of duration)', async () => {
         const profile = {
             name: 'Kids',
             avatarId: '507f1f77bcf86cd799439011',
             watchProgress: [
-                { mediaId: 'm1', positionInMs: 9500, updatedAt: new Date('2026-01-02') },
+                { mediaId: 'm1', positionInMs: 3500000, updatedAt: new Date('2026-01-02') },
             ],
             watchlist: [],
         };
-        const media = { _id: 'm1', title: 'Movie', metadata: { durationInMs: 10000 } };
+        const media = { _id: 'm1', title: 'Movie', metadata: { durationInMs: 3600000 } };
         const userDal = { getProfile: jest.fn().mockResolvedValue(profile) };
         const mediaDal = { getMedia: jest.fn().mockResolvedValue(media) };
         const app = makeApp(userDal, 'alice', 'user', mediaDal);
 
-        const response = await request(app).get('/user/profile/Kids/continue-watching');
+        const response = await request(app).get('/user/profile/Kids/continueWatching');
 
         expect(response.status).toBe(200);
         expect(response.body).toHaveLength(0);
@@ -325,43 +325,19 @@ describe('GET /user/profile/:profileName/watchlist', () => {
         expect(response.body).toEqual([]);
     });
 
-    it('returns resolved media items for watchlist', async () => {
+    it('returns watchlist mediaIds', async () => {
         const profile = {
             name: 'Kids',
             avatarId: '507f1f77bcf86cd799439011',
             watchProgress: [],
             watchlist: ['m1', 'm2'],
         };
-        const m1 = { _id: 'm1', title: 'Movie One' };
-        const m2 = { _id: 'm2', title: 'Movie Two' };
         const userDal = { getProfile: jest.fn().mockResolvedValue(profile) };
-        const mediaDal = { getMedia: jest.fn().mockImplementation((id: string) => Promise.resolve(id === 'm1' ? m1 : m2)) };
-        const app = makeApp(userDal, 'alice', 'user', mediaDal);
+        const app = makeApp(userDal);
 
         const response = await request(app).get('/user/profile/Kids/watchlist');
 
         expect(response.status).toBe(200);
-        expect(response.body).toHaveLength(2);
-        expect(response.body[0]).toMatchObject({ _id: 'm1' });
-        expect(response.body[1]).toMatchObject({ _id: 'm2' });
-    });
-
-    it('filters out null media from watchlist', async () => {
-        const profile = {
-            name: 'Kids',
-            avatarId: '507f1f77bcf86cd799439011',
-            watchProgress: [],
-            watchlist: ['m1', 'deleted'],
-        };
-        const m1 = { _id: 'm1', title: 'Movie One' };
-        const userDal = { getProfile: jest.fn().mockResolvedValue(profile) };
-        const mediaDal = { getMedia: jest.fn().mockImplementation((id: string) => Promise.resolve(id === 'm1' ? m1 : null)) };
-        const app = makeApp(userDal, 'alice', 'user', mediaDal);
-
-        const response = await request(app).get('/user/profile/Kids/watchlist');
-
-        expect(response.status).toBe(200);
-        expect(response.body).toHaveLength(1);
-        expect(response.body[0]).toMatchObject({ _id: 'm1' });
+        expect(response.body).toEqual(['m1', 'm2']);
     });
 });

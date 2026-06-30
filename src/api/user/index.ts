@@ -239,7 +239,7 @@ export const createUserRouter = (userDal: UserDal) => {
 
     /**
      * @openapi
-     * /user/profile/{profileName}/continue-watching:
+     * /user/profile/{profileName}/continueWatching:
      *   get:
      *     summary: Get in-progress media for a profile, newest first
      *     tags: [User]
@@ -253,7 +253,7 @@ export const createUserRouter = (userDal: UserDal) => {
      *       200: { description: List of in-progress media with positionInMs }
      *       401: { description: Unauthorized }
      */
-    router.get("/profile/:profileName/continue-watching", userHandlers.getContinueWatching);
+    router.get("/profile/:profileName/continueWatching", userHandlers.getContinueWatching);
 
     /**
      * @openapi

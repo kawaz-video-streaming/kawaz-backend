@@ -3,9 +3,12 @@ import { isNil, isNotNil } from "ramda";
 import { MediaDal } from "../../dal/media";
 import { Media } from "../../dal/media/model";
 import { UserDal } from "../../dal/user";
+import { FINISHED_THRESHOLD_MS } from "./consts";
 import { ContinueWatchingItem } from "./types";
 
-const FINISHED_THRESHOLD = 0.9;
+type ResolvedProgressItem = { mediaId: string; positionInMs: number; updatedAt: Date; media: Media | null };
+type ResolvedProgressItemWithMedia = { mediaId: string; positionInMs: number; updatedAt: Date; media: Media };
+const isResolvedWithMedia = (item: ResolvedProgressItem): item is ResolvedProgressItemWithMedia => isNotNil(item.media);
 
 export const createUserLogic = (userDal: UserDal) => (mediaDal: MediaDal) => ({
     upsertWatchProgress: async (username: string, profileName: string, mediaId: string, positionInMs: number): Promise<void> => {
@@ -15,9 +18,8 @@ export const createUserLogic = (userDal: UserDal) => (mediaDal: MediaDal) => ({
         }
     },
 
-    removeWatchProgress: async (username: string, profileName: string, mediaId: string): Promise<void> => {
-        await userDal.removeWatchProgress(username, profileName, mediaId);
-    },
+    removeWatchProgress: (username: string, profileName: string, mediaId: string) =>
+        userDal.removeWatchProgress(username, profileName, mediaId),
 
     getContinueWatching: async (username: string, profileName: string): Promise<ContinueWatchingItem[]> => {
         const profile = await userDal.getProfile(username, profileName);
@@ -27,34 +29,33 @@ export const createUserLogic = (userDal: UserDal) => (mediaDal: MediaDal) => ({
         const resolved = await Promise.all(
             profile.watchProgress.map(async ({ mediaId, positionInMs, updatedAt }) => {
                 const media = await mediaDal.getMedia(mediaId);
-                return { media, positionInMs, updatedAt };
+                return { mediaId, positionInMs, updatedAt, media };
             })
         );
         return resolved
-            .filter((item): item is { media: Media; positionInMs: number; updatedAt: Date } => isNotNil(item.media))
+            .filter(isResolvedWithMedia)
             .filter(({ media, positionInMs }) => {
                 const durationInMs = media.metadata?.durationInMs;
-                if (isNil(durationInMs)) { return true; }
-                return positionInMs < durationInMs * FINISHED_THRESHOLD;
+                if (isNil(durationInMs)) {
+                    return true;
+                }
+                return positionInMs < durationInMs - FINISHED_THRESHOLD_MS;
             })
             .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-            .map(({ media, positionInMs }) => ({ ...media, positionInMs }));
+            .map(({ mediaId, positionInMs }) => ({ mediaId, positionInMs }));
     },
 
-    addToWatchlist: async (username: string, profileName: string, mediaId: string): Promise<void> => {
-        await userDal.addToWatchlist(username, profileName, mediaId);
-    },
+    addToWatchlist: (username: string, profileName: string, mediaId: string) =>
+        userDal.addToWatchlist(username, profileName, mediaId),
 
-    removeFromWatchlist: async (username: string, profileName: string, mediaId: string): Promise<void> => {
-        await userDal.removeFromWatchlist(username, profileName, mediaId);
-    },
+    removeFromWatchlist: (username: string, profileName: string, mediaId: string) =>
+        userDal.removeFromWatchlist(username, profileName, mediaId),
 
-    getWatchlist: async (username: string, profileName: string): Promise<Media[]> => {
+    getWatchlist: async (username: string, profileName: string): Promise<string[]> => {
         const profile = await userDal.getProfile(username, profileName);
         if (isNil(profile)) {
             return [];
         }
-        const resolved = await Promise.all(profile.watchlist.map((id) => mediaDal.getMedia(id)));
-        return resolved.filter((m): m is Media => isNotNil(m));
+        return profile.watchlist;
     },
 });
