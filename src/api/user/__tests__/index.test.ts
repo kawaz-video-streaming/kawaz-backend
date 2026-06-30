@@ -257,9 +257,8 @@ describe('GET /user/profile/:profileName/continueWatching', () => {
             ],
             watchlist: [],
         };
-        const media = { _id: 'm1', title: 'Movie', metadata: { durationInMs: 3600000 } };
         const userDal = { getProfile: jest.fn().mockResolvedValue(profile) };
-        const mediaDal = { getMedia: jest.fn().mockResolvedValue(media) };
+        const mediaDal = { getMediaDuration: jest.fn().mockResolvedValue(3600000) };
         const app = makeApp(userDal, 'alice', 'user', mediaDal);
 
         const response = await request(app).get('/user/profile/Kids/continueWatching');
@@ -278,9 +277,27 @@ describe('GET /user/profile/:profileName/continueWatching', () => {
             ],
             watchlist: [],
         };
-        const media = { _id: 'm1', title: 'Movie', metadata: { durationInMs: 3600000 } };
         const userDal = { getProfile: jest.fn().mockResolvedValue(profile) };
-        const mediaDal = { getMedia: jest.fn().mockResolvedValue(media) };
+        const mediaDal = { getMediaDuration: jest.fn().mockResolvedValue(3600000) };
+        const app = makeApp(userDal, 'alice', 'user', mediaDal);
+
+        const response = await request(app).get('/user/profile/Kids/continueWatching');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toHaveLength(0);
+    });
+
+    it('excludes items where media no longer exists or is not yet completed', async () => {
+        const profile = {
+            name: 'Kids',
+            avatarId: '507f1f77bcf86cd799439011',
+            watchProgress: [
+                { mediaId: 'm1', positionInMs: 1800000, updatedAt: new Date('2026-01-02') },
+            ],
+            watchlist: [],
+        };
+        const userDal = { getProfile: jest.fn().mockResolvedValue(profile) };
+        const mediaDal = { getMediaDuration: jest.fn().mockResolvedValue(null) };
         const app = makeApp(userDal, 'alice', 'user', mediaDal);
 
         const response = await request(app).get('/user/profile/Kids/continueWatching');

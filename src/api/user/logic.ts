@@ -1,14 +1,9 @@
 import { NotFoundError } from "@ido_kawaz/server-framework";
-import { isNil, isNotNil } from "ramda";
+import { isNil } from "ramda";
 import { MediaDal } from "../../dal/media";
-import { Media } from "../../dal/media/model";
 import { UserDal } from "../../dal/user";
 import { FINISHED_THRESHOLD_MS } from "./consts";
 import { ContinueWatchingItem } from "./types";
-
-type ResolvedProgressItem = { mediaId: string; positionInMs: number; updatedAt: Date; media: Media | null };
-type ResolvedProgressItemWithMedia = { mediaId: string; positionInMs: number; updatedAt: Date; media: Media };
-const isResolvedWithMedia = (item: ResolvedProgressItem): item is ResolvedProgressItemWithMedia => isNotNil(item.media);
 
 export const createUserLogic = (userDal: UserDal) => (mediaDal: MediaDal) => ({
     upsertWatchProgress: async (username: string, profileName: string, mediaId: string, positionInMs: number): Promise<void> => {
@@ -28,16 +23,14 @@ export const createUserLogic = (userDal: UserDal) => (mediaDal: MediaDal) => ({
         }
         const resolved = await Promise.all(
             profile.watchProgress.map(async ({ mediaId, positionInMs, updatedAt }) => {
-                const media = await mediaDal.getMedia(mediaId);
-                return { mediaId, positionInMs, updatedAt, media };
+                const durationInMs = await mediaDal.getMediaDuration(mediaId);
+                return { mediaId, positionInMs, updatedAt, durationInMs };
             })
         );
         return resolved
-            .filter(isResolvedWithMedia)
-            .filter(({ media, positionInMs }) => {
-                const durationInMs = media.metadata?.durationInMs;
+            .filter(({ durationInMs, positionInMs }) => {
                 if (isNil(durationInMs)) {
-                    return true;
+                    return false;
                 }
                 return positionInMs < durationInMs - FINISHED_THRESHOLD_MS;
             })
