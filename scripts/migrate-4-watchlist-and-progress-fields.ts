@@ -78,14 +78,14 @@ async function migrate(): Promise<void> {
                         continue;
                     }
 
-                    const media = await mediaColl.findOne({ _id: raw });
+                    const media = await mediaColl.findOne({ _id: raw } as any);
                     if (media && (media as any).kind === 'movie' && !(media as any).collectionId) {
                         resolved.push({ id: raw, kind: 'media' });
                         entriesKept++;
                         continue;
                     }
 
-                    const collection = await mediaCollectionColl.findOne({ _id: raw });
+                    const collection = await mediaCollectionColl.findOne({ _id: raw } as any);
                     if (collection && !(collection as any).collectionId) {
                         resolved.push({ id: raw, kind: 'collection' });
                         entriesKept++;
