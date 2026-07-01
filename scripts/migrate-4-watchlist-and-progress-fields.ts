@@ -1,18 +1,20 @@
 /**
- * Converts legacy Profile.watchlist entries (plain mediaId strings) to the
- * new shape ({ id, kind: "media" | "collection" }) introduced when the
- * watchlist feature was extended to support movies, shows, and top-level
- * collections instead of only movies.
+ * One-time migration for the KAN-9 watch-progress/watchlist feature.
  *
- * Also drops entries that are no longer eligible under the new rules:
- * episodes, seasons, nested collections, or ids that no longer exist.
+ * Combines what would otherwise be two sequential migrations into one pass:
+ *   1. Backfills watchProgress ([]) and watchlist ([]) onto existing Profile
+ *      subdocuments that predate the feature entirely.
+ *   2. Converts any watchlist entries still in the legacy string (mediaId-only)
+ *      shape to { id, kind: "media" | "collection" }, dropping entries that
+ *      are no longer eligible (episodes, seasons, nested collections, or ids
+ *      that no longer exist).
  *
- * Run BEFORE deploying the watchlist-kinds feature — old and new code
- * disagree on the shape of Profile.watchlist.
+ * Run BEFORE deploying the KAN-9 feature — old and new code disagree on the
+ * shape of Profile.watchProgress/watchlist.
  *
  * Usage (from kawaz-backend/):
- *   npx ts-node-dev --env-file .env scripts/migrate-5-watchlist-entries.ts --dry-run
- *   npx ts-node-dev --env-file .env scripts/migrate-5-watchlist-entries.ts
+ *   npx ts-node-dev --env-file .env scripts/migrate-4-watchlist-and-progress-fields.ts --dry-run
+ *   npx ts-node-dev --env-file .env scripts/migrate-4-watchlist-and-progress-fields.ts
  *
  * Requires: MONGO_CONNECTION_STRING
  */
@@ -41,6 +43,7 @@ async function migrate(): Promise<void> {
     const mediaCollectionColl = createMediaCollectionModel(mongoClient).collection;
 
     let usersUpdated = 0;
+    let profilesBackfilled = 0;
     let entriesKept = 0;
     let entriesDropped = 0;
 
@@ -52,12 +55,19 @@ async function migrate(): Promise<void> {
             let userNeedsUpdate = false;
 
             const newProfiles = await Promise.all(profiles.map(async (profile) => {
+                const hasWatchProgress = 'watchProgress' in profile;
+                const hasWatchlist = 'watchlist' in profile;
                 const rawWatchlist: unknown[] = profile.watchlist ?? [];
                 const hasLegacyEntry = rawWatchlist.some(isLegacyEntry);
-                if (!hasLegacyEntry) {
+
+                if (hasWatchProgress && hasWatchlist && !hasLegacyEntry) {
                     return profile;
                 }
                 userNeedsUpdate = true;
+
+                if (!hasWatchProgress || !hasWatchlist) {
+                    profilesBackfilled++;
+                }
 
                 const resolved: WatchlistEntry[] = [];
                 for (const raw of rawWatchlist) {
@@ -86,11 +96,15 @@ async function migrate(): Promise<void> {
                     entriesDropped++;
                 }
 
-                return { ...profile, watchlist: resolved };
+                return {
+                    ...profile,
+                    watchProgress: profile.watchProgress ?? [],
+                    watchlist: resolved,
+                };
             }));
 
             if (userNeedsUpdate) {
-                console.log(`[${isDryRun ? 'DRY RUN' : 'UPDATE'}] ${user.name}: migrating watchlist entries`);
+                console.log(`[${isDryRun ? 'DRY RUN' : 'UPDATE'}] ${user.name}: migrating profile watch fields`);
                 if (!isDryRun) {
                     await userColl.updateOne({ _id: user._id }, { $set: { profiles: newProfiles } });
                 }
@@ -98,7 +112,7 @@ async function migrate(): Promise<void> {
             }
         }
 
-        console.log(`\nDone. Users updated: ${usersUpdated}, entries kept: ${entriesKept}, entries dropped: ${entriesDropped}`);
+        console.log(`\nDone. Users updated: ${usersUpdated}, profiles backfilled: ${profilesBackfilled}, watchlist entries kept: ${entriesKept}, dropped: ${entriesDropped}`);
 
         if (isDryRun) {
             console.log('\n[DRY RUN] Skipping verification — no writes were made.');
@@ -106,11 +120,27 @@ async function migrate(): Promise<void> {
         }
 
         console.log('\nVerifying...');
-        const remaining = await userColl.countDocuments({ 'profiles.watchlist': { $type: 'string' } });
-        if (remaining > 0) {
-            console.error(`\nVERIFICATION FAILED: ${remaining} user doc(s) still have a legacy string watchlist entry`);
+        const errors: string[] = [];
+
+        const remainingMissingWatchProgress = await userColl.countDocuments({ 'profiles.watchProgress': { $exists: false } });
+        if (remainingMissingWatchProgress > 0)
+            errors.push(`${remainingMissingWatchProgress} user doc(s) still have a profile missing "watchProgress"`);
+
+        const remainingMissingWatchlist = await userColl.countDocuments({ 'profiles.watchlist': { $exists: false } });
+        if (remainingMissingWatchlist > 0)
+            errors.push(`${remainingMissingWatchlist} user doc(s) still have a profile missing "watchlist"`);
+
+        const remainingLegacyEntries = await userColl.countDocuments({ 'profiles.watchlist': { $type: 'string' } });
+        if (remainingLegacyEntries > 0)
+            errors.push(`${remainingLegacyEntries} user doc(s) still have a legacy string watchlist entry`);
+
+        if (errors.length > 0) {
+            console.error('\nVERIFICATION FAILED:');
+            errors.forEach(e => console.error(`  ✗ ${e}`));
             process.exit(1);
         }
+
+        console.log('  ✓ Every profile has "watchProgress" and "watchlist" fields');
         console.log('  ✓ No profile has a legacy string watchlist entry');
         console.log('\nMigration complete.');
     } finally {
