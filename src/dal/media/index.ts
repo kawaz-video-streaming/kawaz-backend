@@ -56,6 +56,15 @@ export class MediaDal extends Dal<Media> {
     .exec()
     .then(result => result ?? { status: PENDING, percentage: 0 });
 
+  getMediaDuration = (mediaId: string): Promise<number | null> =>
+    this.model.findOne(
+      { _id: mediaId, status: COMPLETED },
+      { 'metadata.durationInMs': 1 }
+    )
+    .lean<{ metadata?: { durationInMs?: number } }>()
+    .exec()
+    .then((result) => result?.metadata?.durationInMs ?? null);
+
   getPendingMedia = async (mediaId: string): Promise<Media | null> =>
     this.model.findOne({ _id: mediaId, status: PENDING }).lean<Media>().exec();
 

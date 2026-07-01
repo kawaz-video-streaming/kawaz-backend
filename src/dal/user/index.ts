@@ -1,7 +1,7 @@
 import { Dal } from "@ido_kawaz/mongo-client";
-import { isNil, isNotNil } from "ramda";
+import { isNil, isNotNil, propEq } from "ramda";
 import { ADMIN_ROLE, Role } from "../../utils/types";
-import { APPROVED_STATUS, DENIED_STATUS, PENDING_STATUS, Profile, User, UserModel, UserProjection } from "./model";
+import { APPROVED_STATUS, DENIED_STATUS, PENDING_STATUS, Profile, User, UserModel, UserProjection, WatchlistItemKind, WatchProgressEntry } from "./model";
 
 export class UserDal extends Dal<User> {
   constructor(userModel: UserModel) {
@@ -58,12 +58,20 @@ export class UserDal extends Dal<User> {
     return true;
   };
 
+  getProfile = async (username: string, profileName: string): Promise<Profile | null> => {
+    const user = await this.findUser(username);
+    if (isNil(user)) {
+      return null;
+    }
+    return user.profiles.find(propEq(profileName, 'name')) ?? null;
+  };
+
   updateProfileAvatar = async (username: string, profileName: string, avatarId: string): Promise<boolean> => {
     const user = await this.findUser(username);
     if (isNil(user)) {
       return false;
     }
-    const profileIndex = user.profiles.findIndex((p) => p.name === profileName);
+    const profileIndex = user.profiles.findIndex(propEq(profileName, 'name'));
     if (profileIndex === -1) {
       return false;
     }
@@ -71,6 +79,44 @@ export class UserDal extends Dal<User> {
     await this.model.findOneAndUpdate({ name: username }, { profiles: user.profiles }).exec();
     return true;
   };
+
+  upsertWatchProgress = async (username: string, profileName: string, mediaId: string, positionInMs: number): Promise<boolean> => {
+    const user = await this.findUser(username);
+    if (isNil(user)) {
+      return false;
+    }
+    const profile = user.profiles.find(propEq(profileName, 'name'));
+    if (isNil(profile)) {
+      return false;
+    }
+    const entryIndex = profile.watchProgress.findIndex(propEq(mediaId, 'mediaId'));
+    const updatedEntry: WatchProgressEntry = { mediaId, positionInMs, updatedAt: new Date() };
+    if (entryIndex === -1) {
+      profile.watchProgress.push(updatedEntry);
+    } else {
+      profile.watchProgress[entryIndex] = updatedEntry;
+    }
+    await this.model.findOneAndUpdate({ name: username }, { profiles: user.profiles }).exec();
+    return true;
+  };
+
+  removeWatchProgress = (username: string, profileName: string, mediaId: string) =>
+    this.model.findOneAndUpdate(
+      { name: username, 'profiles.name': profileName },
+      { $pull: { 'profiles.$.watchProgress': { mediaId } } }
+    ).exec();
+
+  addToWatchlist = (username: string, profileName: string, id: string, kind: WatchlistItemKind) =>
+    this.model.findOneAndUpdate(
+      { name: username, 'profiles.name': profileName },
+      { $addToSet: { 'profiles.$.watchlist': { id, kind } } }
+    ).exec();
+
+  removeFromWatchlist = (username: string, profileName: string, id: string, kind: WatchlistItemKind) =>
+    this.model.findOneAndUpdate(
+      { name: username, 'profiles.name': profileName },
+      { $pull: { 'profiles.$.watchlist': { id, kind } } }
+    ).exec();
 
   deleteProfile = (name: string, profileName: string) =>
     this.model.findOneAndUpdate({ name }, { $pull: { profiles: { name: profileName } } }).exec();
