@@ -5,7 +5,7 @@ import { requestHandlerDecorator } from "../../utils/decorator";
 import { AuthenticatedRequest } from "../../utils/types";
 import { MediaAuthenticatedRequest } from "../types";
 import { createUserLogic } from "./logic";
-import { validateProfileMediaRequest, validateProfileNameRequest, validateUserProfileRequest, validateWatchProgressRequest } from "./types";
+import { validateProfileMediaRequest, validateProfileNameRequest, validateUserProfileRequest, validateWatchlistItemRequest, validateWatchProgressRequest } from "./types";
 
 export const createUserHandlers = (userDal: UserDal) => {
     const logicFactory = createUserLogic(userDal);
@@ -74,9 +74,9 @@ export const createUserHandlers = (userDal: UserDal) => {
             'upsert watch progress',
             async (req: Request, res: Response) => {
                 const { user: { username } } = req as AuthenticatedRequest;
-                const { mediaDal } = req as MediaAuthenticatedRequest;
+                const { mediaDal, mediaCollectionDal } = req as MediaAuthenticatedRequest;
                 const { body: { mediaId, positionInMs }, params: { profileName } } = validateWatchProgressRequest(req);
-                await logicFactory(mediaDal).upsertWatchProgress(username, profileName, mediaId, positionInMs);
+                await logicFactory(mediaDal, mediaCollectionDal).upsertWatchProgress(username, profileName, mediaId, positionInMs);
                 res.status(StatusCodes.OK).json({ message: "Watch progress updated" });
             }
         ),
@@ -85,9 +85,9 @@ export const createUserHandlers = (userDal: UserDal) => {
             'remove watch progress',
             async (req: Request, res: Response) => {
                 const { user: { username } } = req as AuthenticatedRequest;
-                const { mediaDal } = req as MediaAuthenticatedRequest;
+                const { mediaDal, mediaCollectionDal } = req as MediaAuthenticatedRequest;
                 const { params: { profileName, mediaId } } = validateProfileMediaRequest(req);
-                await logicFactory(mediaDal).removeWatchProgress(username, profileName, mediaId);
+                await logicFactory(mediaDal, mediaCollectionDal).removeWatchProgress(username, profileName, mediaId);
                 res.status(StatusCodes.OK).json({ message: "Watch progress removed" });
             }
         ),
@@ -96,9 +96,9 @@ export const createUserHandlers = (userDal: UserDal) => {
             'get continue watching',
             async (req: Request, res: Response) => {
                 const { user: { username } } = req as AuthenticatedRequest;
-                const { mediaDal } = req as MediaAuthenticatedRequest;
+                const { mediaDal, mediaCollectionDal } = req as MediaAuthenticatedRequest;
                 const { params: { profileName } } = validateProfileNameRequest(req);
-                const items = await logicFactory(mediaDal).getContinueWatching(username, profileName);
+                const items = await logicFactory(mediaDal, mediaCollectionDal).getContinueWatching(username, profileName);
                 res.status(StatusCodes.OK).json(items);
             }
         ),
@@ -107,9 +107,9 @@ export const createUserHandlers = (userDal: UserDal) => {
             'add to watchlist',
             async (req: Request, res: Response) => {
                 const { user: { username } } = req as AuthenticatedRequest;
-                const { mediaDal } = req as MediaAuthenticatedRequest;
-                const { params: { profileName, mediaId } } = validateProfileMediaRequest(req);
-                await logicFactory(mediaDal).addToWatchlist(username, profileName, mediaId);
+                const { mediaDal, mediaCollectionDal } = req as MediaAuthenticatedRequest;
+                const { params: { profileName, kind, id } } = validateWatchlistItemRequest(req);
+                await logicFactory(mediaDal, mediaCollectionDal).addToWatchlist(username, profileName, id, kind);
                 res.status(StatusCodes.OK).json({ message: "Added to watchlist" });
             }
         ),
@@ -118,9 +118,9 @@ export const createUserHandlers = (userDal: UserDal) => {
             'remove from watchlist',
             async (req: Request, res: Response) => {
                 const { user: { username } } = req as AuthenticatedRequest;
-                const { mediaDal } = req as MediaAuthenticatedRequest;
-                const { params: { profileName, mediaId } } = validateProfileMediaRequest(req);
-                await logicFactory(mediaDal).removeFromWatchlist(username, profileName, mediaId);
+                const { mediaDal, mediaCollectionDal } = req as MediaAuthenticatedRequest;
+                const { params: { profileName, kind, id } } = validateWatchlistItemRequest(req);
+                await logicFactory(mediaDal, mediaCollectionDal).removeFromWatchlist(username, profileName, id, kind);
                 res.status(StatusCodes.OK).json({ message: "Removed from watchlist" });
             }
         ),
@@ -129,9 +129,9 @@ export const createUserHandlers = (userDal: UserDal) => {
             'get watchlist',
             async (req: Request, res: Response) => {
                 const { user: { username } } = req as AuthenticatedRequest;
-                const { mediaDal } = req as MediaAuthenticatedRequest;
+                const { mediaDal, mediaCollectionDal } = req as MediaAuthenticatedRequest;
                 const { params: { profileName } } = validateProfileNameRequest(req);
-                const items = await logicFactory(mediaDal).getWatchlist(username, profileName);
+                const items = await logicFactory(mediaDal, mediaCollectionDal).getWatchlist(username, profileName);
                 res.status(StatusCodes.OK).json(items);
             }
         ),

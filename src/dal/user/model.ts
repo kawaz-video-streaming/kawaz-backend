@@ -21,11 +21,20 @@ export interface WatchProgressEntry {
   updatedAt: Date;
 }
 
+export const watchlistItemKinds = ["media", "collection"] as const;
+
+export type WatchlistItemKind = (typeof watchlistItemKinds)[number];
+
+export interface WatchlistEntry {
+  id: string;
+  kind: WatchlistItemKind;
+}
+
 export interface Profile {
   name: string;
   avatarId: string;
   watchProgress: WatchProgressEntry[];
-  watchlist: string[];
+  watchlist: WatchlistEntry[];
 }
 
 interface PasswordResetRequest {
@@ -59,11 +68,16 @@ const watchProgressEntrySchema = new Schema<WatchProgressEntry>({
   updatedAt: { type: Date, required: true },
 }, { _id: false });
 
+const watchlistEntrySchema = new Schema<WatchlistEntry>({
+  id: { type: String, required: true },
+  kind: { type: String, enum: watchlistItemKinds, required: true },
+}, { _id: false });
+
 const profileSchema = new Schema<Profile>({
   name: { type: String, required: true },
   avatarId: { type: String, required: true },
   watchProgress: { type: [watchProgressEntrySchema], default: [] },
-  watchlist: { type: [String], default: [] },
+  watchlist: { type: [watchlistEntrySchema], default: [] },
 });
 
 const passwordResetRequestSchema = new Schema<PasswordResetRequest>({

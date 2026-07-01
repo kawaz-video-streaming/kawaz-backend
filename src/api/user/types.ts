@@ -1,6 +1,7 @@
 import { Types } from "@ido_kawaz/mongo-client";
 import z from "zod";
 import { validateRequest } from "../../utils/zod";
+import { watchlistItemKinds } from "../../dal/user/model";
 
 interface UserProfileRequestBody {
     profileName: string;
@@ -87,6 +88,28 @@ const validatedProfileNameRequestSchema: z.ZodType<ValidatedProfileNameRequest> 
 });
 
 export const validateProfileNameRequest = validateRequest(validatedProfileNameRequestSchema);
+
+// Profile + watchlist item params (used by watchlist POST/DELETE)
+
+interface WatchlistItemRequestParams {
+    profileName: string;
+    kind: typeof watchlistItemKinds[number];
+    id: string;
+}
+
+export interface ValidatedWatchlistItemRequest {
+    params: WatchlistItemRequestParams;
+}
+
+const validatedWatchlistItemRequestSchema: z.ZodType<ValidatedWatchlistItemRequest> = z.object({
+    params: z.object({
+        profileName: z.string().min(1, "profileName is required"),
+        kind: z.enum(watchlistItemKinds),
+        id: z.string().min(1, "id is required"),
+    }),
+});
+
+export const validateWatchlistItemRequest = validateRequest(validatedWatchlistItemRequestSchema);
 
 // Response types
 

@@ -257,9 +257,9 @@ export const createUserRouter = (userDal: UserDal) => {
 
     /**
      * @openapi
-     * /user/profile/{profileName}/watchlist/{mediaId}:
+     * /user/profile/{profileName}/watchlist/{kind}/{id}:
      *   post:
-     *     summary: Add a media item to the profile watchlist
+     *     summary: Add a top-level movie, show, or collection to the profile watchlist
      *     tags: [User]
      *     security: [{ cookieAuth: [] }]
      *     parameters:
@@ -268,20 +268,26 @@ export const createUserRouter = (userDal: UserDal) => {
      *         required: true
      *         schema: { type: string }
      *       - in: path
-     *         name: mediaId
+     *         name: kind
+     *         required: true
+     *         schema: { type: string, enum: [media, collection] }
+     *       - in: path
+     *         name: id
      *         required: true
      *         schema: { type: string }
      *     responses:
      *       200: { description: Added to watchlist }
+     *       400: { description: Item is not a top-level movie, show, or collection }
      *       401: { description: Unauthorized }
+     *       404: { description: Media or collection not found }
      */
-    router.post("/profile/:profileName/watchlist/:mediaId", userHandlers.addToWatchlist);
+    router.post("/profile/:profileName/watchlist/:kind/:id", userHandlers.addToWatchlist);
 
     /**
      * @openapi
-     * /user/profile/{profileName}/watchlist/{mediaId}:
+     * /user/profile/{profileName}/watchlist/{kind}/{id}:
      *   delete:
-     *     summary: Remove a media item from the profile watchlist
+     *     summary: Remove a movie, show, or collection from the profile watchlist
      *     tags: [User]
      *     security: [{ cookieAuth: [] }]
      *     parameters:
@@ -290,14 +296,18 @@ export const createUserRouter = (userDal: UserDal) => {
      *         required: true
      *         schema: { type: string }
      *       - in: path
-     *         name: mediaId
+     *         name: kind
+     *         required: true
+     *         schema: { type: string, enum: [media, collection] }
+     *       - in: path
+     *         name: id
      *         required: true
      *         schema: { type: string }
      *     responses:
      *       200: { description: Removed from watchlist }
      *       401: { description: Unauthorized }
      */
-    router.delete("/profile/:profileName/watchlist/:mediaId", userHandlers.removeFromWatchlist);
+    router.delete("/profile/:profileName/watchlist/:kind/:id", userHandlers.removeFromWatchlist);
 
     /**
      * @openapi
@@ -312,7 +322,7 @@ export const createUserRouter = (userDal: UserDal) => {
      *         required: true
      *         schema: { type: string }
      *     responses:
-     *       200: { description: List of media in the watchlist }
+     *       200: { description: List of watchlist entries (id + kind) }
      *       401: { description: Unauthorized }
      */
     router.get("/profile/:profileName/watchlist", userHandlers.getWatchlist);

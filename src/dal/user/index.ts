@@ -1,7 +1,7 @@
 import { Dal } from "@ido_kawaz/mongo-client";
 import { isNil, isNotNil, propEq } from "ramda";
 import { ADMIN_ROLE, Role } from "../../utils/types";
-import { APPROVED_STATUS, DENIED_STATUS, PENDING_STATUS, Profile, User, UserModel, UserProjection, WatchProgressEntry } from "./model";
+import { APPROVED_STATUS, DENIED_STATUS, PENDING_STATUS, Profile, User, UserModel, UserProjection, WatchlistItemKind, WatchProgressEntry } from "./model";
 
 export class UserDal extends Dal<User> {
   constructor(userModel: UserModel) {
@@ -106,16 +106,16 @@ export class UserDal extends Dal<User> {
       { $pull: { 'profiles.$.watchProgress': { mediaId } } }
     ).exec();
 
-  addToWatchlist = (username: string, profileName: string, mediaId: string) =>
+  addToWatchlist = (username: string, profileName: string, id: string, kind: WatchlistItemKind) =>
     this.model.findOneAndUpdate(
       { name: username, 'profiles.name': profileName },
-      { $addToSet: { 'profiles.$.watchlist': mediaId } }
+      { $addToSet: { 'profiles.$.watchlist': { id, kind } } }
     ).exec();
 
-  removeFromWatchlist = (username: string, profileName: string, mediaId: string) =>
+  removeFromWatchlist = (username: string, profileName: string, id: string, kind: WatchlistItemKind) =>
     this.model.findOneAndUpdate(
       { name: username, 'profiles.name': profileName },
-      { $pull: { 'profiles.$.watchlist': mediaId } }
+      { $pull: { 'profiles.$.watchlist': { id, kind } } }
     ).exec();
 
   deleteProfile = (name: string, profileName: string) =>

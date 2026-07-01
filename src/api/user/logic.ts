@@ -1,11 +1,13 @@
-import { NotFoundError } from "@ido_kawaz/server-framework";
-import { isNil } from "ramda";
+import { BadRequestError, NotFoundError } from "@ido_kawaz/server-framework";
+import { isNil, isNotNil } from "ramda";
 import { MediaDal } from "../../dal/media";
+import { MediaCollectionDal } from "../../dal/mediaCollection";
 import { UserDal } from "../../dal/user";
+import { WatchlistEntry, WatchlistItemKind } from "../../dal/user/model";
 import { FINISHED_THRESHOLD_MS } from "./consts";
 import { ContinueWatchingItem } from "./types";
 
-export const createUserLogic = (userDal: UserDal) => (mediaDal: MediaDal) => ({
+export const createUserLogic = (userDal: UserDal) => (mediaDal: MediaDal, mediaCollectionDal: MediaCollectionDal) => ({
     upsertWatchProgress: async (username: string, profileName: string, mediaId: string, positionInMs: number): Promise<void> => {
         const success = await userDal.upsertWatchProgress(username, profileName, mediaId, positionInMs);
         if (!success) {
@@ -38,13 +40,31 @@ export const createUserLogic = (userDal: UserDal) => (mediaDal: MediaDal) => ({
             .map(({ mediaId, positionInMs }) => ({ mediaId, positionInMs }));
     },
 
-    addToWatchlist: (username: string, profileName: string, mediaId: string) =>
-        userDal.addToWatchlist(username, profileName, mediaId),
+    addToWatchlist: async (username: string, profileName: string, id: string, kind: WatchlistItemKind): Promise<void> => {
+        if (kind === "media") {
+            const media = await mediaDal.getMedia(id);
+            if (isNil(media)) {
+                throw new NotFoundError("Media not found");
+            }
+            if (media.kind !== "movie" || isNotNil(media.collectionId)) {
+                throw new BadRequestError("Only top-level movies can be added to the watchlist");
+            }
+        } else {
+            const collection = await mediaCollectionDal.getCollection(id);
+            if (isNil(collection)) {
+                throw new NotFoundError("Collection not found");
+            }
+            if (isNotNil(collection.collectionId)) {
+                throw new BadRequestError("Only top-level shows or collections can be added to the watchlist");
+            }
+        }
+        await userDal.addToWatchlist(username, profileName, id, kind);
+    },
 
-    removeFromWatchlist: (username: string, profileName: string, mediaId: string) =>
-        userDal.removeFromWatchlist(username, profileName, mediaId),
+    removeFromWatchlist: (username: string, profileName: string, id: string, kind: WatchlistItemKind) =>
+        userDal.removeFromWatchlist(username, profileName, id, kind),
 
-    getWatchlist: async (username: string, profileName: string): Promise<string[]> => {
+    getWatchlist: async (username: string, profileName: string): Promise<WatchlistEntry[]> => {
         const profile = await userDal.getProfile(username, profileName);
         if (isNil(profile)) {
             return [];
