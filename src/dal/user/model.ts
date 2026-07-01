@@ -15,9 +15,26 @@ export const statuses = [
 
 export type Status = (typeof statuses)[number];
 
+export interface WatchProgressEntry {
+  mediaId: string;
+  positionInMs: number;
+  updatedAt: Date;
+}
+
+export const watchlistItemKinds = ["media", "collection"] as const;
+
+export type WatchlistItemKind = (typeof watchlistItemKinds)[number];
+
+export interface WatchlistEntry {
+  id: string;
+  kind: WatchlistItemKind;
+}
+
 export interface Profile {
   name: string;
   avatarId: string;
+  watchProgress: WatchProgressEntry[];
+  watchlist: WatchlistEntry[];
 }
 
 interface PasswordResetRequest {
@@ -45,9 +62,22 @@ const userProjectionZodSchema: z.ZodType<UserProjection> = z.object({
 
 export const validateUserProjection = validateSchemaAndReturnValue(userProjectionZodSchema);
 
+const watchProgressEntrySchema = new Schema<WatchProgressEntry>({
+  mediaId: { type: String, required: true },
+  positionInMs: { type: Number, required: true },
+  updatedAt: { type: Date, required: true },
+}, { _id: false });
+
+const watchlistEntrySchema = new Schema<WatchlistEntry>({
+  id: { type: String, required: true },
+  kind: { type: String, enum: watchlistItemKinds, required: true },
+}, { _id: false });
+
 const profileSchema = new Schema<Profile>({
   name: { type: String, required: true },
   avatarId: { type: String, required: true },
+  watchProgress: { type: [watchProgressEntrySchema], default: [] },
+  watchlist: { type: [watchlistEntrySchema], default: [] },
 });
 
 const passwordResetRequestSchema = new Schema<PasswordResetRequest>({

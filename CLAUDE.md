@@ -86,6 +86,12 @@ Note: The upload AMQP consumer (src/background/upload/) is currently disabled.
 | `DELETE` | `/user/profile/:name` | Yes | Delete one of the authenticated user's profiles |
 | `GET` | `/user/profiles` | Yes | List all profiles for the authenticated user |
 | `DELETE` | `/user/account` | Yes | Permanently delete the authenticated user's account (record, email, password, profiles); clears session cookie |
+| `PUT` | `/user/profile/:profileName/progress` | Yes | Upsert watch progress entry (`{ mediaId, positionInMs }`) for a profile |
+| `DELETE` | `/user/profile/:profileName/progress/:mediaId` | Yes | Remove a watch progress entry for a specific media item |
+| `GET` | `/user/profile/:profileName/continueWatching` | Yes | List in-progress media as `{ mediaId, positionInMs }[]` (excludes items within last 3 minutes of end), sorted by most recent |
+| `POST` | `/user/profile/:profileName/watchlist/:kind/:id` | Yes | Add a top-level movie (`kind=media`) or show/collection (`kind=collection`) to the profile's watchlist; 400 if not top-level, 404 if it doesn't exist |
+| `DELETE` | `/user/profile/:profileName/watchlist/:kind/:id` | Yes | Remove an item from the profile's watchlist |
+| `GET` | `/user/profile/:profileName/watchlist` | Yes | List profile's watchlist as `{ id, kind }[]` |
 | `GET` | `/avatar` | Yes | List all avatars |
 | `GET` | `/avatar/:id` | Yes | Get a single avatar's metadata |
 | `GET` | `/avatar/:id/image` | Yes | Stream avatar image as `image/jpeg` with `Cache-Control: public, max-age=172800` |
@@ -180,6 +186,24 @@ Thumbnail is uploaded to storage at key `<thumbnailPrefix>/<mediaId>.jpg` by the
 ### User Model (`src/dal/user/model.ts`)
 
 ```ts
+interface WatchProgressEntry {
+  mediaId: string;
+  positionInMs: number;
+  updatedAt: Date;
+}
+
+interface WatchlistEntry {
+  id: string;
+  kind: "media" | "collection";         // "media" = top-level movie; "collection" = top-level show or collection
+}
+
+interface Profile {
+  name: string;
+  avatarId: string;
+  watchProgress: WatchProgressEntry[];  // upserted on play, removed when finished
+  watchlist: WatchlistEntry[];          // top-level movies, shows, or collections only — no episodes, seasons, or nested collections
+}
+
 interface User {
   name: string;               // unique username (unique index)
   password: string;           // bcrypt-hashed
@@ -225,7 +249,7 @@ All `@ido_kawaz/*` packages are listed as **devDependencies** (resolved locally 
 - **Nullable update fields**: `description` and `collectionId` use `z.string().nullish()` — sending `null` triggers a MongoDB `$unset`, omitting the field leaves the DB value unchanged.
 - **Shared types**: `BucketsConfig`, `Coordinates`, `UploadedFile`, `RequestWithIdParam` are defined in `src/utils/types.ts` and shared across modules. `MEDIA_TAGS`/`MediaTag` have been removed; genres are now free-form strings referencing `MediaGenre.name`. Shared API request augmentation types (`AvatarAuthenticatedRequest`, `MediaAuthenticatedRequest`) live in `src/api/types.ts`.
 - **BucketsConfig**: All storage bucket names and key prefixes are consolidated into a single `BucketsConfig` object (see `src/utils/types.ts`) passed down to media, mediaCollection, and upload consumer — no per-feature config interfaces for storage.
-- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia(MediaInfo)`, `updateMedia()`, `deleteMedia()`, `getAllMedia()`, `getMedia()`, `getPendingMedia()`, `getMediaUploadProgress()`, `getAllNoneCompletedMedia()`, `isCollectionEmpty()`, `isGenreEmpty(genreName)`. MediaCollection: `createCollection()`, `updateCollection()`, `deleteCollection()`, `getAllCollections()`, `getCollection()`, `isCollectionEmpty()`, `isGenreUsedInCollection(genre)`. MediaGenre: `getAllGenres()`, `getGenre(genreId)`, `verifyGenreExists(name)`, `createGenre(name)`, `deleteGenre(name)`. User: `createUser(name, password, email)`, `findUser()`, `verifyUser()`, `verifyEmail()`, `approveUser()`, `denyUser()`, `removeUser()`, `getPendingUsers()`, `promoteToAdmin()`, `createPasswordResetRequestForUser(email, tokenHash)`, `findUserByPasswordResetToken(tokenHash)`, `resetUserPassword(name, newPasswordHash)`. Avatar: `createAvatar()`, `deleteAvatar()`, `getAllAvatars()`, `getAvatarById()`, `isCategoryEmpty(categoryId)`. AvatarCategory: `getAllCategories()`, `getCategory(categoryId)`, `createCategory(name)`, `deleteCategory(categoryId)`, `verifyCategoryExists(categoryId)`.
+- **DAL pattern**: Each entity has a DAL class extending the framework's base `Dal`. Media: `createMedia(MediaInfo)`, `updateMedia()`, `deleteMedia()`, `getAllMedia()`, `getMedia()`, `getPendingMedia()`, `getMediaUploadProgress()`, `getAllNoneCompletedMedia()`, `isCollectionEmpty()`, `isGenreEmpty(genreName)`. MediaCollection: `createCollection()`, `updateCollection()`, `deleteCollection()`, `getAllCollections()`, `getCollection()`, `isCollectionEmpty()`, `isGenreUsedInCollection(genre)`. MediaGenre: `getAllGenres()`, `getGenre(genreId)`, `verifyGenreExists(name)`, `createGenre(name)`, `deleteGenre(name)`. User: `createUser(name, password, email)`, `findUser()`, `verifyUser()`, `verifyEmail()`, `approveUser()`, `denyUser()`, `removeUser()`, `getPendingUsers()`, `promoteToAdmin()`, `createPasswordResetRequestForUser(email, tokenHash)`, `findUserByPasswordResetToken(tokenHash)`, `resetUserPassword(name, newPasswordHash)`, `getProfile(username, profileName)`, `upsertWatchProgress(username, profileName, mediaId, positionInMs)`, `removeWatchProgress(username, profileName, mediaId)`, `addToWatchlist(username, profileName, id, kind)`, `removeFromWatchlist(username, profileName, id, kind)`. Avatar: `createAvatar()`, `deleteAvatar()`, `getAllAvatars()`, `getAvatarById()`, `isCategoryEmpty(categoryId)`. AvatarCategory: `getAllCategories()`, `getCategory(categoryId)`, `createCategory(name)`, `deleteCategory(categoryId)`, `verifyCategoryExists(categoryId)`.
 - **Role-based DAL routing**: `decideMediaAndMediaCollectionDalByUserRoleMiddleware` and `decideAvatarDalByUserRoleMiddleware` in `src/api/middleware.ts` inject the correct DAL pair onto the request before handlers run. Logic factories are curried: `createXLogic(staticDeps)(dalA, dalB)` — the second call happens per-request after the middleware has set the DALs. Asset-serving methods (`getManifest`, `getThumbnail`, `getTiles`, `getVtt`, `getAvatarImage`, collection `getThumbnail`) perform a DB existence check before hitting storage — this is the access-control gate. `getSegment` is exempt: segment filenames are opaque and only reachable after the manifest (which is gated) has been fetched.
 - **Native OAuth one-time code store**: `src/api/auth/nativeCodeStore.ts` — in-memory `Map<code, jwt>` with 60-second TTL. Used by the native Google callback to avoid putting JWTs in redirect URLs. Single-replica only; not safe for multi-instance deployments without a shared store.
 - **Colocated tests**: `__tests__/` directories next to the source they test.
