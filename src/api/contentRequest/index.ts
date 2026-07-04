@@ -59,6 +59,30 @@ export const createContentRequestRouter = (dals: Dals, mailer: Mailer, tmdbClien
 
     /**
      * @openapi
+     * /contentRequest/tmdb/show/{showId}/seasons:
+     *   get:
+     *     summary: List a TMDB show's seasons
+     *     description: Returns the season list (name, poster, episode count) for a TMDB show, for picking which season to request.
+     *     tags:
+     *       - ContentRequest
+     *     security:
+     *       - cookieAuth: []
+     *     parameters:
+     *       - in: path
+     *         name: showId
+     *         required: true
+     *         schema:
+     *           type: integer
+     *     responses:
+     *       200:
+     *         description: List of the show's seasons
+     *       401:
+     *         description: Unauthorized
+     */
+    router.get("/tmdb/show/:showId/seasons", handlers.getShowSeasons);
+
+    /**
+     * @openapi
      * /contentRequest:
      *   post:
      *     summary: Submit a content request
@@ -93,7 +117,7 @@ export const createContentRequestRouter = (dals: Dals, mailer: Mailer, tmdbClien
      *       401:
      *         description: Unauthorized
      */
-    router.get("/mine", handlers.getMyRequests);
+    router.get("/mine", requireRegularUser, handlers.getMyRequests);
 
     /**
      * @openapi

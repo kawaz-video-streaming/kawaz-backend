@@ -6,7 +6,7 @@ import { TmdbClient } from "../../services/tmdbClient";
 import { requestHandlerDecorator } from "../../utils/decorator";
 import { AuthenticatedRequest } from "../../utils/types";
 import { createContentRequestLogic } from "./logic";
-import { validateCreateContentRequestRequest, validateTmdbSearchRequest, validateUpdateContentRequestStatusRequest } from "./types";
+import { validateCreateContentRequestRequest, validateTmdbSearchRequest, validateTmdbShowSeasonsRequest, validateUpdateContentRequestStatusRequest } from "./types";
 
 export const createContentRequestHandlers = (dals: Dals, mailer: Mailer, tmdbClient: TmdbClient) => {
     const contentRequestLogic = createContentRequestLogic(dals, mailer, tmdbClient);
@@ -27,36 +27,44 @@ export const createContentRequestHandlers = (dals: Dals, mailer: Mailer, tmdbCli
                 res.status(StatusCodes.OK).json(results);
             }
         ),
+        getShowSeasons: requestHandlerDecorator(
+            "get tmdb show seasons for content request",
+            async (req: Request, res: Response) => {
+                const { showId } = validateTmdbShowSeasonsRequest(req);
+                const seasons = await contentRequestLogic.getShowSeasons(showId);
+                res.status(StatusCodes.OK).json(seasons);
+            }
+        ),
         createRequest: requestHandlerDecorator(
             "create content request",
             async (req: Request, res: Response) => {
                 const { user: { username } } = req as AuthenticatedRequest;
-                const { tmdbId, mediaType, title, year, posterPath } = validateCreateContentRequestRequest(req);
-                const request = await contentRequestLogic.createRequest(username, tmdbId, mediaType, title, year, posterPath);
-                res.status(StatusCodes.CREATED).json(request);
+                const { tmdbId, mediaType, title, year, posterPath, seasonNumber } = validateCreateContentRequestRequest(req);
+                const contentRequest = await contentRequestLogic.createRequest(username, tmdbId, mediaType, title, year, posterPath, seasonNumber);
+                res.status(StatusCodes.CREATED).json(contentRequest);
             }
         ),
         getMyRequests: requestHandlerDecorator(
             "get my content requests",
             async (req: Request, res: Response) => {
                 const { user: { username } } = req as AuthenticatedRequest;
-                const requests = await contentRequestLogic.getMyRequests(username);
-                res.status(StatusCodes.OK).json(requests);
+                const contentRequests = await contentRequestLogic.getMyRequests(username);
+                res.status(StatusCodes.OK).json(contentRequests);
             }
         ),
         getAllRequests: requestHandlerDecorator(
             "get all content requests",
             async (_req: Request, res: Response) => {
-                const requests = await contentRequestLogic.getAllRequests();
-                res.status(StatusCodes.OK).json(requests);
+                const contentRequests = await contentRequestLogic.getAllRequests();
+                res.status(StatusCodes.OK).json(contentRequests);
             }
         ),
         updateStatus: requestHandlerDecorator(
             "update content request status",
             async (req: Request, res: Response) => {
                 const { id, status, note } = validateUpdateContentRequestStatusRequest(req);
-                const request = await contentRequestLogic.updateStatus(id, status, note);
-                res.status(StatusCodes.OK).json(request);
+                const contentRequest = await contentRequestLogic.updateStatus(id, status, note);
+                res.status(StatusCodes.OK).json(contentRequest);
             }
         ),
     };

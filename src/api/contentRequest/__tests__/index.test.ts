@@ -40,6 +40,7 @@ type MockMailer = {
 type MockTmdbClient = {
     searchMovies: jest.Mock;
     searchShows: jest.Mock;
+    getShowSeasons: jest.Mock;
 };
 
 const makeApp = (userDal: MockUserDal, contentRequestDal: MockContentRequestDal, mailer: MockMailer, tmdbClient: MockTmdbClient): Application => {
@@ -84,6 +85,7 @@ const makeMailer = (overrides: Partial<MockMailer> = {}): MockMailer => ({
 const makeTmdbClient = (overrides: Partial<MockTmdbClient> = {}): MockTmdbClient => ({
     searchMovies: jest.fn().mockResolvedValue([{ id: 1, title: 'Dune' }]),
     searchShows: jest.fn().mockResolvedValue([{ id: 2, name: 'The Bear' }]),
+    getShowSeasons: jest.fn().mockResolvedValue([{ id: 100, name: 'Season 1', season_number: 1, episode_count: 8 }]),
     ...overrides,
 });
 
@@ -107,6 +109,28 @@ describe('GET /contentRequest/tmdb/search/movie', () => {
     });
 });
 
+describe('GET /contentRequest/tmdb/show/:showId/seasons', () => {
+    it('returns the season list for a show for any authenticated user', async () => {
+        const userToken = jwt.sign({ username: 'alice', role: 'user' }, AUTH_CONFIG.jwtSecret);
+        const tmdbClient = makeTmdbClient();
+        const app = makeApp(makeUserDal(), makeContentRequestDal(), makeMailer(), tmdbClient);
+
+        const response = await request(app)
+            .get('/contentRequest/tmdb/show/2/seasons')
+            .set('Cookie', `kawaz-token=${userToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual([{ id: 100, name: 'Season 1', season_number: 1, episode_count: 8 }]);
+        expect(tmdbClient.getShowSeasons).toHaveBeenCalledWith(2);
+    });
+
+    it('returns 401 when not authenticated', async () => {
+        const app = makeApp(makeUserDal(), makeContentRequestDal(), makeMailer(), makeTmdbClient());
+        const response = await request(app).get('/contentRequest/tmdb/show/2/seasons');
+        expect(response.status).toBe(401);
+    });
+});
+
 describe('POST /contentRequest', () => {
     it('returns 201 and creates a request for a regular user', async () => {
         const userToken = jwt.sign({ username: 'alice', role: 'user' }, AUTH_CONFIG.jwtSecret);
@@ -119,7 +143,49 @@ describe('POST /contentRequest', () => {
             .send({ tmdbId: 42, mediaType: 'movie', title: 'Dune', year: 2021, posterPath: '/poster.jpg' });
 
         expect(response.status).toBe(201);
-        expect(contentRequestDal.createRequest).toHaveBeenCalledWith('alice', 42, 'movie', 'Dune', 2021, '/poster.jpg');
+        expect(contentRequestDal.createRequest).toHaveBeenCalledWith('alice', 42, 'movie', 'Dune', 2021, '/poster.jpg', undefined);
+    });
+
+    it('creates a season request when mediaType is season and seasonNumber is provided', async () => {
+        const userToken = jwt.sign({ username: 'alice', role: 'user' }, AUTH_CONFIG.jwtSecret);
+        const contentRequestDal = makeContentRequestDal();
+        const app = makeApp(makeUserDal(), contentRequestDal, makeMailer(), makeTmdbClient());
+
+        const response = await request(app)
+            .post('/contentRequest')
+            .set('Cookie', `kawaz-token=${userToken}`)
+            .send({ tmdbId: 2, mediaType: 'season', title: 'The Bear', seasonNumber: 2 });
+
+        expect(response.status).toBe(201);
+        expect(contentRequestDal.createRequest).toHaveBeenCalledWith('alice', 2, 'season', 'The Bear', undefined, undefined, 2);
+    });
+
+    it('returns 400 when mediaType is season and seasonNumber is missing', async () => {
+        const userToken = jwt.sign({ username: 'alice', role: 'user' }, AUTH_CONFIG.jwtSecret);
+        const contentRequestDal = makeContentRequestDal();
+        const app = makeApp(makeUserDal(), contentRequestDal, makeMailer(), makeTmdbClient());
+
+        const response = await request(app)
+            .post('/contentRequest')
+            .set('Cookie', `kawaz-token=${userToken}`)
+            .send({ tmdbId: 2, mediaType: 'season', title: 'The Bear' });
+
+        expect(response.status).toBe(400);
+        expect(contentRequestDal.createRequest).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when seasonNumber is provided for a non-season mediaType', async () => {
+        const userToken = jwt.sign({ username: 'alice', role: 'user' }, AUTH_CONFIG.jwtSecret);
+        const contentRequestDal = makeContentRequestDal();
+        const app = makeApp(makeUserDal(), contentRequestDal, makeMailer(), makeTmdbClient());
+
+        const response = await request(app)
+            .post('/contentRequest')
+            .set('Cookie', `kawaz-token=${userToken}`)
+            .send({ tmdbId: 42, mediaType: 'movie', title: 'Dune', seasonNumber: 2 });
+
+        expect(response.status).toBe(400);
+        expect(contentRequestDal.createRequest).not.toHaveBeenCalled();
     });
 
     it('returns 401 when the requester is a special user', async () => {

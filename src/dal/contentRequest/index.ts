@@ -1,5 +1,6 @@
 import { Dal, Types } from "@ido_kawaz/mongo-client";
-import { ContentRequest, ContentRequestMediaType, ContentRequestModel, ContentRequestStatus } from "./model";
+import { isNotNil } from "ramda";
+import { ContentRequest, ContentRequestMediaType, ContentRequestModel, ContentRequestStatus, REQUESTED_STATUS } from "./model";
 
 export class ContentRequestDal extends Dal<ContentRequest> {
     constructor(model: ContentRequestModel) {
@@ -13,6 +14,7 @@ export class ContentRequestDal extends Dal<ContentRequest> {
         title: string,
         year?: number,
         posterPath?: string | null,
+        seasonNumber?: number,
     ): Promise<ContentRequest> => {
         const request: ContentRequest = {
             _id: new Types.ObjectId().toString(),
@@ -21,8 +23,9 @@ export class ContentRequestDal extends Dal<ContentRequest> {
             mediaType,
             title,
             year,
-            posterPath: posterPath ?? undefined,
-            status: "requested",
+            ...(isNotNil(seasonNumber) && { seasonNumber }),
+            ...(isNotNil(posterPath) && { posterPath }),
+            status: REQUESTED_STATUS,
             createdAt: new Date(),
             updatedAt: new Date(),
         };

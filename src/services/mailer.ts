@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { ContentRequestTerminalStatus } from "../dal/contentRequest/model";
 
 export interface MailerConfig {
   gmailUser: string;
@@ -100,7 +101,7 @@ export class Mailer {
   sendContentRequestStatusEmail = async (
     email: string,
     title: string,
-    status: "uploaded" | "rejected" | "failed",
+    status: ContentRequestTerminalStatus,
     note?: string,
   ): Promise<void> => {
     const { subject, message } = {

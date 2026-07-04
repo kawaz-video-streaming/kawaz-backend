@@ -1,6 +1,6 @@
 import { NotFoundError } from "@ido_kawaz/server-framework";
 import { isEmpty, isNil, isNotNil } from "ramda";
-import { TmdbCollectionDetails, TmdbCollectionDetailsRaw, TmdbEpisodeDetails, TmdbEpisodeDetailsRaw, TmdbGenre, TmdbMovieDetails, TmdbMovieDetailsRaw, TmdbMovieSearchResultItem, TmdbSeasonDetails, TmdbSeasonDetailsRaw, TmdbShowDetails, TmdbShowDetailsRaw, TmdbShowSearchResultItem, validateTmdbCollectionDetailsRaw, validateTmdbEpisodeDetailsRaw, validateTmdbGenreList, validateTmdbMovieDetailsRaw, validateTmdbSearchMovieResponse, validateTmdbSearchShowResponse, validateTmdbSeasonDetailsRaw, validateTmdbShowDetailsRaw } from "./types";
+import { TmdbCollectionDetails, TmdbCollectionDetailsRaw, TmdbEpisodeDetails, TmdbEpisodeDetailsRaw, TmdbGenre, TmdbMovieDetails, TmdbMovieDetailsRaw, TmdbMovieSearchResultItem, TmdbSeasonDetails, TmdbSeasonDetailsRaw, TmdbSeasonSummary, TmdbSeasonSummaryRaw, TmdbShowDetails, TmdbShowDetailsRaw, TmdbShowSearchResultItem, validateTmdbCollectionDetailsRaw, validateTmdbEpisodeDetailsRaw, validateTmdbGenreList, validateTmdbMovieDetailsRaw, validateTmdbSearchMovieResponse, validateTmdbSearchShowResponse, validateTmdbSeasonDetailsRaw, validateTmdbShowDetailsRaw, validateTmdbShowSeasonsRaw } from "./types";
 
 export interface TmdbConfig {
     readAccessToken: string;
@@ -29,6 +29,11 @@ export class TmdbClient {
     }
 
     private toSeasonDetails = (raw: TmdbSeasonDetailsRaw): TmdbSeasonDetails => {
+        const { poster_path, ...rest } = raw;
+        return { ...rest, poster_url: this.toImageUrl(poster_path) };
+    }
+
+    private toSeasonSummary = (raw: TmdbSeasonSummaryRaw): TmdbSeasonSummary => {
         const { poster_path, ...rest } = raw;
         return { ...rest, poster_url: this.toImageUrl(poster_path) };
     }
@@ -144,6 +149,14 @@ export class TmdbClient {
         const detailsJson = await this.getRequest(`/tv/${topResult.id}`);
         const rawDetails = validateTmdbShowDetailsRaw(detailsJson);
         return this.toShowDetails(rawDetails);
+    }
+
+    getShowSeasons = async (showId: number): Promise<TmdbSeasonSummary[]> => {
+        const detailsJson = await this.getRequest(`/tv/${showId}`);
+        const { seasons } = validateTmdbShowSeasonsRaw(detailsJson);
+        return seasons
+            .filter(({ season_number }) => season_number > 0)
+            .map(this.toSeasonSummary);
     }
 
     getCollectionDetails = async (id: number): Promise<TmdbCollectionDetails> => {
