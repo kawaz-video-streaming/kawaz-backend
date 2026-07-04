@@ -1,6 +1,6 @@
 import { Dal } from "@ido_kawaz/mongo-client";
 import { isNil, isNotNil, propEq } from "ramda";
-import { ADMIN_ROLE, Role } from "../../utils/types";
+import { ADMIN_ROLE, Role, SPECIAL_USER_ROLE } from "../../utils/types";
 import { APPROVED_STATUS, DENIED_STATUS, PENDING_STATUS, Profile, User, UserModel, UserProjection, WatchlistItemKind, WatchProgressEntry } from "./model";
 
 export class UserDal extends Dal<User> {
@@ -45,7 +45,7 @@ export class UserDal extends Dal<User> {
     this.model.find({ status: PENDING_STATUS }, { name: 1, email: 1 }).lean<UserProjection[]>().exec();
 
   getAllApprovedUserEmails = (): Promise<UserProjection[]> =>
-    this.model.find({ status: APPROVED_STATUS }, { name: 1, email: 1 }).lean<UserProjection[]>().exec();
+    this.model.find({ status: APPROVED_STATUS, role: { $ne: SPECIAL_USER_ROLE } }, { name: 1, email: 1 }).lean<UserProjection[]>().exec();
 
   createProfile = async (name: string, newProfile: Profile): Promise<boolean> => {
     const user = await this.findUser(name);
