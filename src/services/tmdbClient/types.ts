@@ -131,6 +131,16 @@ const TmdbMovieDetailsRawZodSchema: z.ZodType<TmdbMovieDetailsRaw> = z.object({
 export const validateTmdbSearchMovieResponse = validateSchemaAndReturnValue(TmdbSearchMovieResponseZodSchema);
 export const validateTmdbMovieDetailsRaw = validateSchemaAndReturnValue(TmdbMovieDetailsRawZodSchema);
 
+export interface TmdbMovieSearchResultItem {
+    id: number;
+    title: string;
+    overview: string;
+    release_date: string;
+    poster_url: string | null;
+    backdrop_url: string | null;
+    vote_average: number;
+}
+
 export interface TmdbSearchShowResult {
     id: number;
     name: string;
@@ -223,6 +233,16 @@ const TmdbShowDetailsRawZodSchema: z.ZodType<TmdbShowDetailsRaw> = z.object({
 
 export const validateTmdbSearchShowResponse = validateSchemaAndReturnValue(TmdbSearchShowResponseZodSchema);
 export const validateTmdbShowDetailsRaw = validateSchemaAndReturnValue(TmdbShowDetailsRawZodSchema);
+
+export interface TmdbShowSearchResultItem {
+    id: number;
+    name: string;
+    overview: string;
+    first_air_date: string;
+    poster_url: string | null;
+    backdrop_url: string | null;
+    vote_average: number;
+}
 
 // --- Collection details ---
 

@@ -1,6 +1,6 @@
 import { NotFoundError } from "@ido_kawaz/server-framework";
 import { isEmpty, isNil, isNotNil } from "ramda";
-import { TmdbCollectionDetails, TmdbCollectionDetailsRaw, TmdbEpisodeDetails, TmdbEpisodeDetailsRaw, TmdbGenre, TmdbMovieDetails, TmdbMovieDetailsRaw, TmdbSeasonDetails, TmdbSeasonDetailsRaw, TmdbShowDetails, TmdbShowDetailsRaw, validateTmdbCollectionDetailsRaw, validateTmdbEpisodeDetailsRaw, validateTmdbGenreList, validateTmdbMovieDetailsRaw, validateTmdbSearchMovieResponse, validateTmdbSearchShowResponse, validateTmdbSeasonDetailsRaw, validateTmdbShowDetailsRaw } from "./types";
+import { TmdbCollectionDetails, TmdbCollectionDetailsRaw, TmdbEpisodeDetails, TmdbEpisodeDetailsRaw, TmdbGenre, TmdbMovieDetails, TmdbMovieDetailsRaw, TmdbMovieSearchResultItem, TmdbSeasonDetails, TmdbSeasonDetailsRaw, TmdbShowDetails, TmdbShowDetailsRaw, TmdbShowSearchResultItem, validateTmdbCollectionDetailsRaw, validateTmdbEpisodeDetailsRaw, validateTmdbGenreList, validateTmdbMovieDetailsRaw, validateTmdbSearchMovieResponse, validateTmdbSearchShowResponse, validateTmdbSeasonDetailsRaw, validateTmdbShowDetailsRaw } from "./types";
 
 export interface TmdbConfig {
     readAccessToken: string;
@@ -80,6 +80,36 @@ export class TmdbClient {
             throw new Error(`TMDB API error: ${response.status} ${response.statusText}`);
         }
         return response.json();
+    }
+
+    searchMovies = async (title: string): Promise<TmdbMovieSearchResultItem[]> => {
+        const searchParams = new URLSearchParams({ query: title, language: "en-US" });
+        const searchJson = await this.getRequest("/search/movie", searchParams);
+        const { results } = validateTmdbSearchMovieResponse(searchJson);
+        return results.map(({ id, title, overview, release_date, poster_path, backdrop_path, vote_average }): TmdbMovieSearchResultItem => ({
+            id,
+            title,
+            overview,
+            release_date,
+            poster_url: this.toImageUrl(poster_path),
+            backdrop_url: this.toImageUrl(backdrop_path),
+            vote_average,
+        }));
+    }
+
+    searchShows = async (title: string): Promise<TmdbShowSearchResultItem[]> => {
+        const searchParams = new URLSearchParams({ query: title, language: "en-US" });
+        const searchJson = await this.getRequest("/search/tv", searchParams);
+        const { results } = validateTmdbSearchShowResponse(searchJson);
+        return results.map(({ id, name, overview, first_air_date, poster_path, backdrop_path, vote_average }): TmdbShowSearchResultItem => ({
+            id,
+            name,
+            overview,
+            first_air_date,
+            poster_url: this.toImageUrl(poster_path),
+            backdrop_url: this.toImageUrl(backdrop_path),
+            vote_average,
+        }));
     }
 
     getMovieDetails = async (title: string, year: number): Promise<TmdbMovieDetails> => {

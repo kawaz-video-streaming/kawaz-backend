@@ -3,6 +3,8 @@ import { AvatarDal } from "./avatar";
 import { AvatarModel } from "./avatar/model";
 import { AvatarCategoryDal } from "./avatarCategory";
 import { AvatarCategoryModel } from "./avatarCategory/model";
+import { ContentRequestDal } from "./contentRequest";
+import { ContentRequestModel } from "./contentRequest/model";
 import { MediaDal } from "./media";
 import { MediaModel } from "./media/model";
 import { MediaCollectionDal } from "./mediaCollection";
@@ -22,6 +24,7 @@ export interface Models extends Record<string, Model<any>> {
     specialAvatarModel: AvatarModel;
     avatarCategoryModel: AvatarCategoryModel;
     mediaGenreModel: MediaGenreModel;
+    contentRequestModel: ContentRequestModel;
 }
 
 
@@ -35,4 +38,5 @@ export interface Dals {
     specialAvatarDal: AvatarDal;
     avatarCategoryDal: AvatarCategoryDal;
     mediaGenreDal: MediaGenreDal;
+    contentRequestDal: ContentRequestDal;
 }
