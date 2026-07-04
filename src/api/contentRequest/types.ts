@@ -52,30 +52,37 @@ const updateContentRequestStatusRequestZodSchema = z.object({
 
 export const validateUpdateContentRequestStatusRequest = validateRequest(updateContentRequestStatusRequestZodSchema);
 
-interface TmdbSearchQuery {
+interface TmdbTitleYearQuery {
     title: string;
+    year: number;
 }
 
-const tmdbSearchQueryZodSchema = z.object({
+const tmdbTitleYearQueryZodSchema = z.object({
     title: z.string().min(1),
-}) satisfies z.ZodType<TmdbSearchQuery>;
+    year: z.coerce.number().int().positive(),
+}) satisfies z.ZodType<TmdbTitleYearQuery>;
 
-const tmdbSearchRequestZodSchema = z.object({
-    query: tmdbSearchQueryZodSchema,
+const tmdbTitleYearRequestZodSchema = z.object({
+    query: tmdbTitleYearQueryZodSchema,
 }).transform(({ query }) => query);
 
-export const validateTmdbSearchRequest = validateRequest(tmdbSearchRequestZodSchema);
+export const validateTmdbMovieRequest = validateRequest(tmdbTitleYearRequestZodSchema);
+export const validateTmdbShowRequest = validateRequest(tmdbTitleYearRequestZodSchema);
 
-interface TmdbShowIdParam {
-    showId: number;
+interface TmdbSeasonQuery {
+    showTitle: string;
+    showYear: number;
+    seasonNumber: number;
 }
 
-const tmdbShowIdParamZodSchema = z.object({
-    showId: z.coerce.number(),
-}) satisfies z.ZodType<TmdbShowIdParam>;
+const tmdbSeasonQueryZodSchema = z.object({
+    showTitle: z.string().min(1),
+    showYear: z.coerce.number().int().positive(),
+    seasonNumber: z.coerce.number().int().positive(),
+}) satisfies z.ZodType<TmdbSeasonQuery>;
 
-const tmdbShowSeasonsRequestZodSchema = z.object({
-    params: tmdbShowIdParamZodSchema,
-}).transform(({ params }) => params);
+const tmdbSeasonRequestZodSchema = z.object({
+    query: tmdbSeasonQueryZodSchema,
+}).transform(({ query }) => query);
 
-export const validateTmdbShowSeasonsRequest = validateRequest(tmdbShowSeasonsRequestZodSchema);
+export const validateTmdbSeasonRequest = validateRequest(tmdbSeasonRequestZodSchema);

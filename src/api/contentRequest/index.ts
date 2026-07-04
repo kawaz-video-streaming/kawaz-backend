@@ -11,10 +11,10 @@ export const createContentRequestRouter = (dals: Dals, mailer: Mailer, tmdbClien
 
     /**
      * @openapi
-     * /contentRequest/tmdb/search/movie:
+     * /contentRequest/tmdb/movie:
      *   get:
-     *     summary: Search TMDB for movies
-     *     description: Returns a list of TMDB movie search results for picking a request target.
+     *     summary: Look up a TMDB movie by title and year
+     *     description: Returns the top matching TMDB movie's details, for picking a request target.
      *     tags:
      *       - ContentRequest
      *     security:
@@ -25,61 +25,87 @@ export const createContentRequestRouter = (dals: Dals, mailer: Mailer, tmdbClien
      *         required: true
      *         schema:
      *           type: string
-     *     responses:
-     *       200:
-     *         description: List of matching TMDB movies
-     *       401:
-     *         description: Unauthorized
-     */
-    router.get("/tmdb/search/movie", handlers.searchMovies);
-
-    /**
-     * @openapi
-     * /contentRequest/tmdb/search/show:
-     *   get:
-     *     summary: Search TMDB for shows
-     *     description: Returns a list of TMDB TV show search results for picking a request target.
-     *     tags:
-     *       - ContentRequest
-     *     security:
-     *       - cookieAuth: []
-     *     parameters:
      *       - in: query
-     *         name: title
-     *         required: true
-     *         schema:
-     *           type: string
-     *     responses:
-     *       200:
-     *         description: List of matching TMDB shows
-     *       401:
-     *         description: Unauthorized
-     */
-    router.get("/tmdb/search/show", handlers.searchShows);
-
-    /**
-     * @openapi
-     * /contentRequest/tmdb/show/{showId}/seasons:
-     *   get:
-     *     summary: List a TMDB show's seasons
-     *     description: Returns the season list (name, poster, episode count) for a TMDB show, for picking which season to request.
-     *     tags:
-     *       - ContentRequest
-     *     security:
-     *       - cookieAuth: []
-     *     parameters:
-     *       - in: path
-     *         name: showId
+     *         name: year
      *         required: true
      *         schema:
      *           type: integer
      *     responses:
      *       200:
-     *         description: List of the show's seasons
+     *         description: The matching TMDB movie's details
      *       401:
      *         description: Unauthorized
+     *       404:
+     *         description: No matching movie found
      */
-    router.get("/tmdb/show/:showId/seasons", handlers.getShowSeasons);
+    router.get("/tmdb/movie", handlers.getMovieTmdbDetails);
+
+    /**
+     * @openapi
+     * /contentRequest/tmdb/show:
+     *   get:
+     *     summary: Look up a TMDB show by title and year
+     *     description: Returns the top matching TMDB show's details, for picking a request target.
+     *     tags:
+     *       - ContentRequest
+     *     security:
+     *       - cookieAuth: []
+     *     parameters:
+     *       - in: query
+     *         name: title
+     *         required: true
+     *         schema:
+     *           type: string
+     *       - in: query
+     *         name: year
+     *         required: true
+     *         schema:
+     *           type: integer
+     *     responses:
+     *       200:
+     *         description: The matching TMDB show's details
+     *       401:
+     *         description: Unauthorized
+     *       404:
+     *         description: No matching show found
+     */
+    router.get("/tmdb/show", handlers.getShowTmdbDetails);
+
+    /**
+     * @openapi
+     * /contentRequest/tmdb/season:
+     *   get:
+     *     summary: Look up a TMDB season by show title, show year, and season number
+     *     description: Returns the matching TMDB season's details, for picking a specific season to request.
+     *     tags:
+     *       - ContentRequest
+     *     security:
+     *       - cookieAuth: []
+     *     parameters:
+     *       - in: query
+     *         name: showTitle
+     *         required: true
+     *         schema:
+     *           type: string
+     *       - in: query
+     *         name: showYear
+     *         required: true
+     *         schema:
+     *           type: integer
+     *       - in: query
+     *         name: seasonNumber
+     *         required: true
+     *         schema:
+     *           type: integer
+     *     responses:
+     *       200:
+     *         description: The matching TMDB season's details
+     *       401:
+     *         description: Unauthorized
+     *       404:
+     *         description: No matching show found
+     */
+    router.get("/tmdb/season", handlers.getSeasonTmdbDetails);
 
     /**
      * @openapi

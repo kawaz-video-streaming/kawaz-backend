@@ -11,9 +11,9 @@ export const createContentRequestLogic = (
     mailer: Mailer,
     tmdbClient: TmdbClient,
 ) => ({
-    searchMovies: (title: string) => tmdbClient.searchMovies(title),
-    searchShows: (title: string) => tmdbClient.searchShows(title),
-    getShowSeasons: (showId: number) => tmdbClient.getShowSeasons(showId),
+    getMovieTmdbDetails: (title: string, year: number) => tmdbClient.getMovieDetails(title, year),
+    getShowTmdbDetails: (title: string, year: number) => tmdbClient.getShowDetails(title, year),
+    getSeasonTmdbDetails: (showTitle: string, showYear: number, seasonNumber: number) => tmdbClient.getSeasonDetails(showTitle, showYear, seasonNumber),
     createRequest: (
         username: string,
         tmdbId: number,

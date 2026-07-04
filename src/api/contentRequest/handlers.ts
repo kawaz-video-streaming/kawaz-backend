@@ -6,33 +6,33 @@ import { TmdbClient } from "../../services/tmdbClient";
 import { requestHandlerDecorator } from "../../utils/decorator";
 import { AuthenticatedRequest } from "../../utils/types";
 import { createContentRequestLogic } from "./logic";
-import { validateCreateContentRequestRequest, validateTmdbSearchRequest, validateTmdbShowSeasonsRequest, validateUpdateContentRequestStatusRequest } from "./types";
+import { validateCreateContentRequestRequest, validateTmdbMovieRequest, validateTmdbSeasonRequest, validateTmdbShowRequest, validateUpdateContentRequestStatusRequest } from "./types";
 
 export const createContentRequestHandlers = (dals: Dals, mailer: Mailer, tmdbClient: TmdbClient) => {
     const contentRequestLogic = createContentRequestLogic(dals, mailer, tmdbClient);
     return {
-        searchMovies: requestHandlerDecorator(
-            "search tmdb movies for content request",
+        getMovieTmdbDetails: requestHandlerDecorator(
+            "get tmdb movie details for content request",
             async (req: Request, res: Response) => {
-                const { title } = validateTmdbSearchRequest(req);
-                const results = await contentRequestLogic.searchMovies(title);
-                res.status(StatusCodes.OK).json(results);
+                const { title, year } = validateTmdbMovieRequest(req);
+                const details = await contentRequestLogic.getMovieTmdbDetails(title, year);
+                res.status(StatusCodes.OK).json(details);
             }
         ),
-        searchShows: requestHandlerDecorator(
-            "search tmdb shows for content request",
+        getShowTmdbDetails: requestHandlerDecorator(
+            "get tmdb show details for content request",
             async (req: Request, res: Response) => {
-                const { title } = validateTmdbSearchRequest(req);
-                const results = await contentRequestLogic.searchShows(title);
-                res.status(StatusCodes.OK).json(results);
+                const { title, year } = validateTmdbShowRequest(req);
+                const details = await contentRequestLogic.getShowTmdbDetails(title, year);
+                res.status(StatusCodes.OK).json(details);
             }
         ),
-        getShowSeasons: requestHandlerDecorator(
-            "get tmdb show seasons for content request",
+        getSeasonTmdbDetails: requestHandlerDecorator(
+            "get tmdb season details for content request",
             async (req: Request, res: Response) => {
-                const { showId } = validateTmdbShowSeasonsRequest(req);
-                const seasons = await contentRequestLogic.getShowSeasons(showId);
-                res.status(StatusCodes.OK).json(seasons);
+                const { showTitle, showYear, seasonNumber } = validateTmdbSeasonRequest(req);
+                const details = await contentRequestLogic.getSeasonTmdbDetails(showTitle, showYear, seasonNumber);
+                res.status(StatusCodes.OK).json(details);
             }
         ),
         createRequest: requestHandlerDecorator(

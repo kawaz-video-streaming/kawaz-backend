@@ -29,9 +29,9 @@ const makeMailer = (overrides: Partial<Record<keyof Mailer, jest.Mock>> = {}) =>
 
 const makeTmdbClient = (overrides: Partial<Record<keyof TmdbClient, jest.Mock>> = {}) =>
     ({
-        searchMovies: jest.fn(),
-        searchShows: jest.fn(),
-        getShowSeasons: jest.fn(),
+        getMovieDetails: jest.fn(),
+        getShowDetails: jest.fn(),
+        getSeasonDetails: jest.fn(),
         ...overrides,
     }) as unknown as TmdbClient;
 
@@ -137,27 +137,27 @@ describe('createContentRequestLogic.updateStatus', () => {
     });
 });
 
-describe('createContentRequestLogic tmdb search', () => {
-    it('delegates searchMovies/searchShows to the tmdb client', async () => {
+describe('createContentRequestLogic tmdb lookups', () => {
+    it('delegates getMovieTmdbDetails/getShowTmdbDetails to the tmdb client', async () => {
         const tmdbClient = makeTmdbClient({
-            searchMovies: jest.fn().mockResolvedValue([{ id: 1, title: 'Dune' }]),
-            searchShows: jest.fn().mockResolvedValue([{ id: 2, name: 'The Bear' }]),
+            getMovieDetails: jest.fn().mockResolvedValue({ id: 1, title: 'Dune' }),
+            getShowDetails: jest.fn().mockResolvedValue({ id: 2, name: 'The Bear' }),
         });
         const logic = createContentRequestLogic({ contentRequestDal: makeContentRequestDal(), userDal: makeUserDal() } as any, makeMailer(), tmdbClient);
 
-        expect(await logic.searchMovies('Dune')).toEqual([{ id: 1, title: 'Dune' }]);
-        expect(await logic.searchShows('The Bear')).toEqual([{ id: 2, name: 'The Bear' }]);
-        expect(tmdbClient.searchMovies).toHaveBeenCalledWith('Dune');
-        expect(tmdbClient.searchShows).toHaveBeenCalledWith('The Bear');
+        expect(await logic.getMovieTmdbDetails('Dune', 2021)).toEqual({ id: 1, title: 'Dune' });
+        expect(await logic.getShowTmdbDetails('The Bear', 2022)).toEqual({ id: 2, name: 'The Bear' });
+        expect(tmdbClient.getMovieDetails).toHaveBeenCalledWith('Dune', 2021);
+        expect(tmdbClient.getShowDetails).toHaveBeenCalledWith('The Bear', 2022);
     });
 
-    it('delegates getShowSeasons to the tmdb client', async () => {
+    it('delegates getSeasonTmdbDetails to the tmdb client', async () => {
         const tmdbClient = makeTmdbClient({
-            getShowSeasons: jest.fn().mockResolvedValue([{ id: 100, name: 'Season 1', season_number: 1, episode_count: 8 }]),
+            getSeasonDetails: jest.fn().mockResolvedValue({ id: 100, name: 'Season 1', season_number: 1 }),
         });
         const logic = createContentRequestLogic({ contentRequestDal: makeContentRequestDal(), userDal: makeUserDal() } as any, makeMailer(), tmdbClient);
 
-        expect(await logic.getShowSeasons(2)).toEqual([{ id: 100, name: 'Season 1', season_number: 1, episode_count: 8 }]);
-        expect(tmdbClient.getShowSeasons).toHaveBeenCalledWith(2);
+        expect(await logic.getSeasonTmdbDetails('The Bear', 2022, 1)).toEqual({ id: 100, name: 'Season 1', season_number: 1 });
+        expect(tmdbClient.getSeasonDetails).toHaveBeenCalledWith('The Bear', 2022, 1);
     });
 });

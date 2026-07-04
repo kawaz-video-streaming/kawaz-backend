@@ -131,16 +131,6 @@ const TmdbMovieDetailsRawZodSchema: z.ZodType<TmdbMovieDetailsRaw> = z.object({
 export const validateTmdbSearchMovieResponse = validateSchemaAndReturnValue(TmdbSearchMovieResponseZodSchema);
 export const validateTmdbMovieDetailsRaw = validateSchemaAndReturnValue(TmdbMovieDetailsRawZodSchema);
 
-export interface TmdbMovieSearchResultItem {
-    id: number;
-    title: string;
-    overview: string;
-    release_date: string;
-    poster_url: string | null;
-    backdrop_url: string | null;
-    vote_average: number;
-}
-
 export interface TmdbSearchShowResult {
     id: number;
     name: string;
@@ -193,46 +183,6 @@ export interface TmdbShowDetails {
     tagline: string;
 }
 
-export interface TmdbSeasonSummaryRaw {
-    id: number;
-    name: string;
-    overview: string;
-    season_number: number;
-    episode_count: number;
-    air_date: string | null;
-    poster_path: string | null;
-}
-
-export interface TmdbSeasonSummary {
-    id: number;
-    name: string;
-    overview: string;
-    season_number: number;
-    episode_count: number;
-    air_date: string | null;
-    poster_url: string | null;
-}
-
-interface TmdbShowSeasonsRaw {
-    seasons: TmdbSeasonSummaryRaw[];
-}
-
-const TmdbSeasonSummaryRawZodSchema: z.ZodType<TmdbSeasonSummaryRaw> = z.object({
-    id: z.number(),
-    name: z.string(),
-    overview: z.string(),
-    season_number: z.number(),
-    episode_count: z.number(),
-    air_date: z.string().nullable(),
-    poster_path: z.string().nullable(),
-});
-
-const TmdbShowSeasonsRawZodSchema: z.ZodType<TmdbShowSeasonsRaw> = z.object({
-    seasons: z.array(TmdbSeasonSummaryRawZodSchema),
-});
-
-export const validateTmdbShowSeasonsRaw = validateSchemaAndReturnValue(TmdbShowSeasonsRawZodSchema);
-
 const TmdbShowZodSchema: z.ZodType<TmdbSearchShowResult> = z.object({
     id: z.number(),
     name: z.string(),
@@ -273,16 +223,6 @@ const TmdbShowDetailsRawZodSchema: z.ZodType<TmdbShowDetailsRaw> = z.object({
 
 export const validateTmdbSearchShowResponse = validateSchemaAndReturnValue(TmdbSearchShowResponseZodSchema);
 export const validateTmdbShowDetailsRaw = validateSchemaAndReturnValue(TmdbShowDetailsRawZodSchema);
-
-export interface TmdbShowSearchResultItem {
-    id: number;
-    name: string;
-    overview: string;
-    first_air_date: string;
-    poster_url: string | null;
-    backdrop_url: string | null;
-    vote_average: number;
-}
 
 // --- Collection details ---
 
