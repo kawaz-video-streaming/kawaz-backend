@@ -5,6 +5,7 @@ import { Mailer } from "../../services/mailer";
 import { TmdbClient } from "../../services/tmdbClient";
 import { requestHandlerDecorator } from "../../utils/decorator";
 import { AuthenticatedRequest } from "../../utils/types";
+import { validateRequestWithId } from "../../utils/zod";
 import { createContentRequestLogic } from "./logic";
 import { validateCreateContentRequestRequest, validateTmdbMovieRequest, validateTmdbSeasonRequest, validateTmdbShowRequest, validateUpdateContentRequestStatusRequest } from "./types";
 
@@ -65,6 +66,15 @@ export const createContentRequestHandlers = (dals: Dals, mailer: Mailer, tmdbCli
                 const { id, status, note } = validateUpdateContentRequestStatusRequest(req);
                 const contentRequest = await contentRequestLogic.updateStatus(id, status, note);
                 res.status(StatusCodes.OK).json(contentRequest);
+            }
+        ),
+        deleteRequest: requestHandlerDecorator(
+            "delete content request",
+            async (req: Request, res: Response) => {
+                const { user: { username, role } } = req as AuthenticatedRequest;
+                const { params: { id } } = validateRequestWithId(req);
+                await contentRequestLogic.deleteRequest(username, role, id);
+                res.status(StatusCodes.OK).json({ message: "Content request deleted" });
             }
         ),
     };

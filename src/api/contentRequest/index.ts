@@ -191,5 +191,31 @@ export const createContentRequestRouter = (dals: Dals, mailer: Mailer, tmdbClien
      */
     router.patch("/:id/status", requireAdmin, handlers.updateStatus);
 
+    /**
+     * @openapi
+     * /contentRequest/{id}:
+     *   delete:
+     *     summary: Delete a content request
+     *     description: Admins can delete any content request. Regular users can only delete their own request, and only while it's still in the "requested" status.
+     *     tags:
+     *       - ContentRequest
+     *     security:
+     *       - cookieAuth: []
+     *     parameters:
+     *       - in: path
+     *         name: id
+     *         required: true
+     *         schema:
+     *           type: string
+     *     responses:
+     *       200:
+     *         description: Content request deleted
+     *       401:
+     *         description: Not authenticated, not the requester, or the request is no longer pending
+     *       404:
+     *         description: Content request not found
+     */
+    router.delete("/:id", handlers.deleteRequest);
+
     return router;
 };

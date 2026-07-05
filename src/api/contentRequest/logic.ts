@@ -1,9 +1,10 @@
-import { NotFoundError } from "@ido_kawaz/server-framework";
+import { NotFoundError, UnauthorizedError } from "@ido_kawaz/server-framework";
 import { isNil } from "ramda";
 import { Dals } from "../../dal/types";
-import { ContentRequestMediaType, ContentRequestUpdatableStatus } from "../../dal/contentRequest/model";
+import { ContentRequestMediaType, ContentRequestUpdatableStatus, REQUESTED_STATUS } from "../../dal/contentRequest/model";
 import { Mailer } from "../../services/mailer";
 import { TmdbClient } from "../../services/tmdbClient";
+import { ADMIN_ROLE, Role } from "../../utils/types";
 import { buildDisplayTitle, isTerminalStatus } from "./utils";
 
 export const createContentRequestLogic = (
@@ -38,5 +39,20 @@ export const createContentRequestLogic = (
             }
         }
         return updatedRequest;
+    },
+    deleteRequest: async (username: string, role: Role, id: string) => {
+        const existingRequest = await contentRequestDal.getRequestById(id);
+        if (isNil(existingRequest)) {
+            throw new NotFoundError(`Content request with id ${id} not found`);
+        }
+        if (role !== ADMIN_ROLE) {
+            if (existingRequest.username !== username) {
+                throw new UnauthorizedError("You can only delete your own content requests");
+            }
+            if (existingRequest.status !== REQUESTED_STATUS) {
+                throw new UnauthorizedError("Only pending requests can be deleted");
+            }
+        }
+        await contentRequestDal.deleteRequest(id);
     },
 });

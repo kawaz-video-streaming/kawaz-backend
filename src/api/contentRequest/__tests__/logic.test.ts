@@ -1,4 +1,4 @@
-import { NotFoundError } from '@ido_kawaz/server-framework';
+import { NotFoundError, UnauthorizedError } from '@ido_kawaz/server-framework';
 import { ContentRequestDal } from '../../../dal/contentRequest';
 import { UserDal } from '../../../dal/user';
 import { Mailer } from '../../../services/mailer';
@@ -12,6 +12,7 @@ const makeContentRequestDal = (overrides: Partial<Record<keyof ContentRequestDal
         getAllRequests: jest.fn(),
         getRequestById: jest.fn(),
         updateRequestStatus: jest.fn(),
+        deleteRequest: jest.fn(),
         ...overrides,
     }) as unknown as ContentRequestDal;
 
@@ -134,6 +135,53 @@ describe('createContentRequestLogic.updateStatus', () => {
 
         expect(contentRequestDal.updateRequestStatus).toHaveBeenCalledWith('1', 'rejected', 'duplicate');
         expect(mailer.sendContentRequestStatusEmail).toHaveBeenCalledWith('alice@example.com', 'Dune', 'rejected', 'duplicate');
+    });
+});
+
+describe('createContentRequestLogic.deleteRequest', () => {
+    it('throws NotFoundError when the request does not exist', async () => {
+        const contentRequestDal = makeContentRequestDal({ getRequestById: jest.fn().mockResolvedValue(null) });
+        const logic = createContentRequestLogic({ contentRequestDal, userDal: makeUserDal() } as any, makeMailer(), makeTmdbClient());
+
+        await expect(logic.deleteRequest('alice', 'user', 'missing-id')).rejects.toThrow(NotFoundError);
+    });
+
+    it('allows a regular user to delete their own pending request', async () => {
+        const existingRequest = { _id: '1', username: 'alice', tmdbId: 42, mediaType: 'movie', title: 'Dune', status: 'requested' };
+        const contentRequestDal = makeContentRequestDal({ getRequestById: jest.fn().mockResolvedValue(existingRequest) });
+        const logic = createContentRequestLogic({ contentRequestDal, userDal: makeUserDal() } as any, makeMailer(), makeTmdbClient());
+
+        await logic.deleteRequest('alice', 'user', '1');
+
+        expect(contentRequestDal.deleteRequest).toHaveBeenCalledWith('1');
+    });
+
+    it('rejects a regular user deleting someone else\'s request', async () => {
+        const existingRequest = { _id: '1', username: 'bob', tmdbId: 42, mediaType: 'movie', title: 'Dune', status: 'requested' };
+        const contentRequestDal = makeContentRequestDal({ getRequestById: jest.fn().mockResolvedValue(existingRequest) });
+        const logic = createContentRequestLogic({ contentRequestDal, userDal: makeUserDal() } as any, makeMailer(), makeTmdbClient());
+
+        await expect(logic.deleteRequest('alice', 'user', '1')).rejects.toThrow(UnauthorizedError);
+        expect(contentRequestDal.deleteRequest).not.toHaveBeenCalled();
+    });
+
+    it('rejects a regular user deleting their own non-pending request', async () => {
+        const existingRequest = { _id: '1', username: 'alice', tmdbId: 42, mediaType: 'movie', title: 'Dune', status: 'acknowledged' };
+        const contentRequestDal = makeContentRequestDal({ getRequestById: jest.fn().mockResolvedValue(existingRequest) });
+        const logic = createContentRequestLogic({ contentRequestDal, userDal: makeUserDal() } as any, makeMailer(), makeTmdbClient());
+
+        await expect(logic.deleteRequest('alice', 'user', '1')).rejects.toThrow(UnauthorizedError);
+        expect(contentRequestDal.deleteRequest).not.toHaveBeenCalled();
+    });
+
+    it('allows an admin to delete any request regardless of owner or status', async () => {
+        const existingRequest = { _id: '1', username: 'bob', tmdbId: 42, mediaType: 'movie', title: 'Dune', status: 'uploaded' };
+        const contentRequestDal = makeContentRequestDal({ getRequestById: jest.fn().mockResolvedValue(existingRequest) });
+        const logic = createContentRequestLogic({ contentRequestDal, userDal: makeUserDal() } as any, makeMailer(), makeTmdbClient());
+
+        await logic.deleteRequest('admin', 'admin', '1');
+
+        expect(contentRequestDal.deleteRequest).toHaveBeenCalledWith('1');
     });
 });
 

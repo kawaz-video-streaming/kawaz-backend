@@ -31,6 +31,7 @@ type MockContentRequestDal = {
     getAllRequests: jest.Mock;
     getRequestById: jest.Mock;
     updateRequestStatus: jest.Mock;
+    deleteRequest: jest.Mock;
 };
 
 type MockMailer = {
@@ -74,6 +75,7 @@ const makeContentRequestDal = (overrides: Partial<MockContentRequestDal> = {}): 
     getAllRequests: jest.fn().mockResolvedValue([contentRequest]),
     getRequestById: jest.fn().mockResolvedValue(contentRequest),
     updateRequestStatus: jest.fn().mockResolvedValue({ ...contentRequest, status: 'acknowledged' }),
+    deleteRequest: jest.fn().mockResolvedValue({ deletedCount: 1 }),
     ...overrides,
 });
 
@@ -347,5 +349,84 @@ describe('PATCH /contentRequest/:id/status', () => {
 
         expect(response.status).toBe(401);
         expect(contentRequestDal.updateRequestStatus).not.toHaveBeenCalled();
+    });
+});
+
+describe('DELETE /contentRequest/:id', () => {
+    it('allows a regular user to delete their own pending request', async () => {
+        const userToken = jwt.sign({ username: 'alice', role: 'user' }, AUTH_CONFIG.jwtSecret);
+        const contentRequestDal = makeContentRequestDal();
+        const app = makeApp(makeUserDal(), contentRequestDal, makeMailer(), makeTmdbClient());
+
+        const response = await request(app)
+            .delete(`/contentRequest/${contentRequest._id}`)
+            .set('Cookie', `kawaz-token=${userToken}`);
+
+        expect(response.status).toBe(200);
+        expect(contentRequestDal.deleteRequest).toHaveBeenCalledWith(contentRequest._id);
+    });
+
+    it("returns 401 when a regular user tries to delete someone else's request", async () => {
+        const userToken = jwt.sign({ username: 'alice', role: 'user' }, AUTH_CONFIG.jwtSecret);
+        const contentRequestDal = makeContentRequestDal({
+            getRequestById: jest.fn().mockResolvedValue({ ...contentRequest, username: 'bob' }),
+        });
+        const app = makeApp(makeUserDal(), contentRequestDal, makeMailer(), makeTmdbClient());
+
+        const response = await request(app)
+            .delete(`/contentRequest/${contentRequest._id}`)
+            .set('Cookie', `kawaz-token=${userToken}`);
+
+        expect(response.status).toBe(401);
+        expect(contentRequestDal.deleteRequest).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 when a regular user tries to delete their own non-pending request', async () => {
+        const userToken = jwt.sign({ username: 'alice', role: 'user' }, AUTH_CONFIG.jwtSecret);
+        const contentRequestDal = makeContentRequestDal({
+            getRequestById: jest.fn().mockResolvedValue({ ...contentRequest, status: 'acknowledged' }),
+        });
+        const app = makeApp(makeUserDal(), contentRequestDal, makeMailer(), makeTmdbClient());
+
+        const response = await request(app)
+            .delete(`/contentRequest/${contentRequest._id}`)
+            .set('Cookie', `kawaz-token=${userToken}`);
+
+        expect(response.status).toBe(401);
+        expect(contentRequestDal.deleteRequest).not.toHaveBeenCalled();
+    });
+
+    it('allows an admin to delete any request regardless of owner or status', async () => {
+        const adminToken = jwt.sign({ username: 'admin', role: 'admin' }, AUTH_CONFIG.jwtSecret);
+        const userDal = makeUserDal({ findUser: jest.fn().mockResolvedValue({ name: 'admin', email: 'admin@example.com', role: 'admin' }) });
+        const contentRequestDal = makeContentRequestDal({
+            getRequestById: jest.fn().mockResolvedValue({ ...contentRequest, username: 'bob', status: 'uploaded' }),
+        });
+        const app = makeApp(userDal, contentRequestDal, makeMailer(), makeTmdbClient());
+
+        const response = await request(app)
+            .delete(`/contentRequest/${contentRequest._id}`)
+            .set('Cookie', `kawaz-token=${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(contentRequestDal.deleteRequest).toHaveBeenCalledWith(contentRequest._id);
+    });
+
+    it('returns 404 when the request does not exist', async () => {
+        const userToken = jwt.sign({ username: 'alice', role: 'user' }, AUTH_CONFIG.jwtSecret);
+        const contentRequestDal = makeContentRequestDal({ getRequestById: jest.fn().mockResolvedValue(null) });
+        const app = makeApp(makeUserDal(), contentRequestDal, makeMailer(), makeTmdbClient());
+
+        const response = await request(app)
+            .delete(`/contentRequest/${contentRequest._id}`)
+            .set('Cookie', `kawaz-token=${userToken}`);
+
+        expect(response.status).toBe(404);
+    });
+
+    it('returns 401 when not authenticated', async () => {
+        const app = makeApp(makeUserDal(), makeContentRequestDal(), makeMailer(), makeTmdbClient());
+        const response = await request(app).delete(`/contentRequest/${contentRequest._id}`);
+        expect(response.status).toBe(401);
     });
 });

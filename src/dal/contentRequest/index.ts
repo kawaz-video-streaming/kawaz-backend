@@ -1,4 +1,4 @@
-import { Dal, Types } from "@ido_kawaz/mongo-client";
+import { Dal, DeleteResult, Types } from "@ido_kawaz/mongo-client";
 import { isNotNil } from "ramda";
 import { ContentRequest, ContentRequestMediaType, ContentRequestModel, ContentRequestStatus, REQUESTED_STATUS } from "./model";
 
@@ -44,4 +44,7 @@ export class ContentRequestDal extends Dal<ContentRequest> {
 
     updateRequestStatus = (id: string, status: ContentRequestStatus, adminNote?: string): Promise<ContentRequest | null> =>
         this.model.findByIdAndUpdate(id, { status, ...(adminNote && { adminNote }) }, { new: true }).lean<ContentRequest>().exec();
+
+    deleteRequest = (id: string): Promise<DeleteResult> =>
+        this.model.deleteOne({ _id: id }).lean().exec();
 }
