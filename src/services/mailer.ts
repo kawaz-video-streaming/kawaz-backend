@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { ContentRequestTerminalStatus } from "../dal/contentRequest/model";
 
 export interface MailerConfig {
   gmailUser: string;
@@ -95,6 +96,53 @@ export class Mailer {
         html,
       });
     }
+  };
+
+  sendContentRequestStatusEmail = async (
+    email: string,
+    title: string,
+    status: ContentRequestTerminalStatus,
+    note?: string,
+  ): Promise<void> => {
+    const { subject, message } = {
+      uploaded: {
+        subject: `${title} is now available on Kawaz+!`,
+        message: `Good news — the content you requested, <strong>${title}</strong>, has been added to Kawaz+. Go check it out!`,
+      },
+      rejected: {
+        subject: `Update on your request for ${title}`,
+        message: `Unfortunately your request for <strong>${title}</strong> was declined.${note ? ` Reason: ${note}` : ""}`,
+      },
+      failed: {
+        subject: `Update on your request for ${title}`,
+        message: `We tried to add <strong>${title}</strong> to Kawaz+ but weren't able to complete it.${note ? ` Details: ${note}` : ""}`,
+      },
+    }[status];
+    const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:20px;background:#09090b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <div style="max-width:600px;margin:0 auto;background:#18181b;border-radius:12px;padding:32px;">
+    <div style="font-size:28px;font-weight:900;color:#ffffff;margin-bottom:24px;letter-spacing:-1px;">
+      Kawaz<span style="color:#ef4444;">+</span>
+    </div>
+    <div style="font-size:20px;font-weight:600;color:#ffffff;margin-bottom:16px;">${subject}</div>
+    <div style="font-size:15px;color:#a1a1aa;line-height:1.7;">
+      ${message}
+    </div>
+    <div style="margin-top:32px;padding-top:16px;border-top:1px solid #27272a;font-size:12px;color:#52525b;">
+      You're receiving this email because you requested this content on Kawaz+.<br>
+      <a href="${this.config.appDomain}" style="color:#ef4444;">${this.config.appDomain}</a>
+    </div>
+  </div>
+</body>
+</html>`;
+    await this.transport.sendMail({
+      from: this.config.gmailUser,
+      to: email,
+      subject,
+      html,
+    });
   };
 
   sendPasswordResetEmail = async (email: string, token: string): Promise<void> => {

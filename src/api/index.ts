@@ -11,6 +11,7 @@ import { createAdminRouter } from "./admin";
 import { createAuthRouter } from "./auth";
 import { createAvatarRouter } from "./avatar";
 import { createAvatarCategoryRouter } from "./avatarCategory";
+import { createContentRequestRouter } from "./contentRequest";
 import { createMediaRouter } from "./media";
 import { createMediaCollectionRouter } from "./mediaCollection";
 import { createMediaGenreRouter } from "./mediaGenre";
@@ -63,5 +64,6 @@ export const registerRoutes = (
     app.use("/media", decideMediaAndMediaCollectionDalByUserRoleMiddleware(dals), createMediaRouter(config.bucketsConfig, mediaGenreDal, amqpClient, storageClient, tmdbClient));
     app.use("/mediaCollection", decideMediaAndMediaCollectionDalByUserRoleMiddleware(dals), createMediaCollectionRouter(config.bucketsConfig, mediaGenreDal, storageClient));
     app.use("/mediaGenre", createMediaGenreRouter(dals));
+    app.use("/contentRequest", createContentRequestRouter(dals, mailer, tmdbClient));
     return app;
 };
