@@ -43,6 +43,15 @@ export const requireAdmin = (req: Request, res: Response, next: NextFunction): v
     next();
 }
 
+export const requireRegularUser = (req: Request, res: Response, next: NextFunction): void => {
+    const authenticatedReq = req as AuthenticatedRequest;
+    if (authenticatedReq.user.role !== USER_ROLE) {
+        res.status(401).json({ message: "Regular user access required" });
+        return;
+    }
+    next();
+}
+
 export const decideAvatarDalByUserRoleMiddleware = ({ avatarDal, specialAvatarDal }: Dals) => (req: Request, res: Response, next: NextFunction): void => {
     const authenticatedReq = req as AuthenticatedRequest;
     if (authenticatedReq.user.role === USER_ROLE) {

@@ -12,6 +12,8 @@ import { UserDal } from "./user";
 import { createUserModel } from "./user/model";
 import { createMediaGenreModel } from "./mediaGenre/model";
 import { MediaGenreDal } from "./mediaGenre";
+import { createContentRequestModel } from "./contentRequest/model";
+import { ContentRequestDal } from "./contentRequest";
 
 export const createModels = (client: MongoClient): Models => {
     return {
@@ -23,7 +25,8 @@ export const createModels = (client: MongoClient): Models => {
         avatarModel: createAvatarModel(client),
         specialAvatarModel: createSpecialAvatarModel(client),
         avatarCategoryModel: createAvatarCategoryModel(client),
-        mediaGenreModel: createMediaGenreModel(client)
+        mediaGenreModel: createMediaGenreModel(client),
+        contentRequestModel: createContentRequestModel(client)
     };
 }
 
@@ -36,7 +39,8 @@ export const createDals = ({
     avatarModel,
     specialAvatarModel,
     avatarCategoryModel,
-    mediaGenreModel
+    mediaGenreModel,
+    contentRequestModel
 }: Models): Dals => {
     return {
         mediaDal: new MediaDal(mediaModel),
@@ -47,6 +51,7 @@ export const createDals = ({
         avatarDal: new AvatarDal(avatarModel),
         specialAvatarDal: new AvatarDal(specialAvatarModel),
         avatarCategoryDal: new AvatarCategoryDal(avatarCategoryModel),
-        mediaGenreDal: new MediaGenreDal(mediaGenreModel)
+        mediaGenreDal: new MediaGenreDal(mediaGenreModel),
+        contentRequestDal: new ContentRequestDal(contentRequestModel)
     };
 }
