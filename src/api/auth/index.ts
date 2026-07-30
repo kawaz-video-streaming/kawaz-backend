@@ -44,7 +44,7 @@ export const createAuthRouter = (authConfig: AuthConfig, mailer: Mailer, userDal
    *               properties:
    *                 token:
    *                   type: string
-   *                   description: Signed JWT token (expires in 2 days)
+   *                   description: Signed JWT token (expires in 30 days)
    *       400:
    *         description: Invalid request body
    *       409:
@@ -84,7 +84,7 @@ export const createAuthRouter = (authConfig: AuthConfig, mailer: Mailer, userDal
    *               properties:
    *                 token:
    *                   type: string
-   *                   description: Signed JWT token (expires in 2 days)
+   *                   description: Signed JWT token (expires in 30 days)
    *       400:
    *         description: Invalid request body
    *       401:
