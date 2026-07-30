@@ -171,7 +171,7 @@ Returns `200 OK` if service is running.
 
 - Content type: `application/json`
 - Body: `{ "username": string, "password": string }`
-- Success response: `200 { "message": "Login successful" }` + sets `kawaz-token` HttpOnly cookie (maxAge: 2 days)
+- Success response: `200 { "message": "Login successful" }` + sets `kawaz-token` HttpOnly cookie (maxAge: 30 days)
 - Error responses: `400` (invalid body), `401` (invalid credentials or account not yet approved / denied)
 
 ### `POST /auth/promote`

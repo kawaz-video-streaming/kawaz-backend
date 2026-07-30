@@ -9,6 +9,7 @@ import * as jsonwebtoken from "jsonwebtoken";
 import { UserDal } from "../../../dal/user";
 import { Mailer } from "../../../services/mailer";
 import { USER_ROLE } from "../../../utils/types";
+import { JWT_EXPIRATION } from "../consts";
 import { createAuthLogic } from "../logic";
 
 jest.mock("bcrypt");
@@ -174,7 +175,7 @@ describe("createAuthLogic.login", () => {
     expect(mockedSign).toHaveBeenCalledWith(
       { username: "ido", role: USER_ROLE },
       AUTH_CONFIG.jwtSecret,
-      { expiresIn: "2d" },
+      { expiresIn: JWT_EXPIRATION },
     );
     expect(result).toEqual({ token: "signed-token", role: USER_ROLE, username: "ido" });
   });
@@ -262,7 +263,7 @@ describe("createAuthLogic.googleCallback", () => {
     const token = await logic.googleCallback("auth-code");
 
     expect(token).toBe("signed-token");
-    expect(mockedSign).toHaveBeenCalledWith({ username: "John Doe", role: USER_ROLE }, AUTH_CONFIG.jwtSecret, { expiresIn: "2d" });
+    expect(mockedSign).toHaveBeenCalledWith({ username: "John Doe", role: USER_ROLE }, AUTH_CONFIG.jwtSecret, { expiresIn: JWT_EXPIRATION });
   });
 
   it("throws UnauthorizedError for a non-approved existing user", async () => {
@@ -366,7 +367,7 @@ describe("createAuthLogic.googleDevicePoll", () => {
     const result = await logic.googleDevicePoll("device-code-123");
 
     expect(result).toEqual({ status: "approved", token: "signed-token", username: "John Doe", role: USER_ROLE });
-    expect(mockedSign).toHaveBeenCalledWith({ username: "John Doe", role: USER_ROLE }, AUTH_CONFIG.jwtSecret, { expiresIn: "2d" });
+    expect(mockedSign).toHaveBeenCalledWith({ username: "John Doe", role: USER_ROLE }, AUTH_CONFIG.jwtSecret, { expiresIn: JWT_EXPIRATION });
   });
 
   it("returns pending for a non-approved existing user", async () => {
@@ -463,7 +464,7 @@ describe("createAuthLogic.appleSignIn", () => {
     const result = await logic.appleSignIn("apple-sub-123", "ido@example.com");
 
     expect(result).toEqual({ token: "signed-token", role: USER_ROLE, username: "ido" });
-    expect(mockedSign).toHaveBeenCalledWith({ username: "ido", role: USER_ROLE }, AUTH_CONFIG.jwtSecret, { expiresIn: "2d" });
+    expect(mockedSign).toHaveBeenCalledWith({ username: "ido", role: USER_ROLE }, AUTH_CONFIG.jwtSecret, { expiresIn: JWT_EXPIRATION });
     expect(userDal.findUserByEmail).not.toHaveBeenCalled();
   });
 

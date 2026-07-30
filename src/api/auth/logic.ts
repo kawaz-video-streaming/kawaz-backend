@@ -7,7 +7,7 @@ import { UserDal } from "../../dal/user";
 import { APPROVED_STATUS, DENIED_STATUS, PENDING_STATUS } from "../../dal/user/model";
 import { Mailer } from "../../services/mailer";
 import { Role, USER_ROLE } from "../../utils/types";
-import { NON_USERNAME_CHARS } from "./consts";
+import { JWT_EXPIRATION, NON_USERNAME_CHARS } from "./consts";
 import { AuthConfig, TokenPayload } from "./types";
 import { fetchGoogleAccessToken, fetchGoogleDeviceCode, fetchGoogleDeviceToken, fetchGoogleUserInfo } from "./utils";
 
@@ -45,7 +45,7 @@ export const createAuthLogic = (
     const token = sign(
       createUserTokenPayload(user.name, user.role),
       jwtSecret,
-      { expiresIn: "2d" },
+      { expiresIn: JWT_EXPIRATION },
     );
     return { token, role: user.role, username: user.name };
   },
@@ -61,7 +61,7 @@ export const createAuthLogic = (
         const token = sign(
           createUserTokenPayload(existingUser.name, existingUser.role),
           jwtSecret,
-          { expiresIn: "2d" },
+          { expiresIn: JWT_EXPIRATION },
         );
         return token;
       }
@@ -104,7 +104,7 @@ export const createAuthLogic = (
       const token = sign(
         createUserTokenPayload(existingUser.name, existingUser.role),
         jwtSecret,
-        { expiresIn: "2d" },
+        { expiresIn: JWT_EXPIRATION },
       );
       return { status: APPROVED_STATUS, token, username: existingUser.name, role: existingUser.role };
     }
@@ -123,7 +123,7 @@ export const createAuthLogic = (
       if (userByAppleId.status !== APPROVED_STATUS) {
         return null;
       }
-      const token = sign(createUserTokenPayload(userByAppleId.name, userByAppleId.role), jwtSecret, { expiresIn: "2d" });
+      const token = sign(createUserTokenPayload(userByAppleId.name, userByAppleId.role), jwtSecret, { expiresIn: JWT_EXPIRATION });
       return { token, role: userByAppleId.role, username: userByAppleId.name };
     }
     const userByEmail = await userDal.findUserByEmail(email);
@@ -132,7 +132,7 @@ export const createAuthLogic = (
         return null;
       }
       await userDal.linkAppleId(userByEmail.name, appleId);
-      const token = sign(createUserTokenPayload(userByEmail.name, userByEmail.role), jwtSecret, { expiresIn: "2d" });
+      const token = sign(createUserTokenPayload(userByEmail.name, userByEmail.role), jwtSecret, { expiresIn: JWT_EXPIRATION });
       return { token, role: userByEmail.role, username: userByEmail.name };
     }
     const baseName = deriveUsername(email, givenName, familyName);
