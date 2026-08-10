@@ -21,6 +21,13 @@ export class Mailer {
         pass: config.gmailAppPassword,
       },
       tls: { rejectUnauthorized: false },
+      // Gmail throttles/421s accounts that open many short-lived connections in a burst
+      // (which is what happens sending one-connection-per-email in a tight loop).
+      // Pooling + a conservative rate limit keeps newsletter sends under that threshold.
+      pool: true,
+      maxConnections: 1,
+      rateLimit: 1,
+      rateDelta: 1000,
     });
 
   sendApprovalRequestEmail = async (username: string, email: string): Promise<void> => {
@@ -89,12 +96,16 @@ export class Mailer {
   </div>
 </body>
 </html>`;
-      await this.transport.sendMail({
-        from: this.config.gmailUser,
-        to: recipient.email,
-        subject,
-        html,
-      });
+      try {
+        await this.transport.sendMail({
+          from: this.config.gmailUser,
+          to: recipient.email,
+          subject,
+          html,
+        });
+      } catch (error) {
+        console.error(`Failed to send newsletter to ${recipient.email}: ${(error as Error).message}`);
+      }
     }
   };
 
